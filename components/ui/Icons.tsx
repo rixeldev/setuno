@@ -399,3 +399,219 @@ export const BoostIcon = (props: any) => (
     {...props}
   />
 )
+
+/* ------------------------------------------------------------------------- */
+/* Stage Book icons                                                          */
+/* Musical, editorial and navigation symbols used across the product.        */
+/* ------------------------------------------------------------------------- */
+
+export interface IconProps {
+  size?: number
+  color?: string
+}
+
+export const MusicIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="musical-notes" size={size} color={color} {...rest} />
+)
+
+export const NoteIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="musical-note" size={size} color={color} {...rest} />
+)
+
+export const MicIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="mic" size={size} color={color} {...rest} />
+)
+
+export const MicOffIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="mic-off" size={size} color={color} {...rest} />
+)
+
+export const GuitarIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="guitar-pick" size={size} color={color} {...rest} />
+)
+
+export const LibraryIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="library" size={size} color={color} {...rest} />
+)
+
+export const SearchIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="search" size={size} color={color} {...rest} />
+)
+
+export const TrashIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="trash-outline" size={size} color={color} {...rest} />
+)
+
+export const PlusIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="add" size={size} color={color} {...rest} />
+)
+
+export const SaveIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="checkmark-done" size={size} color={color} {...rest} />
+)
+
+export const ChevronRightIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="chevron-forward" size={size} color={color} {...rest} />
+)
+
+export const ChevronDownIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="chevron-down" size={size} color={color} {...rest} />
+)
+
+export const ChevronUpIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="chevron-up" size={size} color={color} {...rest} />
+)
+
+export const ArrowLeftIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="arrow-back" size={size} color={color} {...rest} />
+)
+
+export const ArrowDownIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="arrow-down" size={size} color={color} {...rest} />
+)
+
+export const ArrowUpwardIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="arrow-up" size={size} color={color} {...rest} />
+)
+
+export const AlertIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="alert-circle" size={size} color={color} {...rest} />
+)
+
+export const CheckCircleIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="checkmark-circle" size={size} color={color} {...rest} />
+)
+
+export const ClockIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="time-outline" size={size} color={color} {...rest} />
+)
+
+export const KeyIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="key" size={size} color={color} {...rest} />
+)
+
+export const TextSizeIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="format-size" size={size} color={color} {...rest} />
+)
+
+export const TransposeIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="git-compare-outline" size={size} color={color} {...rest} />
+)
+
+export const SettingsIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="settings-outline" size={size} color={color} {...rest} />
+)
+
+export const MenuIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="menu" size={size} color={color} {...rest} />
+)
+
+export const SwapIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="swap-horizontal" size={size} color={color} {...rest} />
+)
+
+export const SortIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="swap-vertical" size={size} color={color} {...rest} />
+)
+
+export const ExpandIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="expand-outline" size={size} color={color} {...rest} />
+)
+
+export const CollapseIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="contract-outline" size={size} color={color} {...rest} />
+)
+
+export const DragIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="reorder-three-outline" size={size} color={color} {...rest} />
+)
+
+export const LogoIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="guitar-electric" size={size} color={color} {...rest} />
+)
+
+/* Filter / list navigation icons used by search and menu screens. */
+export const FilterIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="funnel-outline" size={size} color={color} {...rest} />
+)
+
+export const TuneIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="options-outline" size={size} color={color} {...rest} />
+)
+
+export const DotsIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="ellipsis-horizontal" size={size} color={color} {...rest} />
+)
+
+export const BookIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="book-open-page-variant-outline" size={size} color={color} {...rest} />
+)
+
+export const PlaylistIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="playlist-music" size={size} color={color} {...rest} />
+)
+
+export const CalendarOutlineIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="calendar-outline" size={size} color={color} {...rest} />
+)
+
+export const CalendarCheckIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="calendar-check" size={size} color={color} {...rest} />
+)
+
+export const SignOutIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="logout" size={size} color={color} {...rest} />
+)
+
+export const AccountIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="account-circle" size={size} color={color} {...rest} />
+)
+
+export const ShieldCheckIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="shield-checkmark" size={size} color={color} {...rest} />
+)
+
+export const PaletteIconNew = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="color-palette-outline" size={size} color={color} {...rest} />
+)
+
+export const PencilIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="pencil" size={size} color={color} {...rest} />
+)
+
+export const CopyListIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="content-copy" size={size} color={color} {...rest} />
+)
+
+export const StageIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="guitar-electric" size={size} color={color} {...rest} />
+)
+
+export const MapPinIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="map-marker-outline" size={size} color={color} {...rest} />
+)
+
+export const EmailIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="email-outline" size={size} color={color} {...rest} />
+)
+
+export const GroupIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="account-group" size={size} color={color} {...rest} />
+)
+
+export const FullscreenIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="fullscreen" size={size} color={color} {...rest} />
+)
+
+export const FullscreenExitIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="fullscreen-exit" size={size} color={color} {...rest} />
+)
+
+export const SuggestIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="lightbulb-on-outline" size={size} color={color} {...rest} />
+)
+
+/** Band / organization mark used in settings and navigation. */
+export const OrganizationIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="business-outline" size={size} color={color} {...rest} />
+)

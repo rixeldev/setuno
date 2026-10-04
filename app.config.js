@@ -1,6 +1,7 @@
 export default {
   expo: {
-    name: "StageBook",
+    owner: "rikirilis",
+    name: "Stage Book",
     slug: "stage-book",
     scheme: "stagebook",
     version: "1.0.0",
@@ -86,7 +87,7 @@ export default {
     extra: {
       router: {},
       eas: {
-        projectId: "",
+        projectId: "dd8d3677-ef3a-463a-b2dd-faa1012f920a",
       },
     },
   },

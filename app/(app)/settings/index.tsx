@@ -1,0 +1,276 @@
+import React, { useState } from "react"
+import { Pressable, StyleSheet, View } from "react-native"
+import { useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
+
+import { Theme } from "@/constants/Theme"
+import { useThemedStyles } from "@/hooks/useThemedStyles"
+import { AppText } from "@/components/ui/AppText"
+import { Avatar } from "@/components/ui/Avatar"
+import { Badge, Card, Divider } from "@/components/ui/Card"
+import { Dialog } from "@/components/ui/Dialog"
+import { useToast } from "@/components/ui/Toast"
+import {
+  AccountIcon,
+  ChevronRightIcon,
+  GroupIcon,
+  LogoutIcon,
+  OrganizationIcon,
+  PaletteIconNew,
+} from "@/components/ui/Icons"
+import { ScreenContainer } from "@/components/app/ScreenContainer"
+import { useAuth } from "@/hooks/useAuth"
+import { useOrganization } from "@/hooks/useOrganization"
+import { useOrgData } from "@/hooks/useOrgData"
+import { getAppearance } from "@/services/themeManager"
+import { ACCENTS } from "@/libs/appearance"
+import { toFriendlyError } from "@/services/errors"
+import { pluralize } from "@/libs/format"
+import { ROLE_LABELS } from "@/interfaces"
+
+interface RowProps {
+  icon: React.ComponentType<{ size?: number; color?: string }>
+  title: string
+  subtitle?: string
+  onPress: () => void
+  danger?: boolean
+}
+
+/**
+ * Settings hub: profile summary, links to the settings sub-screens and the
+ * sign-out confirmation.
+ */
+export default function SettingsScreen() {
+  const { t } = useTranslation()
+  const styles = useThemedStyles(createStyles)
+  const router = useRouter()
+  const toast = useToast()
+  const { profile, user, signOut } = useAuth()
+  const { organization, role, organizations } = useOrganization()
+  const { songs, setlists, performances, members } = useOrgData()
+  const [confirmSignOut, setConfirmSignOut] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+
+  const displayName = profile?.displayName ?? user?.displayName ?? ""
+  const email = user?.email ?? profile?.email ?? ""
+  const appearance = getAppearance()
+  const modeLabel =
+    appearance.mode === "dark" ? t("settings.dark") : t("settings.light")
+
+  const handleSignOut = async () => {
+    setSigningOut(true)
+    try {
+      await signOut()
+      toast.showSuccess(t("toasts.signedOut"))
+    } catch (error) {
+      toast.showError(toFriendlyError(error))
+    } finally {
+      setSigningOut(false)
+      setConfirmSignOut(false)
+    }
+  }
+
+  return (
+    <ScreenContainer
+      title={t("settings.settings")}
+      subtitle={t("settings.subtitle", { defaultValue: "Your account and band" })}
+      large
+    >
+      <Card style={styles.card}>
+        <View style={styles.profile}>
+          <Avatar name={displayName || email} size={56} />
+          <View style={styles.profileText}>
+            <AppText variant="title" numberOfLines={1}>
+              {displayName || email}
+            </AppText>
+            {email ? (
+              <AppText variant="caption" tone="muted" numberOfLines={1}>
+                {email}
+              </AppText>
+            ) : null}
+            {role ? (
+              <Badge
+                label={
+                  isOwner(user?.uid, organization?.ownerId)
+                    ? t("organizations.owner")
+                    : ROLE_LABELS[role]
+                }
+                tone="primary"
+                style={styles.badge}
+              />
+            ) : null}
+          </View>
+        </View>
+        <Divider />
+        <Row
+          icon={AccountIcon}
+          title={t("settings.profile")}
+          subtitle={displayName}
+          onPress={() => router.push("/settings/profile")}
+        />
+      </Card>
+
+      <Card style={styles.card}>
+        <Row
+          icon={OrganizationIcon}
+          title={t("settings.organization")}
+          subtitle={organization?.name}
+          onPress={() => router.push("/settings/organization")}
+        />
+        <Divider />
+        <Row
+          icon={PaletteIconNew}
+          title={t("settings.appearance")}
+          subtitle={`${modeLabel} · ${ACCENTS[appearance.accent].name}`}
+          onPress={() => router.push("/settings/appearance")}
+        />
+        <Divider />
+        <Row
+          icon={GroupIcon}
+          title={t("organizations.bands")}
+          subtitle={pluralize(organizations.length, "band")}
+          onPress={() => router.push("/organizations")}
+        />
+      </Card>
+
+      <Card style={styles.card}>
+        <View style={styles.stats}>
+          <Stat label={t("dashboard.stats.totalSongs")} value={songs.length} />
+          <Stat label={t("dashboard.stats.totalSetlists")} value={setlists.length} />
+          <Stat label={t("dashboard.stats.upcomingShows")} value={performances.length} />
+          <Stat label={t("dashboard.stats.members")} value={members.length} />
+        </View>
+      </Card>
+
+      <Card>
+        <Row
+          icon={LogoutIcon}
+          title={t("settings.signOut")}
+          danger
+          onPress={() => setConfirmSignOut(true)}
+        />
+      </Card>
+
+      <Dialog
+        visible={confirmSignOut}
+        onClose={() => setConfirmSignOut(false)}
+        title={t("settings.signOutConfirm", {
+          defaultValue: "Sign out of your account?",
+        })}
+        description={t("settings.signOutDescription", {
+          defaultValue: "Your songs stay safe on the server. Sign back in any time.",
+        })}
+        confirmLabel={t("settings.signOut")}
+        cancelLabel={t("common.cancel")}
+        confirmLoading={signingOut}
+        tone="danger"
+        onConfirm={handleSignOut}
+      />
+    </ScreenContainer>
+  )
+}
+
+function Row({ icon: Icon, title, subtitle, onPress, danger }: RowProps) {
+  const styles = useThemedStyles(createStyles)
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+    >
+      <View style={[styles.rowIcon, danger && styles.rowIconDanger]}>
+        <Icon
+          size={20}
+          color={danger ? Theme.colors.danger : Theme.colors.primary}
+        />
+      </View>
+      <View style={styles.rowBody}>
+        <AppText variant="bodyStrong" tone={danger ? "danger" : "default"}>
+          {title}
+        </AppText>
+        {subtitle ? (
+          <AppText variant="caption" tone="muted" numberOfLines={1}>
+            {subtitle}
+          </AppText>
+        ) : null}
+      </View>
+      {!danger ? (
+        <ChevronRightIcon size={18} color={Theme.colors.textFaint} />
+      ) : null}
+    </Pressable>
+  )
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  const styles = useThemedStyles(createStyles)
+  return (
+    <View style={styles.stat}>
+      <AppText variant="heading">{value}</AppText>
+      <AppText variant="caption" tone="muted">
+        {label}
+      </AppText>
+    </View>
+  )
+}
+
+function isOwner(uid: string | undefined, ownerId: string | undefined): boolean {
+  return Boolean(uid && ownerId && uid === ownerId)
+}
+
+const createStyles = () =>
+  StyleSheet.create({
+    card: {
+      marginBottom: Theme.spacing.xs,
+    },
+    profile: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.m,
+      paddingVertical: Theme.spacing.xs,
+    },
+    profileText: {
+      flex: 1,
+      gap: 2,
+    },
+    badge: {
+      alignSelf: "flex-start",
+      marginTop: 6,
+    },
+    stats: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: Theme.spacing.m,
+    },
+    stat: {
+      flexGrow: 1,
+      minWidth: 110,
+      gap: 2,
+    },
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.s,
+      paddingVertical: Theme.spacing.s,
+    },
+    rowPressed: {
+      opacity: 0.6,
+    },
+    rowIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: Theme.radii.m,
+      backgroundColor: Theme.colors.surface,
+      borderWidth: 1,
+      borderColor: Theme.colors.borderSoft,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    rowIconDanger: {
+      backgroundColor: Theme.colors.background,
+    },
+    rowBody: {
+      flex: 1,
+      gap: 2,
+    },
+  })

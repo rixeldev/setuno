@@ -1,0 +1,337 @@
+rules_version = '2';
+
+/**
+ * Stage Book — Firestore security rules (docs §23).
+ *
+ * Model recap:
+ *   users/{uid}                                     profile + preferences
+ *   users/{uid}/organizations/{organizationId}      membership index (role)
+ *   organizations/{organizationId}                  the band
+ *   organizations/{organizationId}/members/{uid}
+ *   organizations/{organizationId}/songs
+ *   organizations/{organizationId}/setlists
+ *   organizations/{organizationId}/performances
+ *   organizations/{organizationId}/suggestions
+ *   organizations/{organizationId}/activity
+ *   organizations/{organizationId}/invitations/{lowercased email}
+ *
+ * Invariants enforced here:
+ *   • only members can read anything inside their band;
+ *   • only admins can write songs, setlists, performances or membership;
+ *   • any member can create a suggestion, nobody can edit a song directly;
+ *   • nobody can change their own role, admins included;
+ *   • membership is granted through an email-keyed invitation that only the
+ *     matching authenticated account can accept, in the same batch that creates
+ *     the membership;
+ *   • `users/{uid}` is private: no client can look up another person's account,
+ *     which is what keeps invite-by-email honest.
+ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ----------------------------------------------------------------- helpers
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    /** Lowercased email on the auth token; the invitation key is built from it. */
+    function tokenEmail() {
+      return signedIn() && request.auth.token.email is string
+        ? request.auth.token.email.lowerAsciiToLower()
+        : '';
+    }
+
+    function memberPath(organizationId, uid) {
+      return /databases/$(database)/documents/organizations/$(organizationId)/members/$(uid);
+    }
+
+    function organizationPath(organizationId) {
+      return /databases/$(database)/documents/organizations/$(organizationId);
+    }
+
+    function invitationPath(organizationId) {
+      return /databases/$(database)/documents/organizations/$(organizationId)/invitations/$(tokenEmail());
+    }
+
+    /** `get()` sees the state *before* a batch, so roles are read per request. */
+    function roleOf(organizationId) {
+      return exists(memberPath(organizationId, request.auth.uid))
+        ? get(memberPath(organizationId, request.auth.uid)).data.role
+        : null;
+    }
+
+    function isMember(organizationId) {
+      return signedIn() && roleOf(organizationId) in ['admin', 'member'];
+    }
+
+    function isAdmin(organizationId) {
+      return signedIn() && roleOf(organizationId) == 'admin';
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    /**
+     * Creating the band and the owner's own membership happen in one batch, so
+     * the membership check has to look at the post-batch organization.
+     */
+    function isBandOwnerAfterBatch(organizationId) {
+      return getAfter(organizationPath(organizationId)).data.ownerId == request.auth.uid;
+    }
+
+    /** Accepting an invitation creates the membership in the same batch. */
+    function acceptedOwnInvitationAfterBatch(organizationId) {
+      return getAfter(invitationPath(organizationId)).data.status == 'accepted';
+    }
+
+    function validEmail(address) {
+      return address is string && address.size() > 3 && address.size() <= 320
+        && address.lowerAsciiToLower() == address
+        && address.contains('@');
+    }
+
+    // -------------------------------------------------------------------- users
+
+    match /users/{uid} {
+      // A profile is private: band membership is read through
+      // `organizations/{id}/members`, never from here.
+      allow read: if isSelf(uid);
+
+      allow create: if isSelf(uid)
+        && request.resource.data.keys().hasOnly([
+          'uid', 'displayName', 'email', 'photoURL', 'organizationIds',
+          'activeOrganizationId', 'preferences', 'onboarded', 'createdAt', 'updatedAt'
+        ]);
+
+      allow update: if isSelf(uid)
+        // The email mirrors the auth identity: it may be (re)written but only to
+        // the address Firebase Auth says the caller owns.
+        && request.resource.data.email == tokenEmail()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'uid', 'displayName', 'email', 'photoURL', 'preferences',
+          'onboarded', 'activeOrganizationId', 'organizationIds', 'updatedAt'
+        ]);
+
+      allow delete: if false;
+
+      /**
+       * Denormalised membership index so the app can list a user's bands in one
+       * read. Only the user themselves writes it (when they accept an invite or
+       * leave a band); admins never write into another user's document.
+       */
+      match /organizations/{organizationId} {
+        allow read: if isSelf(uid)
+          || (signedIn() && isAdmin(organizationId) && exists(memberPath(organizationId, uid)));
+        allow create: if isSelf(uid)
+          && request.resource.data.keys().hasOnly(['name', 'role', 'logoURL', 'joinedAt'])
+          && request.resource.data.role in ['admin', 'member']
+          && acceptedOwnInvitationAfterBatch(organizationId);
+        allow update: if isSelf(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasAll(['name', 'role', 'logoURL', 'joinedAt']);
+        allow delete: if isSelf(uid);
+      }
+    }
+
+    // ------------------------------------------------------------ organizations
+
+    match /organizations/{organizationId} {
+      allow read: if isMember(organizationId);
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'name', 'description', 'logoURL', 'ownerId', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 60
+        && request.resource.data.description is string;
+
+      allow update: if isAdmin(organizationId)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['name', 'description', 'logoURL', 'updatedAt']);
+
+      // Only the owner can delete the band.
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+
+      // ----------------------------------------------------------------- members
+
+      match /members/{memberUid} {
+        allow read: if isMember(organizationId);
+
+        allow create: if request.resource.data.keys().hasOnly([
+              'uid', 'displayName', 'email', 'photoURL', 'role', 'joinedAt', 'invitedBy'
+            ])
+            && request.resource.data.uid == memberUid
+            && request.resource.data.role in ['admin', 'member']
+            && (
+              // an admin adding somebody by hand
+              isAdmin(organizationId)
+              // the creator seeding their own membership for a band they just made
+              || (isSelf(memberUid) && isBandOwnerAfterBatch(organizationId))
+              // an invitee accepting their own invitation
+              || (isSelf(memberUid) && acceptedOwnInvitationAfterBatch(organizationId))
+            );
+
+        // Admins manage other members. Nobody may change their own role, and the
+        // owner flag stays with the account that created the band.
+        allow update: if isAdmin(organizationId)
+          && memberUid != request.auth.uid
+          && request.resource.data.uid == memberUid
+          && request.resource.data.role in ['admin', 'member']
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['role', 'displayName', 'photoURL', 'email']);
+
+        // Nobody may remove themselves: they would lose the ability to leave
+        // cleanly and it lets an admin lock the owner out.
+        allow delete: if isAdmin(organizationId) && memberUid != request.auth.uid;
+      }
+
+      // ------------------------------------------------------------- invitations
+
+      match /invitations/{invitationId} {
+        // Admins see every invitation; an invitee only ever sees their own.
+        allow read: if isAdmin(organizationId)
+          || (signedIn() && validEmail(resource.data.email) && resource.data.email == tokenEmail());
+
+        allow create: if isAdmin(organizationId)
+          && request.resource.data.keys().hasOnly([
+            'organizationId', 'organizationName', 'email', 'role', 'status',
+            'invitedBy', 'invitedByName', 'createdAt', 'respondedAt'
+          ])
+          && request.resource.data.organizationId == organizationId
+          && request.resource.data.role in ['admin', 'member']
+          && request.resource.data.status == 'pending'
+          && validEmail(request.resource.data.email)
+          // The document id is the lowercased email, otherwise the invitee could
+          // never find their own invitation.
+          && request.resource.data.email == invitationId;
+
+        // Admins own invitations outright (re-invite, revoke, correct a role).
+        // The invitee may only flip their own invitation to accepted, and only in
+        // the same batch that creates their membership.
+        allow update: if isAdmin(organizationId)
+          || (signedIn()
+              && resource.data.email == tokenEmail()
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['status', 'respondedAt'])
+              && request.resource.data.status == 'accepted'
+              && getAfter(memberPath(organizationId, request.auth.uid)).data.role in ['admin', 'member']);
+
+        allow delete: if isAdmin(organizationId);
+      }
+
+      // ------------------------------------------------------------------- songs
+
+      match /songs/{songId} {
+        allow read: if isMember(organizationId);
+        allow create: if isAdmin(organizationId)
+          && request.resource.data.organizationId == organizationId
+          && request.resource.data.title is string
+          && request.resource.data.title.size() > 0
+          && request.resource.data.title.size() <= 140
+          && request.resource.data.sections is list;
+        allow update: if isAdmin(organizationId)
+          && request.resource.data.organizationId == organizationId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'title', 'artist', 'key', 'originalKey', 'capo', 'bpm', 'durationSec',
+            'genre', 'notes', 'tags', 'sections', 'authorId', 'authorName', 'updatedAt'
+          ]);
+        allow delete: if isAdmin(organizationId);
+      }
+
+      // ---------------------------------------------------------------- setlists
+
+      match /setlists/{setlistId} {
+        allow read: if isMember(organizationId);
+        allow create: if isAdmin(organizationId)
+          && request.resource.data.organizationId == organizationId
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.songs is list;
+        allow update: if isAdmin(organizationId)
+          && request.resource.data.organizationId == organizationId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name', 'description', 'date', 'notes', 'songs',
+            'estimatedDurationSec', 'updatedAt'
+          ]);
+        allow delete: if isAdmin(organizationId);
+      }
+
+      // ------------------------------------------------------------ performances
+
+      match /performances/{performanceId} {
+        allow read: if isMember(organizationId);
+        allow create: if isAdmin(organizationId)
+          && request.resource.data.organizationId == organizationId
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.date is string
+          && request.resource.data.venue is map
+          && request.resource.data.status in ['scheduled', 'completed', 'cancelled'];
+        allow update: if isAdmin(organizationId)
+          && request.resource.data.organizationId == organizationId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name', 'date', 'startTime', 'endTime', 'venue', 'notes',
+            'setlistId', 'setlistName', 'status', 'updatedAt'
+          ]);
+        allow delete: if isAdmin(organizationId);
+      }
+
+      // ------------------------------------------------------------- suggestions
+
+      match /suggestions/{suggestionId} {
+        allow read: if isMember(organizationId);
+
+        // Every member may suggest a change, only ever under their own name and
+        // only in the pending state.
+        allow create: if isMember(organizationId)
+          && request.resource.data.keys().hasOnly([
+            'organizationId', 'songId', 'songTitle', 'authorId', 'authorName',
+            'type', 'change', 'summary', 'comment', 'status', 'createdAt',
+            'reviewedBy', 'reviewedByName', 'reviewedAt', 'reviewNote'
+          ])
+          && request.resource.data.organizationId == organizationId
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.status == 'pending';
+
+        // Admins review; authors may still edit or withdraw their own pending
+        // suggestion but cannot resolve it themselves.
+        allow update: if (isAdmin(organizationId)
+                          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                            'status', 'reviewedBy', 'reviewedByName', 'reviewedAt',
+                            'reviewNote', 'songId', 'songTitle'
+                          ])
+                          && request.resource.data.status in ['pending', 'accepted', 'rejected'])
+          || (isSelf(resource.data.authorId)
+              && resource.data.status == 'pending'
+              && request.resource.data.status == 'pending'
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['comment', 'summary', 'change', 'type', 'songTitle']));
+
+        allow delete: if isAdmin(organizationId)
+          || (isSelf(resource.data.authorId) && resource.data.status == 'pending');
+      }
+
+      // ---------------------------------------------------------------- activity
+
+      match /activity/{eventId} {
+        // Append-only feed: members add to it, nobody edits history.
+        allow read: if isMember(organizationId);
+        allow create: if isMember(organizationId)
+          && request.resource.data.organizationId == organizationId
+          && request.resource.data.actorId == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
