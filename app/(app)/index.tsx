@@ -1,5 +1,5 @@
 import React, { useMemo } from "react"
-import { StyleSheet, View } from "react-native"
+import { Pressable, StyleSheet, View } from "react-native"
 import { useRouter } from "expo-router"
 import { useTranslation } from "react-i18next"
 
@@ -91,16 +91,24 @@ export default function Dashboard() {
     )
   }
 
-  // The signed-in musician: photo when there is one, first letter otherwise.
-  const avatar = (
-    <Avatar
-      name={profile?.displayName || profile?.email || ""}
-      photoURL={profile?.photoURL}
-      size={36}
-      maxInitials={1}
+  // The signed-in musician: photo when there is one, first letter otherwise,
+  // with the name beside it. Opens the profile settings.
+  const accountName = profile?.displayName || profile?.email || ""
+  const account = (
+    <Pressable
       onPress={() => router.push("/settings/profile")}
+      accessibilityRole="button"
       accessibilityLabel={t("settings.profile")}
-    />
+      hitSlop={Theme.hitSlop}
+      style={({ pressed }) => [styles.account, pressed && styles.accountPressed]}
+    >
+      <Avatar name={accountName} photoURL={profile?.photoURL} size={36} maxInitials={1} />
+      {accountName ? (
+        <AppText variant="bodyStrong" numberOfLines={1} style={styles.accountName}>
+          {accountName}
+        </AppText>
+      ) : null}
+    </Pressable>
   )
 
   // Accounts are not tied to a band: a new user lands here and decides later
@@ -125,7 +133,7 @@ export default function Dashboard() {
         title={t("dashboard.setupTitle")}
         subtitle={t("dashboard.setupSubtitle")}
         large
-        headerTop={avatar}
+        headerTop={account}
       >
         <View style={styles.features}>
           {features.map((feature) => {
@@ -167,7 +175,7 @@ export default function Dashboard() {
       large
       headerTop={
         <View style={styles.topBar}>
-          {avatar}
+          {account}
           {isAdmin ? (
             <IconButton
               label={t("dashboard.addSong")}
@@ -449,6 +457,17 @@ const createStyles = () =>
   StyleSheet.create({
     flex: { flex: 1, minWidth: 0 },
     topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: Theme.spacing.m },
+    account: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.s,
+      flex: 1,
+      minWidth: 0,
+      paddingVertical: 2,
+      borderRadius: Theme.radii.pill,
+    },
+    accountPressed: { opacity: 0.7 },
+    accountName: { flexShrink: 1 },
     quick: { gap: Theme.spacing.s },
     quickActions: { flexDirection: "row", flexWrap: "wrap", gap: Theme.spacing.s },
     features: { gap: Theme.spacing.m },
