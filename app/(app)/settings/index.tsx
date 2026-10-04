@@ -14,6 +14,7 @@ import {
   AccountIcon,
   ChevronRightIcon,
   GroupIcon,
+  LanguageIcon,
   LogoutIcon,
   OrganizationIcon,
   PaletteIconNew,
@@ -23,6 +24,9 @@ import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { getAppearance } from "@/services/themeManager"
+import { useLanguagePreference } from "@/services/i18next"
+import { getDeviceLanguage } from "@/libs/deviceLanguage"
+import { LANGUAGE_NAMES, matchLanguage } from "@/libs/language"
 import { ACCENTS } from "@/libs/appearance"
 import { toFriendlyError } from "@/services/errors"
 import { pluralize } from "@/libs/format"
@@ -54,8 +58,13 @@ export default function SettingsScreen() {
   const displayName = profile?.displayName ?? user?.displayName ?? ""
   const email = user?.email ?? profile?.email ?? ""
   const appearance = getAppearance()
+  const languagePreference = useLanguagePreference()
   const modeLabel =
     appearance.mode === "dark" ? t("settings.dark") : t("settings.light")
+  const languageLabel =
+    languagePreference === "device"
+      ? `${t("settings.automatic")} · ${LANGUAGE_NAMES[matchLanguage(getDeviceLanguage())]}`
+      : LANGUAGE_NAMES[languagePreference]
 
   const handleSignOut = async () => {
     setSigningOut(true)
@@ -123,6 +132,13 @@ export default function SettingsScreen() {
           title={t("settings.appearance")}
           subtitle={`${modeLabel} · ${ACCENTS[appearance.accent].name}`}
           onPress={() => router.push("/settings/appearance")}
+        />
+        <Divider />
+        <Row
+          icon={LanguageIcon}
+          title={t("settings.language")}
+          subtitle={languageLabel}
+          onPress={() => router.push("/settings/language")}
         />
         <Divider />
         <Row

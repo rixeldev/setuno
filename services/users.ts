@@ -18,6 +18,7 @@ import {
   type UserProfileUpdate,
 } from "@/interfaces"
 import { applyAccent, applyAppearanceMode, applyAppearance } from "@/services/themeManager"
+import { updateCachedPreferences, writeCachedPreferences } from "@/services/prefs"
 import { isAccentId, isAppearanceMode } from "@/libs/appearance"
 
 const mapUser = (data: Record<string, unknown>, id: string): UserProfile =>
@@ -106,7 +107,13 @@ export const subscribeUserProfile = (
   }
   return onSnapshot(
     doc(firestore, paths.user(uid)),
-    (snapshot) => onChange(mapDoc(snapshot, mapUser)),
+    (snapshot) => {
+      const profile = mapDoc(snapshot, mapUser)
+      // Keep the local preference cache in step with the profile so settings
+      // survive a restart even when this device is offline next time.
+      if (profile) writeCachedPreferences(profile.preferences)
+      onChange(profile)
+    },
     () => onChange(null),
   )
 }
@@ -131,6 +138,7 @@ export const updateUserProfile = async (
     const current = await fetchUserProfile(uid)
     const merged = { ...(current?.preferences ?? DEFAULT_PREFERENCES), ...update.preferences }
     patch.preferences = merged
+    updateCachedPreferences(merged)
     applyPreferencesToRuntime(merged)
   }
   await updateDoc(doc(firestore, paths.user(uid)), patch)
@@ -149,6 +157,7 @@ export const updatePreferences = async (
     ...(stored?.preferences ?? {}),
   }
   const merged = { ...current, ...preferences }
+  updateCachedPreferences(merged)
   applyPreferencesToRuntime(merged)
   await updateDoc(reference, {
     preferences: merged,

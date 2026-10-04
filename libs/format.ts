@@ -83,15 +83,40 @@ export const dayStamp = (
   }
 }
 
+/** "Saturday, 4 October" in the given locale (falls back to a plain date). */
+export const formatDateLong = (date: Date | null | undefined, locale?: string): string => {
+  if (!date) return "—"
+  try {
+    return new Intl.DateTimeFormat(locale || undefined, {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(date)
+  } catch {
+    // Intl is unavailable on some engines: keep a readable fallback.
+    return formatDate(date)
+  }
+}
+
+/** Translatable words for the near-day labels of `formatRelativeDay`. */
+export interface RelativeDayLabels {
+  today: string
+  tomorrow: string
+  yesterday: string
+}
+
 /** "Today · 9:00 PM" style relative labels used in agendas. */
-export const formatRelativeDay = (date: Date | null | undefined): string => {
+export const formatRelativeDay = (
+  date: Date | null | undefined,
+  labels?: RelativeDayLabels,
+): string => {
   if (!date) return "—"
   const today = startOfDay(new Date())
   const target = startOfDay(date)
   const diffDays = Math.round((target.getTime() - today.getTime()) / 86_400_000)
-  if (diffDays === 0) return "Today"
-  if (diffDays === 1) return "Tomorrow"
-  if (diffDays === -1) return "Yesterday"
+  if (diffDays === 0) return labels?.today ?? "Today"
+  if (diffDays === 1) return labels?.tomorrow ?? "Tomorrow"
+  if (diffDays === -1) return labels?.yesterday ?? "Yesterday"
   if (diffDays > 1 && diffDays < 7) return target.toLocaleDateString(undefined, { weekday: "long" })
   return formatDate(date)
 }
@@ -137,11 +162,12 @@ export const formatRelativeTime = (date: Date | null | undefined): string => {
 export const pluralize = (count: number, singular: string, plural?: string): string =>
   `${count} ${count === 1 ? singular : (plural ?? `${singular}s`)}`
 
-export const initials = (name: string): string =>
+/** First letters of a name, capped at `max` (used by avatars). */
+export const initials = (name: string, max = 2): string =>
   name
     .split(/\s+/)
     .filter(Boolean)
-    .slice(0, 2)
+    .slice(0, Math.max(1, max))
     .map((part) => (part[0] ?? "").toUpperCase())
     .join("")
 

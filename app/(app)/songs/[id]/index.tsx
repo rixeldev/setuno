@@ -20,10 +20,13 @@ import { useResponsive } from "@/hooks/useResponsive"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { deleteSong, subscribeSong } from "@/services/songs"
+import { updatePreferences } from "@/services/users"
+import { updateCachedPreferences, usePreferences } from "@/services/prefs"
 import { toFriendlyError } from "@/services/errors"
 import { transposeKey } from "@/libs/chords"
 import { formatRelativeTime, formatDuration } from "@/libs/format"
 import { toDate } from "@/interfaces/timestamp"
+import type { UserPreferences } from "@/interfaces"
 import { songLyricsText } from "@/libs/songUtils"
 import * as Clipboard from "expo-clipboard"
 
@@ -53,10 +56,21 @@ export default function SongScreen() {
   // The reader's own capo choice; until they move it, the song's own capo is
   // used, so an edit made by an admin shows up without losing the reader's pick.
   const [capoOverride, setCapoOverride] = useState<number | null>(null)
-  const [fontSize, setFontSize] = useState(profile?.preferences.songFontSize ?? 18)
-  const [showChords, setShowChords] = useState(profile?.preferences.chordsVisible ?? true)
+  // Reader display settings come from the local preference cache so they are
+  // restored instantly on every start-up (docs §32), then mirrored to the
+  // profile so the defaults follow the account across devices.
+  const preferences = usePreferences()
+  const [fontSize, setFontSize] = useState(preferences.songFontSize)
+  const [showChords, setShowChords] = useState(preferences.chordsVisible)
   const [immersive, setImmersive] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
+
+  const saveDisplayPreference = (patch: Partial<UserPreferences>): void => {
+    updateCachedPreferences(patch)
+    if (profile?.uid) {
+      void updatePreferences(profile.uid, patch).catch(() => undefined)
+    }
+  }
 
   const displayKey = useMemo(() => {
     if (!song) return ""
@@ -239,9 +253,16 @@ export default function SongScreen() {
         capo={capo}
         onCapoChange={setCapoOverride}
         fontSize={fontSize}
-        onFontSizeChange={setFontSize}
+        onFontSizeChange={(size) => {
+          setFontSize(size)
+          saveDisplayPreference({ songFontSize: size })
+        }}
         showChords={showChords}
-        onToggleChords={() => setShowChords((value) => !value)}
+        onToggleChords={() => {
+          const next = !showChords
+          setShowChords(next)
+          saveDisplayPreference({ chordsVisible: next })
+        }}
       />
 
       <View style={[styles.actions, { paddingHorizontal: gutter }]}>

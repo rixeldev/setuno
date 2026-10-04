@@ -67,11 +67,19 @@ npx expo-doctor         # diagnose dependency and config issues
 
 ## Internationalization
 
-- i18next is initialised in `services/i18next.ts` (imported once from `app/_layout.tsx`); locale bundles are `locales/en.json` and `locales/es.json`.
+- i18next is configured in `services/i18next.ts`; locale bundles are `locales/en.json` and `locales/es.json`.
+- The app starts in the **device language** (`libs/deviceLanguage.ts` native / `.web.ts` browser) unless the user picked one in `app/(app)/settings/language.tsx`. The choice lives in AsyncStorage and is restored by `hydrateLanguage()` from `app/_layout.tsx` before the first frame.
+- Supported languages are declared once in `libs/language.ts` (`SUPPORTED_LANGUAGES`, `LANGUAGE_NAMES`, `resolveLanguage`).
 - Every user-facing string comes from `t("namespace.key")` via `useTranslation()` from `react-i18next`.
 - **Adding a string means editing both locale files.** Keep `en.json` and `es.json` structurally identical.
 - Interpolation: `{{variable}}`. Plurals: `key_one` / `key_other`.
 - Domain error messages are mapped centrally in `services/errors.ts` (`toFriendlyError`) — extend that instead of hardcoding user-facing error text.
+
+## Preferences & storage
+
+- Anything the user configures must survive a restart: theme/accent (`services/themeManager.ts`), language (`services/i18next.ts`) and reader settings — font size, chords visible, motion (`services/prefs.ts`).
+- All three are hydrated together in `app/_layout.tsx` before the first frame, so nothing flashes with default values.
+- `services/users.ts` mirrors the profile's `preferences` into the local cache (and back), so settings are available offline and before the profile loads. Writes are local first, then Firestore.
 
 ## Design system & UI
 

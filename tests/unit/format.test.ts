@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   formatDate,
+  formatDateLong,
   formatDateTime,
   formatDuration,
   formatDurationLong,
@@ -81,6 +82,20 @@ describe("dates", () => {
     expect(formatRelativeDay(yesterday)).toBe("Yesterday")
     expect(formatRelativeDay(nextWeek)).toBe(formatDate(nextWeek))
     expect(formatRelativeDay(null)).toBe("—")
+  })
+
+  it("uses translated labels for the days around today", () => {
+    const today = new Date()
+    const labels = { today: "Hoy", tomorrow: "Mañana", yesterday: "Ayer" }
+    expect(formatRelativeDay(today, labels)).toBe("Hoy")
+    expect(formatRelativeDay(null, labels)).toBe("—")
+  })
+
+  it("formats a long date in the requested locale", () => {
+    const date = new Date(2026, 9, 4)
+    expect(formatDateLong(date, "en").toLowerCase()).toContain("october")
+    expect(formatDateLong(date, "es").toLowerCase()).toContain("octubre")
+    expect(formatDateLong(null)).toBe("—")
   })
 
   it("shows how long ago something happened", () => {

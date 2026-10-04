@@ -1,6 +1,7 @@
-import React, { useMemo, type ComponentType } from "react"
+import React, { useMemo } from "react"
 import { StyleSheet, View } from "react-native"
 import { useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -18,6 +19,7 @@ import {
   StarIcon,
   UsersIcon,
 } from "@/components/ui/Icons"
+import { Avatar } from "@/components/ui/Avatar"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { StatRow, StatTile } from "@/components/app/StatTile"
 import { SongRow } from "@/components/app/SongRow"
@@ -25,31 +27,17 @@ import { PERFORMANCE_STATUS_TONES } from "@/components/performances/PerformanceC
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
-import { PERFORMANCE_STATUS_LABELS } from "@/interfaces"
+import type { RelativeDayLabels } from "@/libs/format"
 import {
   dayStamp,
+  formatDateLong,
   formatRelativeDay,
-  formatShortDate,
   formatTime,
-  pluralize,
 } from "@/libs/format"
 import { parseIsoDate } from "@/libs/validation"
 
 const MAX_RECENT_SONGS = 4
 const MAX_UPCOMING = 3
-
-interface StarterFeature {
-  icon: ComponentType<{ size?: number; color?: string }>
-  title: string
-  text: string
-}
-
-/** What Stage Book does, shown to people who don't belong to a band yet. */
-const STARTER_FEATURES: StarterFeature[] = [
-  { icon: MusicIcon, title: "Songbook", text: "Lyrics and chords, transposed on stage" },
-  { icon: ListIcon, title: "Setlists", text: "Running orders you reuse for every gig" },
-  { icon: CalendarIcon, title: "Gigs", text: "Dates, venues and who is playing" },
-]
 
 /**
  * Dashboard: what the band needs right now (docs §17) — the next show, the
@@ -58,6 +46,7 @@ const STARTER_FEATURES: StarterFeature[] = [
 export default function Dashboard() {
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
+  const { t, i18n } = useTranslation()
   const { profile } = useAuth()
   const { organization, isAdmin, role, state } = useOrganization()
   const {
@@ -73,6 +62,12 @@ export default function Dashboard() {
     members,
   } = useOrgData()
 
+  const dayLabels: RelativeDayLabels = {
+    today: t("common.today"),
+    tomorrow: t("common.tomorrow"),
+    yesterday: t("common.yesterday"),
+  }
+
   const recentSongs = useMemo(
     () =>
       [...songs]
@@ -86,52 +81,54 @@ export default function Dashboard() {
   )
 
   const upcoming = useMemo(() => upcomingPerformances.slice(0, MAX_UPCOMING), [upcomingPerformances])
-  const today = useMemo(() => formatShortDate(new Date()), [])
-  const firstName = profile?.displayName?.split(" ")[0] || "there"
+  const today = useMemo(() => new Date(), [])
 
   if (error) {
     return (
-      <ScreenContainer title="Dashboard">
+      <ScreenContainer title={t("dashboard.dashboard")}>
         <ErrorState message={error} />
       </ScreenContainer>
     )
   }
 
+  // The signed-in musician: photo when there is one, first letter otherwise.
+  const avatar = (
+    <Avatar
+      name={profile?.displayName || profile?.email || ""}
+      photoURL={profile?.photoURL}
+      size={36}
+      maxInitials={1}
+      onPress={() => router.push("/settings/profile")}
+      accessibilityLabel={t("settings.profile")}
+    />
+  )
+
   // Accounts are not tied to a band: a new user lands here and decides later
   // whether to lead a band or wait for an invitation (docs §7).
   if (state === "needs-organization") {
+    const features = [
+      {
+        icon: MusicIcon,
+        title: t("dashboard.featureSongbook"),
+        text: t("dashboard.featureSongbookHint"),
+      },
+      {
+        icon: ListIcon,
+        title: t("dashboard.featureSetlists"),
+        text: t("dashboard.featureSetlistsHint"),
+      },
+      { icon: CalendarIcon, title: t("dashboard.featureGigs"), text: t("dashboard.featureGigsHint") },
+    ]
+
     return (
       <ScreenContainer
-        title={`Hey ${firstName}`}
-        subtitle={`Welcome · ${today}`}
+        title={t("dashboard.setupTitle")}
+        subtitle={t("dashboard.setupSubtitle")}
         large
-        toolbar={
-          <AppText variant="body" tone="muted">
-            Nothing to set up right now — the rest of the app stays open while you decide.
-          </AppText>
-        }
+        headerTop={avatar}
       >
-        <Card style={styles.welcome}>
-          <View style={styles.welcomeIcon}>
-            <MusicIcon size={24} color={Theme.colors.primary} />
-          </View>
-          <AppText variant="subheading">Your account is ready</AppText>
-          <AppText variant="body" tone="muted">
-            Stage Book keeps the songbook, setlists and gigs for each band. Create yours whenever
-            you want, or join one with an invitation.
-          </AppText>
-          <View style={styles.welcomeActions}>
-            <Button label="Create a band" onPress={() => router.push("/organizations/new")} />
-            <Button
-              label="Bands and invitations"
-              variant="secondary"
-              onPress={() => router.push("/organizations")}
-            />
-          </View>
-        </Card>
-
-        <View style={styles.featureList}>
-          {STARTER_FEATURES.map((feature) => {
+        <View style={styles.features}>
+          {features.map((feature) => {
             const Icon = feature.icon
             return (
               <View key={feature.title} style={styles.feature}>
@@ -148,51 +145,63 @@ export default function Dashboard() {
             )
           })}
         </View>
+
+        <View style={styles.setupActions}>
+          <Button label={t("organizations.createBand")} onPress={() => router.push("/organizations/new")} />
+          <Button
+            label={t("dashboard.setupInvitation")}
+            variant="ghost"
+            onPress={() => router.push("/organizations")}
+          />
+        </View>
       </ScreenContainer>
     )
   }
 
   return (
     <ScreenContainer
-      title={`Hey ${firstName}`}
-      subtitle={organization ? `${organization.name} · ${today}` : today}
+      title={organization?.name ?? t("dashboard.dashboard")}
+      subtitle={`${formatDateLong(today, i18n.language)} · ${t("organizations.membersCount", {
+        count: members.length,
+      })}`}
       large
-      headerRight={
-        isAdmin ? (
-          <IconButton
-            label="Add a song"
-            variant="secondary"
-            onPress={() => router.push("/songs/new")}
-            icon={<PlusIcon size={18} color={Theme.colors.primary} />}
-          />
-        ) : null
+      headerTop={
+        <View style={styles.topBar}>
+          {avatar}
+          {isAdmin ? (
+            <IconButton
+              label={t("dashboard.addSong")}
+              variant="secondary"
+              onPress={() => router.push("/songs/new")}
+              icon={<PlusIcon size={18} color={Theme.colors.primary} />}
+            />
+          ) : null}
+        </View>
       }
       toolbar={
         <View style={styles.quick}>
           <AppText variant="caption" tone="muted">
-            {role === "admin"
-              ? "You can edit songs, setlists and gigs."
-              : "You can suggest changes to songs."}
+            {role === "admin" ? t("dashboard.adminNote") : t("dashboard.memberNote")}
           </AppText>
           <View style={styles.quickActions}>
             {isAdmin ? (
               <>
                 <Button
-                  label="New song"
+                  label={t("dashboard.addSong")}
                   size="sm"
                   variant="secondary"
                   icon={<PlusIcon size={15} color={Theme.colors.text} />}
                   onPress={() => router.push("/songs/new")}
                 />
                 <Button
-                  label="New setlist"
+                  label={t("dashboard.newSetlist")}
                   size="sm"
                   variant="secondary"
                   icon={<ListIcon size={15} color={Theme.colors.text} />}
                   onPress={() => router.push("/setlists/new")}
                 />
                 <Button
-                  label="Schedule gig"
+                  label={t("dashboard.bookGig")}
                   size="sm"
                   variant="secondary"
                   icon={<CalendarIcon size={15} color={Theme.colors.text} />}
@@ -201,7 +210,7 @@ export default function Dashboard() {
               </>
             ) : (
               <Button
-                label="Open songbook"
+                label={t("dashboard.openSongbook")}
                 size="sm"
                 variant="secondary"
                 icon={<MusicIcon size={15} color={Theme.colors.text} />}
@@ -215,7 +224,10 @@ export default function Dashboard() {
       {nextShow ? (
         <Card
           onPress={() => router.push(`/performances/${nextShow.id}`)}
-          accessibilityLabel={`${nextShow.name}, ${formatRelativeDay(parseIsoDate(nextShow.date))}`}
+          accessibilityLabel={`${nextShow.name}, ${formatRelativeDay(
+            parseIsoDate(nextShow.date),
+            dayLabels,
+          )}`}
           style={styles.hero}
           elevated
         >
@@ -237,18 +249,18 @@ export default function Dashboard() {
                 {nextShow.name}
               </AppText>
               <Badge
-                label={PERFORMANCE_STATUS_LABELS[nextShow.status]}
+                label={t(`performances.${nextShow.status}`)}
                 tone={PERFORMANCE_STATUS_TONES[nextShow.status]}
               />
             </View>
             <AppText variant="caption" tone="muted" numberOfLines={1}>
               {[
-                formatRelativeDay(parseIsoDate(nextShow.date)),
+                formatRelativeDay(parseIsoDate(nextShow.date), dayLabels),
                 nextShow.startTime ? formatTime(nextShow.startTime) : null,
                 nextShow.venue.name,
               ]
                 .filter(Boolean)
-                .join(" · ") || "No time or venue yet"}
+                .join(" · ") || t("dashboard.noGigDetails")}
             </AppText>
             {nextShow.setlistName ? (
               <Chip
@@ -268,16 +280,14 @@ export default function Dashboard() {
             <CalendarIcon size={19} color={Theme.colors.primary} />
           </View>
           <View style={styles.flex}>
-            <AppText variant="bodyStrong">Nothing booked yet</AppText>
+            <AppText variant="bodyStrong">{t("dashboard.noGig")}</AppText>
             <AppText variant="caption" tone="muted">
-              {isAdmin
-                ? "Add a gig or a rehearsal and it shows up here."
-                : "Your band hasn't scheduled a gig yet."}
+              {isAdmin ? t("dashboard.noGigAdmin") : t("dashboard.noGigMember")}
             </AppText>
           </View>
           {isAdmin ? (
             <Button
-              label="Plan a gig"
+              label={t("dashboard.bookGig")}
               size="sm"
               variant="secondary"
               onPress={() => router.push("/performances/new")}
@@ -288,31 +298,35 @@ export default function Dashboard() {
 
       <StatRow>
         <StatTile
-          label="Songs"
+          label={t("nav.songs")}
           value={loading ? "—" : stats.songs}
-          hint={loading ? "Loading" : pluralize(stats.chords, "chord")}
+          hint={loading ? t("common.loading") : t("songs.chordsCount", { count: stats.chords })}
           icon={MusicIcon}
           tone="primary"
           onPress={() => router.push("/songs")}
         />
         <StatTile
-          label="Setlists"
+          label={t("nav.setlists")}
           value={setlists.length}
-          hint={setlists.length > 0 ? "Reusable running orders" : "None yet"}
+          hint={setlists.length > 0 ? t("dashboard.setlistsHint") : t("common.empty")}
           icon={ListIcon}
           onPress={() => router.push("/setlists")}
         />
         <StatTile
-          label="Upcoming"
+          label={t("dashboard.stats.upcomingShows")}
           value={upcomingPerformances.length}
-          hint={nextShow ? formatRelativeDay(parseIsoDate(nextShow.date)) : "Nothing booked"}
+          hint={
+            nextShow
+              ? formatRelativeDay(parseIsoDate(nextShow.date), dayLabels)
+              : t("dashboard.noGig")
+          }
           icon={CalendarIcon}
           onPress={() => router.push("/performances")}
         />
         <StatTile
-          label="Members"
+          label={t("nav.members")}
           value={members.length}
-          hint={isAdmin ? "You are the admin" : "Band members"}
+          hint={isAdmin ? t("dashboard.youAreAdmin") : t("dashboard.bandMembers")}
           icon={UsersIcon}
           onPress={() => router.push("/members")}
         />
@@ -320,10 +334,10 @@ export default function Dashboard() {
 
       {isAdmin && pendingSuggestions.length > 0 ? (
         <Section
-          title="Suggestions waiting for you"
-          subtitle="Only admins can approve chord changes"
+          title={t("dashboard.suggestionsTitle")}
+          subtitle={t("dashboard.suggestionsSubtitle")}
           action={
-            <Button label="Review" size="sm" variant="secondary" onPress={() => router.push("/suggestions")} />
+            <Button label={t("common.review")} size="sm" variant="secondary" onPress={() => router.push("/suggestions")} />
           }
         >
           <Card style={styles.cardList}>
@@ -344,7 +358,7 @@ export default function Dashboard() {
                     {suggestion.authorName} · {suggestion.summary}
                   </AppText>
                 </View>
-                <Badge label="Pending" tone="warning" />
+                <Badge label={t("suggestions.pending")} tone="warning" />
               </View>
             ))}
           </Card>
@@ -352,18 +366,20 @@ export default function Dashboard() {
       ) : null}
 
       <Section
-        title="Recently updated"
-        subtitle={loading ? undefined : `${pluralize(songs.length, "song")} in this band`}
-        action={<Button label="All songs" size="sm" variant="ghost" onPress={() => router.push("/songs")} />}
+        title={t("dashboard.recentlyUpdated")}
+        subtitle={loading ? undefined : t("organizations.songsCount", { count: songs.length })}
+        action={
+          <Button label={t("dashboard.allSongs")} size="sm" variant="ghost" onPress={() => router.push("/songs")} />
+        }
       >
         {loading ? (
           <SkeletonList count={3} height={78} />
         ) : recentSongs.length === 0 ? (
           <EmptyState
             compact
-            title="No songs yet"
-            message="Add the first song to your band's chord book."
-            actionLabel={isAdmin ? "Add a song" : undefined}
+            title={t("dashboard.noSongs")}
+            message={t("dashboard.noSongsDescription")}
+            actionLabel={isAdmin ? t("dashboard.addSong") : undefined}
             onAction={isAdmin ? () => router.push("/songs/new") : undefined}
           />
         ) : (
@@ -377,8 +393,10 @@ export default function Dashboard() {
 
       {upcoming.length > 1 ? (
         <Section
-          title="Coming up"
-          action={<Button label="Calendar" size="sm" variant="ghost" onPress={() => router.push("/calendar")} />}
+          title={t("dashboard.comingUp")}
+          action={
+            <Button label={t("dashboard.viewCalendar")} size="sm" variant="ghost" onPress={() => router.push("/calendar")} />
+          }
         >
           <View style={styles.list}>
             {upcoming.slice(1).map((performance) => (
@@ -397,7 +415,7 @@ export default function Dashboard() {
                     {performance.name}
                   </AppText>
                   <AppText variant="caption" tone="muted" numberOfLines={1}>
-                    {formatRelativeDay(parseIsoDate(performance.date))}
+                    {formatRelativeDay(parseIsoDate(performance.date), dayLabels)}
                     {performance.startTime ? ` · ${formatTime(performance.startTime)}` : ""}
                     {performance.venue.name ? ` · ${performance.venue.name}` : ""}
                   </AppText>
@@ -410,7 +428,7 @@ export default function Dashboard() {
       ) : null}
 
       {activity.length > 0 ? (
-        <Section title="Band activity">
+        <Section title={t("dashboard.bandActivity")}>
           <Card style={styles.cardList}>
             {activity.slice(0, 6).map((event) => (
               <View key={event.id} style={styles.activityRow}>
@@ -430,28 +448,20 @@ export default function Dashboard() {
 const createStyles = () =>
   StyleSheet.create({
     flex: { flex: 1, minWidth: 0 },
+    topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: Theme.spacing.m },
     quick: { gap: Theme.spacing.s },
     quickActions: { flexDirection: "row", flexWrap: "wrap", gap: Theme.spacing.s },
-    welcome: { gap: Theme.spacing.m, alignItems: "flex-start" },
-    welcomeIcon: {
-      width: 52,
-      height: 52,
-      borderRadius: Theme.radii.pill,
-      backgroundColor: Theme.colors.primarySoft,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    welcomeActions: { flexDirection: "row", flexWrap: "wrap", gap: Theme.spacing.s },
-    featureList: { gap: Theme.spacing.s },
+    features: { gap: Theme.spacing.m },
     feature: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.m },
     featureIcon: {
-      width: 38,
-      height: 38,
+      width: 40,
+      height: 40,
       borderRadius: Theme.radii.pill,
       backgroundColor: Theme.colors.surfaceHigh,
       alignItems: "center",
       justifyContent: "center",
     },
+    setupActions: { gap: Theme.spacing.s },
     hero: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.m },
     heroBody: { flex: 1, minWidth: 0, gap: 4 },
     heroTitle: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.s },

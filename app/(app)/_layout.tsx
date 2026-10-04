@@ -48,6 +48,7 @@ export default function AppLayout() {
         <Stack.Screen name="settings/profile" />
         <Stack.Screen name="settings/organization" />
         <Stack.Screen name="settings/appearance" />
+        <Stack.Screen name="settings/language" />
         <Stack.Screen name="more" />
         <Stack.Screen name="organizations/index" />
         <Stack.Screen name="organizations/new" />

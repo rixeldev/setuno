@@ -15,8 +15,9 @@ import { OrganizationProvider } from "@/hooks/useOrganization"
 import { OrgDataProvider } from "@/hooks/useOrgData"
 import { ToastProvider } from "@/components/ui/Toast"
 import { hydrateAppearance } from "@/services/themeManager"
+import { hydrateLanguage } from "@/services/i18next"
+import { hydratePreferences } from "@/services/prefs"
 import { installWebDocumentStyles } from "@/libs/webStyles"
-import "@/services/i18next"
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined)
 
@@ -25,18 +26,20 @@ SplashScreen.preventAutoHideAsync().catch(() => undefined)
  * Auth and organization state live here so every screen can rely on them.
  */
 export default function Layout() {
-  const [appearanceReady, setAppearanceReady] = useState(false)
+  const [preferencesReady, setPreferencesReady] = useState(false)
   const [fontsLoaded, fontError] = useFonts({
     Onest: Onest_400Regular,
     OnestBold: Onest_700Bold,
   })
 
+  // Every stored preference (theme, language, reader settings) is restored
+  // before the first frame so nothing flashes with the wrong values (docs §32).
   useEffect(() => {
     let mounted = true
-    hydrateAppearance()
+    Promise.all([hydrateAppearance(), hydrateLanguage(), hydratePreferences()])
       .catch(() => undefined)
       .finally(() => {
-        if (mounted) setAppearanceReady(true)
+        if (mounted) setPreferencesReady(true)
       })
     return () => {
       mounted = false
@@ -48,7 +51,7 @@ export default function Layout() {
     installWebDocumentStyles()
   }, [])
 
-  const ready = (fontsLoaded || fontError !== null) && appearanceReady
+  const ready = (fontsLoaded || fontError !== null) && preferencesReady
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => undefined)

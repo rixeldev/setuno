@@ -23,6 +23,8 @@ interface ScreenContainerProps {
   back?: boolean
   large?: boolean
   headerRight?: React.ReactNode
+  /** Bar rendered above the header title (brand mark, page actions). */
+  headerTop?: React.ReactNode
   /** Extra element rendered under the header, above the content. */
   toolbar?: React.ReactNode
   refreshing?: boolean
@@ -47,6 +49,7 @@ export function ScreenContainer({
   back = false,
   large = false,
   headerRight,
+  headerTop,
   toolbar,
   refreshing = false,
   onRefresh,
@@ -62,7 +65,14 @@ export function ScreenContainer({
   const header =
     title || subtitle ? (
       <View style={[styles.body, { maxWidth: columnMaxWidth }]}>
-        <PageHeader title={title ?? ""} subtitle={subtitle} back={back} large={large} right={headerRight} />
+        <PageHeader
+          title={title ?? ""}
+          subtitle={subtitle}
+          back={back}
+          large={large}
+          right={headerRight}
+          top={headerTop}
+        />
       </View>
     ) : null
 

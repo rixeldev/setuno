@@ -15,6 +15,8 @@ interface PageHeaderProps {
   back?: boolean
   onBack?: () => void
   right?: React.ReactNode
+  /** Bar rendered above the title (brand, page actions). */
+  top?: React.ReactNode
   /** Sticky styling for scrolling screens. */
   elevated?: boolean
   style?: StyleProp<ViewStyle>
@@ -32,6 +34,7 @@ export function PageHeader({
   back = false,
   onBack,
   right,
+  top,
   elevated = false,
   style,
   large = false,
@@ -58,30 +61,34 @@ export function PageHeader({
         style,
       ]}
     >
-      {back ? (
-        <Pressable
-          onPress={handleBack}
-          hitSlop={Theme.hitSlop}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          style={({ pressed }) => [styles.back, pressed && styles.pressed]}
-        >
-          <ArrowLeftIcon color={Theme.colors.text} size={20} />
-        </Pressable>
-      ) : null}
+      {top ? <View style={styles.top}>{top}</View> : null}
 
-      <View style={styles.titles}>
-        <AppText variant={large ? "display" : "title"} numberOfLines={1}>
-          {title}
-        </AppText>
-        {subtitle ? (
-          <AppText variant="caption" tone="muted" numberOfLines={1}>
-            {subtitle}
-          </AppText>
+      <View style={[styles.titleRow, large && styles.titleRowLarge]}>
+        {back ? (
+          <Pressable
+            onPress={handleBack}
+            hitSlop={Theme.hitSlop}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            style={({ pressed }) => [styles.back, pressed && styles.pressed]}
+          >
+            <ArrowLeftIcon color={Theme.colors.text} size={20} />
+          </Pressable>
         ) : null}
-      </View>
 
-      {right ? <View style={styles.actions}>{right}</View> : null}
+        <View style={styles.titles}>
+          <AppText variant={large ? "display" : "title"} numberOfLines={1}>
+            {title}
+          </AppText>
+          {subtitle ? (
+            <AppText variant="caption" tone="muted" numberOfLines={1}>
+              {subtitle}
+            </AppText>
+          ) : null}
+        </View>
+
+        {right ? <View style={styles.actions}>{right}</View> : null}
+      </View>
     </View>
   )
 }
@@ -89,15 +96,26 @@ export function PageHeader({
 const createStyles = () =>
   StyleSheet.create({
     header: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: Theme.spacing.m,
+      gap: Theme.spacing.xs,
       paddingTop: Theme.spacing.m,
       paddingBottom: Theme.spacing.m,
     },
     headerLarge: {
       paddingTop: Theme.spacing.xxl,
       paddingBottom: Theme.spacing.m,
+    },
+    top: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: Theme.spacing.m,
+    },
+    titleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.m,
+    },
+    titleRowLarge: {
       alignItems: "flex-end",
     },
     headerElevated: {

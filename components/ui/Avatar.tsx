@@ -10,6 +10,8 @@ interface AvatarProps {
   name: string
   photoURL?: string | null
   size?: number
+  /** How many initials to show without a photo (default 2). */
+  maxInitials?: number
   onPress?: () => void
   /** Small online/role marker rendered on the avatar corner. */
   badge?: string | null
@@ -22,6 +24,7 @@ export function Avatar({
   name,
   photoURL,
   size = 40,
+  maxInitials = 2,
   onPress,
   badge,
   style,
@@ -47,7 +50,7 @@ export function Avatar({
         />
       ) : (
         <AppText variant="caption" style={{ fontSize, fontFamily: Theme.fonts.onestBold }}>
-          {initials(name) || "?"}
+          {initials(name, maxInitials) || "?"}
         </AppText>
       )}
       {badge ? (

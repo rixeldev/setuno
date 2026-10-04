@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { useAuth } from "@/hooks/useAuth"
 import { updatePreferences } from "@/services/users"
+import { updateCachedPreferences, usePreferences } from "@/services/prefs"
 import {
   applyAccent,
   applyAppearanceMode,
@@ -28,17 +29,18 @@ export default function AppearanceSettings() {
   const { profile } = useAuth()
 
   const appearance = getAppearance()
-  const preferences = profile?.preferences
+  // Read from the local cache so the values are right even before the profile
+  // loads (or while the device is offline); writes mirror to the profile.
+  const preferences = usePreferences()
   const uid = profile?.uid ?? null
 
-  const persist = async (patch: Parameters<typeof updatePreferences>[1]): Promise<void> => {
+  const persist = (patch: Parameters<typeof updatePreferences>[1]): void => {
+    updateCachedPreferences(patch)
     if (!uid) return
-    try {
-      await updatePreferences(uid, patch)
-    } catch {
+    void updatePreferences(uid, patch).catch(() => {
       // Appearance is already applied locally; a failed preference write is not
       // worth interrupting the user for.
-    }
+    })
   }
 
   return (
