@@ -84,8 +84,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const organization = detail.id === activeIdResolved ? detail.organization : null
   const member = detail.id === activeIdResolved ? detail.member : null
 
-  // 3. Invitations only matter while the user has no band to join.
-  const invitations = uid !== null && organizations.length === 0 ? invites : NO_INVITATIONS
+  // 3. Pending invitations addressed to this user, surfaced in the band
+  // switcher even when they already belong to a band (multi-band membership).
+  const invitations = uid !== null ? invites : NO_INVITATIONS
 
   // 4. Live list of the bands the user belongs to.
   useEffect(() => {
@@ -124,11 +125,12 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     })
   }, [activeIdResolved])
 
-  // 7. Pending invitations addressed to this user (join flow).
+  // 7. Pending invitations addressed to this user (join flow), always live so
+  // an invite can be accepted whether or not the user already has a band.
   useEffect(() => {
-    if (!uid || organizations.length > 0) return
+    if (!uid || !email) return
     return subscribeMyInvitations(email, setInvites)
-  }, [uid, email, organizations.length])
+  }, [uid, email])
 
   const switchOrganization = useCallback(
     async (organizationId: string) => {

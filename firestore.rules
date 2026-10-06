@@ -135,6 +135,20 @@ service cloud.firestore {
       }
     }
 
+    // ------------------------------------------- invitations (collection group)
+    //
+    // `subscribeMyInvitations` queries the "invitations" collection group to
+    // find the invitee without knowing which band invited them. Collection
+    // group queries only match rules declared with a recursive wildcard, so the
+    // nested /organizations/{id}/invitations rule below is not enough on its
+    // own: this grants invitees read access to their own invitation, and only
+    // their own.
+    match /{path=**}/invitations/{invitationId} {
+      allow read: if signedIn()
+        && validEmail(resource.data.email)
+        && resource.data.email == tokenEmail();
+    }
+
     // ------------------------------------------------------------ organizations
 
     match /organizations/{organizationId} {
