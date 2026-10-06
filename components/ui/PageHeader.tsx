@@ -54,10 +54,14 @@ export function PageHeader({
   titleLines = 1,
 }: PageHeaderProps) {
   const styles = useThemedStyles(createStyles)
-  const { gutter } = useResponsive()
+  const { gutter, isMobile } = useResponsive()
   const { t } = useTranslation()
 
   const showBack = back ?? router.canGoBack()
+  const titleStyle = titleVariant ?? (large ? "display" : "title")
+  // Phones get a compact large title: the same size reads far bigger on a
+  // narrow viewport and long names wrap into a wall of text.
+  const compactDisplay = titleStyle === "display" && isMobile
 
   const handleBack = (): void => {
     if (onBack) {
@@ -95,7 +99,8 @@ export function PageHeader({
 
         <View style={styles.titles}>
           <AppText
-            variant={titleVariant ?? (large ? "display" : "title")}
+            variant={titleStyle}
+            style={compactDisplay ? styles.titleCompact : undefined}
             numberOfLines={titleLines > 0 ? titleLines : undefined}
           >
             {title}
@@ -145,6 +150,8 @@ const createStyles = () =>
       ...Platform.select({ web: { position: "sticky" as never, top: 0 }, default: {} }),
       zIndex: 20,
     },
+    // Compact large title for phones (see `compactDisplay` above).
+    titleCompact: { fontSize: 25, lineHeight: 29 },
     back: {
       width: 40,
       height: 40,
