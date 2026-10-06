@@ -72,35 +72,37 @@ export function TimeField({
         </AppText>
       ) : null}
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={
-          selected ? `${displayLabel}. ${t("common.changeTime")}` : placeholderText
-        }
-        onPress={() => {
-          setDraftHour(selected?.hour ?? new Date().getHours())
-          setDraftMinute(selected?.minute ?? 0)
-          setOpen(true)
-        }}
-        style={({ pressed }) => [styles.trigger, error && styles.triggerError, pressed && styles.pressed]}
-      >
-        <ClockIcon size={16} color={error ? Theme.colors.danger : Theme.colors.textFaint} />
-        <AppText variant="body" tone={selected ? "default" : "faint"} style={styles.triggerText}>
-          {displayLabel}
-        </AppText>
+      <View style={[styles.trigger, error && styles.triggerError]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            selected ? `${displayLabel}. ${t("common.changeTime")}` : placeholderText
+          }
+          onPress={() => {
+            setDraftHour(selected?.hour ?? new Date().getHours())
+            setDraftMinute(selected?.minute ?? 0)
+            setOpen(true)
+          }}
+          style={({ pressed }) => [styles.triggerMain, pressed && styles.pressed]}
+        >
+          <ClockIcon size={16} color={error ? Theme.colors.danger : Theme.colors.textFaint} />
+          <AppText variant="body" tone={selected ? "default" : "faint"} style={styles.triggerText}>
+            {displayLabel}
+          </AppText>
+        </Pressable>
         {selected ? (
-          <AppText
-            variant="caption"
-            tone="faint"
-            onPress={() => onChange("")}
+          <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("common.clearTime")}
-            suppressHighlighting
+            onPress={() => onChange("")}
+            style={({ pressed }) => [styles.clear, pressed && styles.pressed]}
           >
-            {t("common.clear")}
-          </AppText>
+            <AppText variant="caption" tone="faint">
+              {t("common.clear")}
+            </AppText>
+          </Pressable>
         ) : null}
-      </Pressable>
+      </View>
 
       {error ? (
         <AppText variant="caption" tone="danger">
@@ -183,8 +185,7 @@ const createStyles = () =>
     host: { gap: 6 },
     trigger: {
       flexDirection: "row",
-      alignItems: "center",
-      gap: Theme.spacing.s,
+      alignItems: "stretch",
       minHeight: 46,
       paddingHorizontal: Theme.spacing.l,
       borderRadius: Theme.radii.m,
@@ -192,8 +193,17 @@ const createStyles = () =>
       borderColor: Theme.colors.border,
       backgroundColor: Theme.colors.surface,
     },
+    triggerMain: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.s,
+    },
     triggerError: { borderColor: Theme.colors.danger },
     triggerText: { flex: 1 },
+    // Sibling of the main press target: nesting buttons breaks web hydration.
+    clear: { alignItems: "center", justifyContent: "center", paddingLeft: Theme.spacing.m },
     columns: { flexDirection: "row", gap: Theme.spacing.m },
     column: { flex: 1, gap: 4 },
     list: {

@@ -27,4 +27,14 @@ describe("react-native-web deprecations", () => {
 
     expect(offenders, `Use style={{ pointerEvents }} in: ${offenders.join(", ")}`).toEqual([])
   })
+
+  it("never renders AppText as a button", () => {
+    // `<AppText accessibilityRole="button">` becomes a nested <button> inside
+    // another pressable target on web (invalid HTML + hydration error).
+    const files = [...walk(join(process.cwd(), "app")), ...walk(join(process.cwd(), "components"))]
+    const pattern = /<AppText\b[^>]*accessibilityRole="button"/
+    const offenders = files.filter((file) => pattern.test(readFileSync(file, "utf8")))
+
+    expect(offenders, `Use Pressable instead of AppText with role=button in: ${offenders.join(", ")}`).toEqual([])
+  })
 })
