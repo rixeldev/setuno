@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react"
 import { Animated, Easing, Platform, StyleSheet, View } from "react-native"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -60,24 +61,25 @@ interface ErrorStateProps {
 
 /** Error state with a retry affordance (network, permission, offline). */
 export function ErrorState({
-  title = "Something went wrong",
+  title,
   message,
   onRetry,
   compact = false,
 }: ErrorStateProps) {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   return (
     <View style={[styles.empty, compact && styles.emptyCompact]}>
       <View style={[styles.iconWrap, styles.iconError]}>
         <View style={styles.errorDot} />
       </View>
       <AppText variant="heading" style={styles.centered}>
-        {title}
+        {title ?? t("common.somethingWentWrong")}
       </AppText>
       <AppText variant="body" tone="muted" style={styles.centered}>
         {message}
       </AppText>
-      {onRetry ? <Button label="Try again" variant="secondary" onPress={onRetry} /> : null}
+      {onRetry ? <Button label={t("common.tryAgain")} variant="secondary" onPress={onRetry} /> : null}
     </View>
   )
 }

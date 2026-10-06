@@ -13,7 +13,7 @@ export default {
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
-      backgroundColor: "#14100E",
+      backgroundColor: "#0B0B14",
     },
     ios: {
       supportsTablet: true,
@@ -25,7 +25,7 @@ export default {
       versionCode: 1,
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#E2592B",
+        backgroundColor: "#0B0B14",
         backgroundImage: "./assets/adaptive-icon.png",
       },
       icon: "./assets/icon.png",
@@ -54,10 +54,10 @@ export default {
         "expo-splash-screen",
         {
           image: "./assets/icons/mipmap-xxxhdpi/ic_launcher.png",
-          backgroundColor: "#000B0A",
+          backgroundColor: "#0B0B14",
           dark: {
             image: "./assets/icons/mipmap-xxxhdpi/ic_launcher.png",
-            backgroundColor: "#000B0A",
+            backgroundColor: "#0B0B14",
           },
         },
       ],

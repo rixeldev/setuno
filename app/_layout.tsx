@@ -3,7 +3,6 @@ import { View } from "react-native"
 import { SafeAreaProvider } from "react-native-safe-area-context"
 import { StatusBar } from "expo-status-bar"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
-import { BottomSheetModalProvider } from "@gorhom/bottom-sheet"
 import { Stack } from "expo-router"
 import * as SplashScreen from "expo-splash-screen"
 import { useFonts } from "expo-font"
@@ -17,6 +16,8 @@ import { ToastProvider } from "@/components/ui/Toast"
 import { hydrateAppearance } from "@/services/themeManager"
 import { hydrateLanguage } from "@/services/i18next"
 import { hydratePreferences } from "@/services/prefs"
+import { hydrateRecentChords } from "@/services/recentChords"
+import { startSyncWatcher } from "@/services/sync"
 import { installWebDocumentStyles } from "@/libs/webStyles"
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined)
@@ -36,7 +37,12 @@ export default function Layout() {
   // before the first frame so nothing flashes with the wrong values (docs §32).
   useEffect(() => {
     let mounted = true
-    Promise.all([hydrateAppearance(), hydrateLanguage(), hydratePreferences()])
+    Promise.all([
+      hydrateAppearance(),
+      hydrateLanguage(),
+      hydratePreferences(),
+      hydrateRecentChords(),
+    ])
       .catch(() => undefined)
       .finally(() => {
         if (mounted) setPreferencesReady(true)
@@ -45,6 +51,10 @@ export default function Layout() {
       mounted = false
     }
   }, [])
+
+  // Offline writes live in the Firestore cache; this keeps the UI informed and
+  // drains the queue as soon as the connection is back (docs §37).
+  useEffect(() => startSyncWatcher(), [])
 
   // Clears the browser's default focus ring around text fields (web only).
   useEffect(() => {
@@ -65,28 +75,26 @@ export default function Layout() {
     <SafeAreaProvider>
       <StatusBar />
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <BottomSheetModalProvider>
-          <ToastProvider>
-            <AuthProvider>
-              <OrganizationProvider>
-                <OrgDataProvider>
-                  <Stack
-                    screenOptions={{
-                      headerShown: false,
-                      animation: "slide_from_right",
-                      animationDuration: 180,
-                      contentStyle: { backgroundColor: Theme.colors.background },
-                    }}
-                  >
-                    <Stack.Screen name="index" />
-                    <Stack.Screen name="(auth)" />
-                    <Stack.Screen name="(app)" />
-                  </Stack>
-                </OrgDataProvider>
-              </OrganizationProvider>
-            </AuthProvider>
-          </ToastProvider>
-        </BottomSheetModalProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <OrganizationProvider>
+              <OrgDataProvider>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    animation: "slide_from_right",
+                    animationDuration: 180,
+                    contentStyle: { backgroundColor: Theme.colors.background },
+                  }}
+                >
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(app)" />
+                </Stack>
+              </OrgDataProvider>
+            </OrganizationProvider>
+          </AuthProvider>
+        </ToastProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>
   )

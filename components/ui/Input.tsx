@@ -8,6 +8,7 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from "react-native"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -71,6 +72,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
   ref,
 ) {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const initialValue = typeof rest.value === "string" ? rest.value : ""
   const [focused, setFocused] = useState(initialValue.length > 0)
   const [hidden, setHidden] = useState(secure)
@@ -150,7 +152,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
             onPress={() => setHidden((value) => !value)}
             hitSlop={Theme.hitSlop}
             accessibilityRole="button"
-            accessibilityLabel={hidden ? "Show password" : "Hide password"}
+            accessibilityLabel={hidden ? t("common.showPassword") : t("common.hidePassword")}
             style={styles.adornment}
           >
             {hidden ? (
@@ -190,6 +192,7 @@ export const SearchInput = forwardRef<TextInput, SearchInputProps>(function Sear
   { value, onClear, ...rest },
   ref,
 ) {
+  const { t } = useTranslation()
   return (
     <Input
       ref={ref}
@@ -198,7 +201,7 @@ export const SearchInput = forwardRef<TextInput, SearchInputProps>(function Sear
       autoCapitalize="none"
       autoCorrect={false}
       clearButtonMode="never"
-      accessibilityLabel={rest.label ?? "Search"}
+      accessibilityLabel={rest.label ?? t("common.search")}
       {...rest}
       right={
         typeof value === "string" && value.length > 0 ? (
@@ -206,7 +209,7 @@ export const SearchInput = forwardRef<TextInput, SearchInputProps>(function Sear
             onPress={onClear}
             hitSlop={Theme.hitSlop}
             accessibilityRole="button"
-            accessibilityLabel="Clear search"
+            accessibilityLabel={t("common.clearSearch")}
           >
             <CloseIcon color={Theme.colors.textFaint} size={16} />
           </Pressable>
@@ -241,14 +244,16 @@ export function SelectField<T extends string>({
   value,
   options,
   onChange,
-  placeholder = "Select…",
+  placeholder,
   error,
   hint,
   containerStyle,
 }: SelectFieldProps<T>) {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const selected = options.find((option) => option.value === value)
+  const placeholderText = placeholder ?? t("common.select")
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -259,9 +264,9 @@ export function SelectField<T extends string>({
       ) : null}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={label ?? placeholder}
-        accessibilityValue={{ text: selected?.label ?? placeholder }}
-        accessibilityHint="Opens the list of options"
+        accessibilityLabel={label ?? placeholderText}
+        accessibilityValue={{ text: selected?.label ?? placeholderText }}
+        accessibilityHint={t("common.opensOptions")}
         onPress={() => setOpen((value) => !value)}
         style={[
           styles.field,
@@ -269,7 +274,7 @@ export function SelectField<T extends string>({
         ]}
       >
         <AppText tone={selected ? "default" : "faint"} numberOfLines={1} style={styles.selectText}>
-          {selected?.label ?? placeholder}
+          {selected?.label ?? placeholderText}
         </AppText>
       </Pressable>
 
@@ -277,7 +282,7 @@ export function SelectField<T extends string>({
         <>
           <Pressable
             style={styles.backdrop}
-            accessibilityLabel="Close options"
+            accessibilityLabel={t("common.close")}
             accessibilityRole="button"
             onPress={() => setOpen(false)}
           />

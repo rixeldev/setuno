@@ -1,9 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
-import { useThemeVersion } from "@/services/themeManager"
+import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { CheckIcon, CloseIcon, InfoIcon } from "@/components/ui/Icons"
 
 export type ToastKind = "success" | "error" | "info"
@@ -78,14 +79,9 @@ export function useToast(): ToastContextValue {
   return context
 }
 
-const kindColors: Record<ToastKind, string> = {
-  success: Theme.colors.success,
-  error: Theme.colors.danger,
-  info: Theme.colors.primary,
-}
-
 function ToastSnackbar({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }) {
-  useThemeVersion()
+  const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const progress = useState(() => new Animated.Value(0))[0]
 
@@ -99,7 +95,13 @@ function ToastSnackbar({ toast, onDismiss }: { toast: ToastItem; onDismiss: () =
   }, [progress, toast.id])
 
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [24, 0] })
-  const accent = kindColors[toast.kind]
+  // Resolved per render so a theme switch repaints the snackbar too.
+  const accent =
+    toast.kind === "success"
+      ? Theme.colors.success
+      : toast.kind === "error"
+        ? Theme.colors.danger
+        : Theme.colors.primary
 
   return (
     <View style={[styles.host, { pointerEvents: "none" }]}>
@@ -111,11 +113,12 @@ function ToastSnackbar({ toast, onDismiss }: { toast: ToastItem; onDismiss: () =
             opacity: progress,
             transform: [{ translateY }],
             bottom: Math.max(insets.bottom, 12) + (Platform.OS === "web" ? 24 : 76),
+            // `pointerEvents` belongs to the style on react-native-web.
+            pointerEvents: "box-none",
           },
         ]}
-        pointerEvents="box-none"
       >
-        <View style={styles.row} pointerEvents="none">
+        <View style={[styles.row, { pointerEvents: "none" }]}>
           <View style={[styles.iconWrap, { backgroundColor: `${accent}22` }]}>
             {toast.kind === "success" ? (
               <CheckIcon color={accent} size={16} />
@@ -146,7 +149,7 @@ function ToastSnackbar({ toast, onDismiss }: { toast: ToastItem; onDismiss: () =
           hitSlop={Theme.hitSlop}
           style={styles.close}
           accessibilityRole="button"
-          accessibilityLabel="Dismiss notification"
+          accessibilityLabel={t("common.dismiss")}
         >
           <CloseIcon color={Theme.colors.textFaint} size={14} />
         </Pressable>
@@ -155,57 +158,58 @@ function ToastSnackbar({ toast, onDismiss }: { toast: ToastItem; onDismiss: () =
   )
 }
 
-const styles = StyleSheet.create({
-  host: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: "flex-end",
-    zIndex: 10_000,
-  },
-  snackbar: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Theme.spacing.m,
-    paddingVertical: Theme.spacing.m,
-    paddingHorizontal: Theme.spacing.l,
-    borderRadius: Theme.radii.xl,
-    borderWidth: 1,
-    borderColor: Theme.colors.borderSoft,
-    backgroundColor: Theme.colors.modal,
-    ...Theme.shadows.lg,
-    maxWidth: 560,
-    alignSelf: "center",
-  },
-  row: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Theme.spacing.m,
-  },
-  iconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  message: {
-    flex: 1,
-    color: Theme.colors.text,
-    fontSize: Theme.sizes.h5,
-    fontFamily: Theme.fonts.onest,
-    lineHeight: Theme.sizes.h5 * 1.4,
-  },
-  action: { paddingHorizontal: Theme.spacing.s },
-  actionText: {
-    fontSize: Theme.sizes.h5,
-    fontFamily: Theme.fonts.onestBold,
-  },
-  close: { padding: 2 },
-})
+const createStyles = () =>
+  StyleSheet.create({
+    host: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+      justifyContent: "flex-end",
+      zIndex: 10_000,
+    },
+    snackbar: {
+      position: "absolute",
+      left: 16,
+      right: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.m,
+      paddingVertical: Theme.spacing.m,
+      paddingHorizontal: Theme.spacing.l,
+      borderRadius: Theme.radii.xl,
+      borderWidth: 1,
+      borderColor: Theme.colors.borderSoft,
+      backgroundColor: Theme.colors.modal,
+      ...Theme.shadows.lg,
+      maxWidth: 560,
+      alignSelf: "center",
+    },
+    row: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.m,
+    },
+    iconWrap: {
+      width: 28,
+      height: 28,
+      borderRadius: 999,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    message: {
+      flex: 1,
+      color: Theme.colors.text,
+      fontSize: Theme.sizes.h5,
+      fontFamily: Theme.fonts.onest,
+      lineHeight: Theme.sizes.h5 * 1.4,
+    },
+    action: { paddingHorizontal: Theme.spacing.s },
+    actionText: {
+      fontSize: Theme.sizes.h5,
+      fontFamily: Theme.fonts.onestBold,
+    },
+    close: { padding: 2 },
+  })

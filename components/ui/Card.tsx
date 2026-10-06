@@ -1,5 +1,11 @@
 import React from "react"
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
+import {
+  Pressable,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -77,7 +83,9 @@ export function Chip({
   style,
 }: ChipProps) {
   const styles = useThemedStyles(createStyles)
-  const toneStyle = selected ? styles[`selected_${tone}`] : styles[`chip_${tone}`]
+  const toneStyle = selected
+    ? styles[`selected_${tone}`]
+    : styles[`chip_${tone}`]
 
   return (
     <Pressable
@@ -150,7 +158,13 @@ interface SectionProps {
 }
 
 /** Titled block with an optional trailing action (dashboard sections). */
-export function Section({ title, subtitle, action, children, style }: SectionProps) {
+export function Section({
+  title,
+  subtitle,
+  action,
+  children,
+  style,
+}: SectionProps) {
   const styles = useThemedStyles(createStyles)
   return (
     <View style={[styles.section, style]}>
@@ -198,16 +212,46 @@ const createStyles = () =>
       borderWidth: 1,
     },
     chipSmall: { paddingHorizontal: Theme.spacing.s, paddingVertical: 4 },
-    chip_default: { backgroundColor: Theme.colors.surfaceHigh, borderColor: Theme.colors.border },
-    chip_primary: { backgroundColor: Theme.colors.surfaceHigh, borderColor: Theme.colors.border },
-    chip_accent: { backgroundColor: Theme.colors.accentSoft, borderColor: "transparent" },
-    chip_danger: { backgroundColor: Theme.colors.dangerSoft, borderColor: "transparent" },
-    chip_success: { backgroundColor: Theme.colors.successSoft, borderColor: "transparent" },
-    selected_default: { backgroundColor: Theme.colors.surfaceMuted, borderColor: Theme.colors.border },
-    selected_primary: { backgroundColor: Theme.colors.primarySoft, borderColor: Theme.colors.primary },
-    selected_accent: { backgroundColor: Theme.colors.accentSoft, borderColor: Theme.colors.accent },
-    selected_danger: { backgroundColor: Theme.colors.dangerSoft, borderColor: Theme.colors.danger },
-    selected_success: { backgroundColor: Theme.colors.successSoft, borderColor: Theme.colors.success },
+    chip_default: {
+      backgroundColor: Theme.colors.surfaceHigh,
+      borderColor: Theme.colors.border,
+    },
+    chip_primary: {
+      backgroundColor: Theme.colors.surfaceHigh,
+      borderColor: Theme.colors.border,
+    },
+    chip_accent: {
+      backgroundColor: Theme.colors.accentSoft,
+      borderColor: "transparent",
+    },
+    chip_danger: {
+      backgroundColor: Theme.colors.dangerSoft,
+      borderColor: "transparent",
+    },
+    chip_success: {
+      backgroundColor: Theme.colors.successSoft,
+      borderColor: "transparent",
+    },
+    selected_default: {
+      backgroundColor: Theme.colors.surfaceMuted,
+      borderColor: Theme.colors.border,
+    },
+    selected_primary: {
+      backgroundColor: Theme.colors.primarySoft,
+      borderColor: Theme.colors.primary,
+    },
+    selected_accent: {
+      backgroundColor: Theme.colors.accentSoft,
+      borderColor: Theme.colors.accent,
+    },
+    selected_danger: {
+      backgroundColor: Theme.colors.dangerSoft,
+      borderColor: Theme.colors.danger,
+    },
+    selected_success: {
+      backgroundColor: Theme.colors.successSoft,
+      borderColor: Theme.colors.success,
+    },
     badge: {
       paddingHorizontal: Theme.spacing.s,
       paddingVertical: 3,

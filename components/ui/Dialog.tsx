@@ -9,6 +9,7 @@ import {
   StyleSheet,
   View,
 } from "react-native"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -43,7 +44,7 @@ export function Dialog({
   description,
   children,
   confirmLabel,
-  cancelLabel = "Cancel",
+  cancelLabel,
   onConfirm,
   confirmLoading = false,
   confirmDisabled = false,
@@ -51,6 +52,7 @@ export function Dialog({
   hideActions = false,
 }: DialogProps) {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const progress = useState(() => new Animated.Value(0))[0]
 
   useEffect(() => {
@@ -74,7 +76,7 @@ export function Dialog({
     >
       <Pressable
         style={styles.backdrop}
-        accessibilityLabel="Close dialog"
+        accessibilityLabel={t("common.close")}
         accessibilityRole="button"
         onPress={onClose}
       />
@@ -98,7 +100,7 @@ export function Dialog({
               onPress={onClose}
               hitSlop={Theme.hitSlop}
               accessibilityRole="button"
-              accessibilityLabel="Close"
+              accessibilityLabel={t("common.close")}
               style={styles.close}
             >
               <CloseIcon color={Theme.colors.textMuted} size={18} />
@@ -117,7 +119,12 @@ export function Dialog({
 
           {hideActions ? null : (
             <View style={styles.actions}>
-              <Button label={cancelLabel} variant="secondary" onPress={onClose} style={styles.action} />
+              <Button
+                label={cancelLabel ?? t("common.cancel")}
+                variant="secondary"
+                onPress={onClose}
+                style={styles.action}
+              />
               {onConfirm && confirmLabel ? (
                 <Button
                   label={confirmLabel}

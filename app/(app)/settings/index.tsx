@@ -20,6 +20,8 @@ import {
   PaletteIconNew,
 } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
+import { LanguageSheet } from "@/components/settings/LanguageSheet"
+import { ThemeSheet } from "@/components/settings/ThemeSheet"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
@@ -27,10 +29,8 @@ import { getAppearance } from "@/services/themeManager"
 import { useLanguagePreference } from "@/services/i18next"
 import { getDeviceLanguage } from "@/libs/deviceLanguage"
 import { LANGUAGE_NAMES, matchLanguage } from "@/libs/language"
-import { ACCENTS } from "@/libs/appearance"
 import { toFriendlyError } from "@/services/errors"
 import { pluralize } from "@/libs/format"
-import { ROLE_LABELS } from "@/interfaces"
 
 interface RowProps {
   icon: React.ComponentType<{ size?: number; color?: string }>
@@ -54,13 +54,18 @@ export default function SettingsScreen() {
   const { songs, setlists, performances, members } = useOrgData()
   const [confirmSignOut, setConfirmSignOut] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  const [sheet, setSheet] = useState<"theme" | "language" | null>(null)
 
   const displayName = profile?.displayName ?? user?.displayName ?? ""
   const email = user?.email ?? profile?.email ?? ""
   const appearance = getAppearance()
   const languagePreference = useLanguagePreference()
   const modeLabel =
-    appearance.mode === "dark" ? t("settings.dark") : t("settings.light")
+    appearance.mode === "system"
+      ? t("settings.system")
+      : appearance.mode === "light"
+        ? t("settings.light")
+        : t("settings.dark")
   const languageLabel =
     languagePreference === "device"
       ? `${t("settings.automatic")} · ${LANGUAGE_NAMES[matchLanguage(getDeviceLanguage())]}`
@@ -82,7 +87,7 @@ export default function SettingsScreen() {
   return (
     <ScreenContainer
       title={t("settings.settings")}
-      subtitle={t("settings.subtitle", { defaultValue: "Your account and band" })}
+      subtitle={t("settings.subtitle")}
       large
     >
       <Card style={styles.card}>
@@ -102,7 +107,9 @@ export default function SettingsScreen() {
                 label={
                   isOwner(user?.uid, organization?.ownerId)
                     ? t("organizations.owner")
-                    : ROLE_LABELS[role]
+                    : role === "admin"
+                      ? t("organizations.admin")
+                      : t("organizations.member")
                 }
                 tone="primary"
                 style={styles.badge}
@@ -130,15 +137,15 @@ export default function SettingsScreen() {
         <Row
           icon={PaletteIconNew}
           title={t("settings.appearance")}
-          subtitle={`${modeLabel} · ${ACCENTS[appearance.accent].name}`}
-          onPress={() => router.push("/settings/appearance")}
+          subtitle={modeLabel}
+          onPress={() => setSheet("theme")}
         />
         <Divider />
         <Row
           icon={LanguageIcon}
           title={t("settings.language")}
           subtitle={languageLabel}
-          onPress={() => router.push("/settings/language")}
+          onPress={() => setSheet("language")}
         />
         <Divider />
         <Row
@@ -182,6 +189,9 @@ export default function SettingsScreen() {
         tone="danger"
         onConfirm={handleSignOut}
       />
+
+      <ThemeSheet visible={sheet === "theme"} onClose={() => setSheet(null)} />
+      <LanguageSheet visible={sheet === "language"} onClose={() => setSheet(null)} />
     </ScreenContainer>
   )
 }

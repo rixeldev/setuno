@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react"
 import AsyncStorage from "@react-native-async-storage/async-storage"
+import { Appearance as SystemAppearance } from "react-native"
 import { Theme, colorWithOpacity, type ThemeColorKey } from "@/constants/Theme"
 import {
   DEFAULT_ACCENT,
@@ -22,8 +23,10 @@ const listeners = new Set<Listener>()
 let appearance: Appearance = { mode: "dark", accent: DEFAULT_ACCENT }
 let snapshot = 0
 
-const DARK_BASE = "#0A0C10"
-const LIGHT_BASE = "#F7F8FA"
+/** Deep night / soft paper bases, plus the ink used to darken light mode. */
+const DARK_BASE = "#0B0B14"
+const LIGHT_BASE = "#F7F7FB"
+const INK = "#0A0A12"
 
 const hexToRgb = (hex: string): [number, number, number] => {
   const clean = hex.replace("#", "").padEnd(6, "0").slice(0, 6)
@@ -34,6 +37,7 @@ const hexToRgb = (hex: string): [number, number, number] => {
 const rgbToHex = (rgb: [number, number, number]): string =>
   `#${rgb.map((value) => Math.round(value).toString(16).padStart(2, "0")).join("")}`
 
+/** Lerp from `a` to `b` by `amount` (0 = a, 1 = b). */
 const mix = (a: string, b: string, amount: number): string => {
   const ca = hexToRgb(a)
   const cb = hexToRgb(b)
@@ -43,6 +47,9 @@ const mix = (a: string, b: string, amount: number): string => {
     ca[2] + (cb[2] - ca[2]) * amount,
   ])
 }
+
+/** Shifts a colour towards the near-black ink (keeps light mode legible). */
+const darken = (color: string, amount: number): string => mix(color, INK, amount)
 
 const setColor = (key: ThemeColorKey, value: string): void => {
   ;(Theme.colors as Record<ThemeColorKey, string>)[key] = value
@@ -54,58 +61,80 @@ const setGradient = (key: keyof typeof Theme.gradients, value: readonly string[]
 
 /**
  * Derives the full colour token set for a given accent + appearance mode.
- * Dark surfaces are tinted towards the accent, light surfaces towards white so
- * the product keeps the same identity in both modes.
+ *
+ * Dark surfaces are tinted a few percent towards the accent so the product
+ * keeps its identity without losing depth. In light mode the accent itself is
+ * darkened (and `onPrimary` flips to white) so text, icons and buttons keep a
+ * comfortable contrast ratio on paper-white surfaces.
  */
-const buildPalette = (accent: AccentPalette, mode: AppearanceMode): void => {
+const buildPalette = (accent: AccentPalette, mode: "dark" | "light"): void => {
   const dark = mode === "dark"
 
-  const background = dark ? mix(accent.primary, DARK_BASE, 0.05) : mix(accent.primary, LIGHT_BASE, 0.03)
-  const surface = dark ? mix(accent.primary, "#131720", 0.06) : "#FFFFFF"
-  const surfaceHigh = dark ? mix(accent.primary, "#1B212C", 0.08) : mix(accent.primary, "#FFFFFF", 0.0)
-  const border = dark ? mix(accent.primary, "#232B38", 0.22) : mix(accent.primary, "#DCE3EC", 0.18)
-  const chrome = dark ? mix(accent.primary, "#0D1017", 0.05) : "#FFFFFF"
+  const primary = dark ? mix(accent.primary, "#FFFFFF", 0.08) : darken(accent.primary, 0.5)
+  const primaryStrong = dark ? accent.primaryStrong : darken(accent.primaryStrong, 0.5)
+  const highlight = dark ? accent.accent : darken(accent.accent, 0.52)
+  const onPrimary = dark ? accent.onPrimary : "#FFFFFF"
+
+  const background = dark ? mix(DARK_BASE, primary, 0.05) : mix(LIGHT_BASE, primary, 0.035)
+  const surface = dark ? mix("#141420", primary, 0.05) : "#FFFFFF"
+  const surfaceHigh = dark ? mix("#1D1D2B", primary, 0.07) : mix("#FFFFFF", primary, 0.04)
+  const surfaceMuted = dark ? mix("#262636", primary, 0.07) : mix("#EDEDF6", primary, 0.08)
+  const border = dark ? mix("#2C2C3F", primary, 0.2) : mix("#DFDFEC", primary, 0.18)
+  const chrome = dark ? mix("#0D0D17", primary, 0.04) : "#FFFFFF"
+  const modal = dark ? mix("#191926", primary, 0.05) : "#FFFFFF"
+
+  const success = dark ? "#34D399" : "#047857"
+  const warning = dark ? "#FBBF24" : "#B45309"
+  const danger = dark ? "#FF6B7A" : "#B91C1C"
 
   setColor("background", background)
-  setColor("background2", dark ? mix(background, surface, 0.55) : mix(background, surface, 0.75))
-  setColor("text", dark ? "#F5F7FA" : "#101725")
-  setColor("textMuted", dark ? "#9AA4B2" : "#55606E")
-  setColor("textFaint", dark ? "#6B7480" : "#8590A0")
-  setColor("primary", accent.primary)
-  setColor("primaryStrong", accent.primaryStrong)
-  setColor("primarySoft", accent.primarySoft)
-  setColor("onPrimary", accent.onPrimary)
-  setColor("accent", accent.accent)
-  setColor("accentSoft", accent.accentSoft)
+  setColor("background2", dark ? mix(background, surface, 0.6) : mix(background, surface, 0.7))
+  setColor("text", dark ? "#F8F8FC" : "#14141E")
+  setColor("textMuted", dark ? "#ADAEC6" : "#54566E")
+  setColor("textFaint", dark ? "#8A8CA3" : "#63657D")
+  setColor("primary", primary)
+  setColor("primaryStrong", primaryStrong)
+  setColor("primarySoft", colorWithOpacity(primary, dark ? 0.2 : 0.14))
+  setColor("onPrimary", onPrimary)
+  setColor("accent", highlight)
+  setColor("accentSoft", colorWithOpacity(highlight, dark ? 0.18 : 0.14))
+  setColor("success", success)
+  setColor("successSoft", colorWithOpacity(success, dark ? 0.16 : 0.12))
+  setColor("warning", warning)
+  setColor("warningSoft", colorWithOpacity(warning, dark ? 0.16 : 0.12))
+  setColor("danger", danger)
+  setColor("dangerSoft", colorWithOpacity(danger, dark ? 0.16 : 0.12))
   setColor("surface", surface)
   setColor("surfaceHigh", surfaceHigh)
-  setColor("surfaceMuted", dark ? mix(accent.primary, "#202734", 0.08) : mix(accent.primary, "#EDF1F7", 0.12))
+  setColor("surfaceMuted", surfaceMuted)
   setColor("border", border)
-  setColor("borderSoft", dark ? colorWithOpacity("#FFFFFF", 0.08) : colorWithOpacity("#0B1220", 0.1))
-  setColor("modal", dark ? mix(accent.primary, "#161B24", 0.05) : "#FFFFFF")
+  setColor("borderSoft", dark ? colorWithOpacity("#FFFFFF", 0.09) : colorWithOpacity(INK, 0.09))
+  setColor("modal", modal)
   setColor("chrome", chrome)
-  setColor("backdrop", dark ? colorWithOpacity("#05070A", 0.72) : colorWithOpacity("#0B1220", 0.45))
+  setColor("backdrop", dark ? colorWithOpacity("#05050C", 0.66) : colorWithOpacity(INK, 0.45))
+  setColor("overlay", dark ? colorWithOpacity("#05050C", 0.88) : colorWithOpacity(INK, 0.62))
 
   setGradient(
     "background",
     dark
-      ? [mix(accent.primary, "#0B0E14", 0.08), background, chrome]
-      : ["#FFFFFF", background, mix(accent.primary, LIGHT_BASE, 0.06)],
+      ? [mix(DARK_BASE, primary, 0.09), background, chrome]
+      : ["#FFFFFF", background, mix(LIGHT_BASE, primary, 0.07)],
   )
   setGradient(
     "card",
-    dark ? [mix(accent.primary, "#161B24", 0.05), "#12161E"] : ["#FFFFFF", mix(accent.primary, "#F2F5F9", 0.3)],
+    dark ? [surfaceHigh, surface] : ["#FFFFFF", mix("#F1F1F9", primary, 0.3)],
   )
   setGradient(
     "cardHigh",
-    dark ? ["#1C222E", "#151A23"] : ["#FFFFFF", mix(accent.primary, "#EDF1F7", 0.25)],
+    dark ? [mix("#242436", primary, 0.08), surfaceHigh] : ["#FFFFFF", mix("#E9E9F4", primary, 0.25)],
   )
-  setGradient("primary", [accent.primary, accent.primaryStrong])
-  setGradient("primaryDeep", [accent.primaryStrong, mix(accent.primaryStrong, "#000000", 0.25)])
-  setGradient("accent", [accent.accent, mix(accent.accent, "#000000", 0.2)])
+  setGradient("primary", [primary, primaryStrong])
+  setGradient("primaryDeep", [primaryStrong, mix(primaryStrong, "#000000", 0.22)])
+  setGradient("accent", [highlight, mix(highlight, "#000000", 0.18)])
+  setGradient("danger", dark ? ["#FF7A87", "#DC2626"] : ["#F87171", "#B91C1C"])
 
-  Theme.shadows.glow.boxShadow = `0px 0px 16px ${colorWithOpacity(accent.primary, 0.4)}`
-  Theme.shadows.glowDanger.boxShadow = `0px 0px 14px ${colorWithOpacity(Theme.colors.danger, 0.4)}`
+  Theme.shadows.glow.boxShadow = `0px 0px 16px ${colorWithOpacity(primary, 0.42)}`
+  Theme.shadows.glowDanger.boxShadow = `0px 0px 14px ${colorWithOpacity(danger, 0.42)}`
 }
 
 const notify = (): void => {
@@ -114,6 +143,14 @@ const notify = (): void => {
 }
 
 export const getAppearance = (): Appearance => appearance
+
+/** Collapses "system" onto the current device/browser colour scheme. */
+export const resolveAppearanceMode = (mode: AppearanceMode): "dark" | "light" =>
+  mode === "system"
+    ? SystemAppearance.getColorScheme() === "light"
+      ? "light"
+      : "dark"
+    : mode
 
 /** Applies and (optionally) persists an appearance selection. */
 export const applyAppearance = (
@@ -124,11 +161,26 @@ export const applyAppearance = (
     mode: next.mode ?? appearance.mode,
     accent: next.accent ?? appearance.accent,
   }
-  buildPalette(getAccent(appearance.accent), appearance.mode)
+  buildPalette(getAccent(appearance.accent), resolveAppearanceMode(appearance.mode))
   if (options.persist !== false) {
     void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(appearance))
   }
   notify()
+}
+
+/**
+ * Keeps "system" in step with the OS: when the device flips between light and
+ * dark the palette is rebuilt without touching the stored preference.
+ */
+let systemSchemeSubscription: { remove: () => void } | null = null
+
+const watchSystemScheme = (): void => {
+  if (systemSchemeSubscription) return
+  systemSchemeSubscription = SystemAppearance.addChangeListener(({ colorScheme }) => {
+    if (appearance.mode !== "system") return
+    buildPalette(getAccent(appearance.accent), colorScheme === "light" ? "light" : "dark")
+    notify()
+  })
 }
 
 /** Applies a single accent (used by the appearance settings screen). */
@@ -158,6 +210,7 @@ export const hydrateAppearance = async (): Promise<Appearance> => {
   } catch {
     // A corrupted preference must never block the app: keep the defaults.
   }
+  watchSystemScheme()
   return appearance
 }
 

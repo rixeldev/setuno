@@ -6,92 +6,79 @@ export interface AccentPalette {
   /** Brand colour used for primary actions. */
   primary: string
   primaryStrong: string
-  /** Colour drawn on top of `primary`. */
+  /** Colour drawn on top of `primary` (dark mode; light mode always uses white). */
   onPrimary: string
-  /** Tinted fill used behind primary-coloured elements. */
-  primarySoft: string
-  /** Secondary highlight (chords, key badges). */
+  /** Secondary highlight (chords, key badges) paired with the primary. */
   accent: string
-  accentSoft: string
 }
 
 /**
- * Stage Book accents. Each one is a musical/stage inspired hue that keeps a
- * comfortable contrast ratio against both the dark and light surfaces.
+ * Stage Book accents. Every palette is tuned for the two modes:
+ * bright and luminous on the dark stage surfaces, and darkened by the palette
+ * engine (`services/themeManager.ts`) when light mode renders it on white.
+ * The `accent` of each entry is picked to contrast with its `primary`.
  */
 export const ACCENTS: Record<AccentId, AccentPalette> = {
-  teal: {
-    id: "teal",
-    name: "Teal Stage",
-    primary: "#14B8A6",
-    primaryStrong: "#0D9488",
-    onPrimary: "#04201E",
-    primarySoft: "#14B8A61F",
-    accent: "#F5A524",
-    accentSoft: "#F5A5241F",
+  ember: {
+    id: "ember",
+    name: "Ember Orange",
+    primary: "#EA580C",
+    primaryStrong: "#C2410C",
+    onPrimary: "#2B1003",
+    accent: "#2DD4BF",
   },
-  amber: {
-    id: "amber",
-    name: "Warm Amber",
-    primary: "#F59E0B",
-    primaryStrong: "#D97706",
-    onPrimary: "#2A1A03",
-    primarySoft: "#F59E0B1F",
-    accent: "#38BDF8",
-    accentSoft: "#38BDF81F",
-  },
-  indigo: {
-    id: "indigo",
-    name: "Indigo Night",
-    primary: "#818CF8",
-    primaryStrong: "#6366F1",
-    onPrimary: "#12123A",
-    primarySoft: "#818CF81F",
-    accent: "#F472B6",
-    accentSoft: "#F472B61F",
+  ocean: {
+    id: "ocean",
+    name: "Stage Ocean",
+    primary: "#38BDF8",
+    primaryStrong: "#0284C7",
+    onPrimary: "#06263C",
+    accent: "#FBBF24",
   },
   emerald: {
     id: "emerald",
-    name: "Emerald Room",
+    name: "Encore Emerald",
     primary: "#34D399",
     primaryStrong: "#059669",
-    onPrimary: "#032018",
-    primarySoft: "#34D3991F",
-    accent: "#FBBF24",
-    accentSoft: "#FBBF241F",
+    onPrimary: "#032A1E",
+    accent: "#F472B6",
   },
-  crimson: {
-    id: "crimson",
-    name: "Crimson Hall",
+  sunset: {
+    id: "sunset",
+    name: "Sunset Coral",
     primary: "#FB7185",
     primaryStrong: "#E11D48",
-    onPrimary: "#2B0710",
-    primarySoft: "#FB71851F",
-    accent: "#38BDF8",
-    accentSoft: "#38BDF81F",
+    onPrimary: "#330812",
+    accent: "#FBBF24",
   },
-  violet: {
-    id: "violet",
-    name: "Violet Reverb",
-    primary: "#C084FC",
-    primaryStrong: "#9333EA",
-    onPrimary: "#23093B",
-    primarySoft: "#C084FC1F",
-    accent: "#4ADE80",
-    accentSoft: "#4ADE801F",
+  magenta: {
+    id: "magenta",
+    name: "Neon Magenta",
+    primary: "#E879F9",
+    primaryStrong: "#C026D3",
+    onPrimary: "#310A35",
+    accent: "#22D3EE",
+  },
+  indigo: {
+    id: "indigo",
+    name: "Midnight Indigo",
+    primary: "#818CF8",
+    primaryStrong: "#4F46E5",
+    onPrimary: "#12143F",
+    accent: "#34D399",
   },
 }
 
 export const ACCENT_LIST: AccentPalette[] = Object.values(ACCENTS)
 
-export const DEFAULT_ACCENT: AccentId = "teal"
+export const DEFAULT_ACCENT: AccentId = "ember"
 
 export const isAccentId = (value: string): value is AccentId => value in ACCENTS
 
 export const getAccent = (id: string | null | undefined): AccentPalette =>
   (id && isAccentId(id) ? ACCENTS[id] : ACCENTS[DEFAULT_ACCENT]) as AccentPalette
 
-export const APPEARANCE_MODES: AppearanceMode[] = ["dark", "light"]
+export const APPEARANCE_MODES: AppearanceMode[] = ["dark", "light", "system"]
 
 export const isAppearanceMode = (value: string): value is AppearanceMode =>
-  value === "dark" || value === "light"
+  value === "dark" || value === "light" || value === "system"

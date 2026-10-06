@@ -1,7 +1,7 @@
 import React from "react"
 import { StyleSheet, Text, type StyleProp, type TextProps, type TextStyle } from "react-native"
 
-import { Theme } from "@/constants/Theme"
+import { Theme, type ThemeColorKey } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 
 export type TextVariant =
@@ -24,15 +24,16 @@ interface AppTextProps extends TextProps {
   children?: React.ReactNode
 }
 
-const TONE_COLORS: Record<TextTone, string> = {
-  default: Theme.colors.text,
-  muted: Theme.colors.textMuted,
-  faint: Theme.colors.textFaint,
-  primary: Theme.colors.primary,
-  accent: Theme.colors.accent,
-  danger: Theme.colors.danger,
-  success: Theme.colors.success,
-  inverse: Theme.colors.onPrimary,
+/** Tone -> palette token. Resolved per render so palettes never go stale. */
+const TONE_KEYS: Record<TextTone, ThemeColorKey> = {
+  default: "text",
+  muted: "textMuted",
+  faint: "textFaint",
+  primary: "primary",
+  accent: "accent",
+  danger: "danger",
+  success: "success",
+  inverse: "onPrimary",
 }
 
 /** Typography primitive: one place that owns the type scale. */
@@ -47,7 +48,7 @@ export function AppText({
   return (
     <Text
       {...rest}
-      style={[styles[variant], { color: TONE_COLORS[tone] }, style]}
+      style={[styles[variant], { color: Theme.colors[TONE_KEYS[tone]] }, style]}
       // Web: disable the tap highlight so links/rows feel native to both platforms.
       suppressHighlighting
     >

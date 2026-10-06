@@ -1,17 +1,22 @@
 import React from "react"
 import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 import { router } from "expo-router"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { useResponsive } from "@/hooks/useResponsive"
-import { AppText } from "@/components/ui/AppText"
+import { AppText, type TextVariant } from "@/components/ui/AppText"
 import { ArrowLeftIcon } from "@/components/ui/Icons"
 
 interface PageHeaderProps {
   title: string
   subtitle?: string
-  /** Shows a back affordance (hidden on root tabs). */
+  /**
+   * Back affordance. When omitted it appears automatically as soon as the
+   * router has somewhere to go back to, so no screen depends on the OS gesture.
+   * Pass `false` to hide it explicitly.
+   */
   back?: boolean
   onBack?: () => void
   right?: React.ReactNode
@@ -22,6 +27,13 @@ interface PageHeaderProps {
   style?: StyleProp<ViewStyle>
   /** Large title used on the main tab screens. */
   large?: boolean
+  /**
+   * Typography for the title. Defaults to `display` on large headers and
+   * `title` elsewhere; dynamic titles (band names) step it down so they fit.
+   */
+  titleVariant?: TextVariant
+  /** Lines before the title truncates. `0` means no limit. Defaults to 1. */
+  titleLines?: number
 }
 
 /**
@@ -31,16 +43,21 @@ interface PageHeaderProps {
 export function PageHeader({
   title,
   subtitle,
-  back = false,
+  back,
   onBack,
   right,
   top,
   elevated = false,
   style,
   large = false,
+  titleVariant,
+  titleLines = 1,
 }: PageHeaderProps) {
   const styles = useThemedStyles(createStyles)
   const { gutter } = useResponsive()
+  const { t } = useTranslation()
+
+  const showBack = back ?? router.canGoBack()
 
   const handleBack = (): void => {
     if (onBack) {
@@ -64,12 +81,12 @@ export function PageHeader({
       {top ? <View style={styles.top}>{top}</View> : null}
 
       <View style={[styles.titleRow, large && styles.titleRowLarge]}>
-        {back ? (
+        {showBack ? (
           <Pressable
             onPress={handleBack}
             hitSlop={Theme.hitSlop}
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t("common.goBack")}
             style={({ pressed }) => [styles.back, pressed && styles.pressed]}
           >
             <ArrowLeftIcon color={Theme.colors.text} size={20} />
@@ -77,7 +94,10 @@ export function PageHeader({
         ) : null}
 
         <View style={styles.titles}>
-          <AppText variant={large ? "display" : "title"} numberOfLines={1}>
+          <AppText
+            variant={titleVariant ?? (large ? "display" : "title")}
+            numberOfLines={titleLines > 0 ? titleLines : undefined}
+          >
             {title}
           </AppText>
           {subtitle ? (
@@ -126,12 +146,14 @@ const createStyles = () =>
       zIndex: 20,
     },
     back: {
-      width: 38,
-      height: 38,
+      width: 40,
+      height: 40,
       borderRadius: Theme.radii.m,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: Theme.colors.surfaceHigh,
+      borderWidth: 1,
+      borderColor: Theme.colors.borderSoft,
     },
     pressed: { opacity: 0.7 },
     titles: { flex: 1, gap: 2, minWidth: 0 },
