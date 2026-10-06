@@ -83,7 +83,7 @@ const OrgDataContext = createContext<OrgDataContextValue | null>(null)
  * band's contents.
  */
 export function OrgDataProvider({ children }: { children: React.ReactNode }) {
-  const { organizationId } = useOrganization()
+  const { organizationId, isAdmin } = useOrganization()
 
   const [snapshot, setSnapshot] = useState<OrgSnapshot>(EMPTY)
 
@@ -128,7 +128,11 @@ export function OrgDataProvider({ children }: { children: React.ReactNode }) {
       subscribePerformances(organizationId, (performances) => merge({ performances }), onError),
       subscribeSuggestions(organizationId, "all", (suggestions) => merge({ suggestions }), onError),
       subscribeMembers(organizationId, (members) => merge({ members }), onError),
-      subscribeInvitations(organizationId, (invitations) => merge({ invitations }), onError),
+      // Invitations are admin-only in the security rules: a plain member reads
+      // their own invite through the band switcher, never the collection.
+      ...(isAdmin
+        ? [subscribeInvitations(organizationId, (invitations) => merge({ invitations }), onError)]
+        : []),
       subscribeActivity(organizationId, (activity) => merge({ activity }), 25, onError),
     ]
 
@@ -136,7 +140,7 @@ export function OrgDataProvider({ children }: { children: React.ReactNode }) {
       cancelled = true
       unsubscribers.forEach((unsubscribe) => unsubscribe())
     }
-  }, [organizationId])
+  }, [organizationId, isAdmin])
 
   const current = organizationId !== null && snapshot.organizationId === organizationId ? snapshot : EMPTY
 
@@ -150,7 +154,8 @@ export function OrgDataProvider({ children }: { children: React.ReactNode }) {
       suggestions: current.suggestions,
       pendingSuggestions: current.suggestions.filter((item) => item.status === "pending"),
       members: current.members,
-      invitations: current.invitations,
+      // Demotions must not leave an admin-only slice behind.
+      invitations: isAdmin ? current.invitations : EMPTY.invitations,
       activity: current.activity,
       songLibrary,
       facets: songFacets(current.songs),
@@ -161,7 +166,7 @@ export function OrgDataProvider({ children }: { children: React.ReactNode }) {
       loading: current.pending,
       error: current.error,
     }
-  }, [current])
+  }, [current, isAdmin])
 
   return <OrgDataContext.Provider value={value}>{children}</OrgDataContext.Provider>
 }
