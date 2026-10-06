@@ -25,6 +25,8 @@ import type { RelativeDayLabels } from "@/libs/format"
 import { formatDateRange, formatDuration, formatDurationLong, formatRelativeDay } from "@/libs/format"
 import { parseIsoDate } from "@/libs/validation"
 import { estimateDurationSec } from "@/libs/songUtils"
+import { displayKey } from "@/libs/chords"
+import { usePreferences } from "@/services/prefs"
 
 /**
  * Setlist detail (docs §20), built for playing live: the running order is the
@@ -47,6 +49,8 @@ export default function SetlistDetail() {
   const { profile } = useAuth()
   const { organizationId, isAdmin } = useOrganization()
   const { setlists, songs, songLibrary, performances } = useOrgData()
+  // Keys are stored in letters; the reader settings decide how they are spelled.
+  const notation = usePreferences().chordNotation ?? "letters"
 
   const [editing, setEditing] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -262,7 +266,7 @@ export default function SetlistDetail() {
                         .join(" · ")}
                     </AppText>
                   </View>
-                  {entry.key ? <Badge label={entry.key} tone="accent" /> : null}
+                  {entry.key ? <Badge label={displayKey(entry.key, notation)} tone="accent" /> : null}
                 </Pressable>
 
                 {editing ? (
@@ -418,7 +422,7 @@ export default function SetlistDetail() {
                   {item.artist || t("common.unknownArtist")}
                 </AppText>
               </View>
-              <Badge label={item.key || "—"} tone="accent" />
+              <Badge label={item.key ? displayKey(item.key, notation) : "—"} tone="accent" />
             </Pressable>
           )}
         />

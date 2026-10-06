@@ -9,6 +9,8 @@ import { ChevronRightIcon, MusicIcon } from "@/components/ui/Icons"
 import { formatDuration, formatRelativeTime, pluralize } from "@/libs/format"
 import { toDate } from "@/interfaces/timestamp"
 import { countSongChords, countSongLines, estimateDurationSec } from "@/libs/songUtils"
+import { displayKey } from "@/libs/chords"
+import { usePreferences } from "@/services/prefs"
 import type { Song } from "@/interfaces"
 
 interface SongRowProps {
@@ -23,13 +25,16 @@ interface SongRowProps {
 /** One song in a list: title, artist, key and quick stats (docs §19). */
 export function SongRow({ song, onPress, right, dense = false }: SongRowProps) {
   const styles = useThemedStyles(createStyles)
+  // Keys are stored in letters; the reader settings decide how they are spelled.
+  const notation = usePreferences().chordNotation ?? "letters"
   const duration = song.durationSec ?? (song.sections.length > 0 ? estimateDurationSec(song.sections) : null)
+  const keyLabel = song.key ? displayKey(song.key, notation) : ""
 
   return (
     <Card
       padded={false}
       onPress={onPress}
-      accessibilityLabel={`${song.title}${song.artist ? ` by ${song.artist}` : ""}, key ${song.key || "unknown"}`}
+      accessibilityLabel={`${song.title}${song.artist ? ` by ${song.artist}` : ""}, key ${keyLabel || "unknown"}`}
       style={dense ? styles.dense : undefined}
     >
       <View style={styles.row}>
@@ -42,7 +47,7 @@ export function SongRow({ song, onPress, right, dense = false }: SongRowProps) {
             <AppText variant="bodyStrong" numberOfLines={1} style={styles.title}>
               {song.title}
             </AppText>
-            {song.key ? <Badge label={song.key} tone="accent" /> : null}
+            {keyLabel ? <Badge label={keyLabel} tone="accent" /> : null}
           </View>
 
           <AppText variant="caption" tone="muted" numberOfLines={1}>
