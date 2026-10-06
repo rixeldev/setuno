@@ -9,7 +9,7 @@ import { AppText } from "@/components/ui/AppText"
 import { Badge, Card, Section } from "@/components/ui/Card"
 import { Button, IconButton } from "@/components/ui/Button"
 import { Dialog } from "@/components/ui/Dialog"
-import { EmptyState } from "@/components/ui/States"
+import { EmptyState, ErrorState } from "@/components/ui/States"
 import { useToast } from "@/components/ui/Toast"
 import { CheckCircleIcon, ChevronRightIcon, PlusIcon, UserIcon } from "@/components/ui/Icons"
 import { ModalScreen } from "@/components/app/ModalScreen"
@@ -26,7 +26,8 @@ export default function OrganizationsScreen() {
   const router = useRouter()
   const toast = useToast()
   const { profile, user } = useAuth()
-  const { organizations, organizationId, invitations, switchOrganization } = useOrganization()
+  const { organizations, organizationId, invitations, invitationsError, switchOrganization } =
+    useOrganization()
 
   const [switching, setSwitching] = useState<string | null>(null)
   const [accepting, setAccepting] = useState<Invitation | null>(null)
@@ -133,7 +134,9 @@ export default function OrganizationsScreen() {
         </View>
       )}
 
-      {invitations.length > 0 ? (
+      {invitationsError ? (
+        <ErrorState message={invitationsError} />
+      ) : invitations.length > 0 ? (
         <Section title={t("auth.invitationsForYou")} subtitle={t("organizations.joinWithOneTap")}>
           {invitations.map((invitation) => (
             <Card key={invitation.id} style={{ gap: Theme.spacing.m }}>
@@ -153,6 +156,12 @@ export default function OrganizationsScreen() {
             </Card>
           ))}
         </Section>
+      ) : organizations.length === 0 ? (
+        <AppText variant="caption" tone="faint">
+          {t("organizations.invitationHint", {
+            email: profile?.email || user?.email || t("common.notAvailable"),
+          })}
+        </AppText>
       ) : null}
 
       <Dialog

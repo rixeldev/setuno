@@ -8,6 +8,7 @@ import {
   subscribeOrganization,
 } from "@/services/organizations"
 import { updateUserProfile } from "@/services/users"
+import { toFriendlyError } from "@/services/errors"
 import type {
   Invitation,
   Organization,
@@ -28,6 +29,8 @@ interface OrganizationContextValue {
   isAdmin: boolean
   organizationId: string | null
   invitations: Invitation[]
+  /** Set when the invitations query failed (e.g. rules not deployed yet). */
+  invitationsError: string | null
   switchOrganization: (organizationId: string) => Promise<void>
   refresh: () => Promise<void>
 }
@@ -64,6 +67,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [activeId, setActiveId] = useState<string | null>(null)
   const [detail, setDetail] = useState<OrganizationDetail>(EMPTY_DETAIL)
   const [invites, setInvites] = useState<Invitation[]>(NO_INVITATIONS)
+  const [invitesError, setInvitesError] = useState<string | null>(null)
 
   const loaded = uid !== null && loadedFor === uid
   const organizations = loaded ? bandRefs : NO_ORGANIZATIONS
@@ -129,7 +133,15 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   // an invite can be accepted whether or not the user already has a band.
   useEffect(() => {
     if (!uid || !email) return
-    return subscribeMyInvitations(email, setInvites)
+    return subscribeMyInvitations(
+      email,
+      (items) => {
+        setInvites(items)
+        setInvitesError(null)
+      },
+      (error) =>
+        setInvitesError(toFriendlyError(error, "We couldn't check your invitations.")),
+    )
   }, [uid, email])
 
   const switchOrganization = useCallback(
@@ -167,10 +179,21 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       isAdmin: member?.role === "admin",
       organizationId: activeIdResolved,
       invitations,
+      invitationsError: invitesError,
       switchOrganization,
       refresh,
     }),
-    [state, organizations, organization, member, invitations, activeIdResolved, switchOrganization, refresh],
+    [
+      state,
+      organizations,
+      organization,
+      member,
+      invitations,
+      invitesError,
+      activeIdResolved,
+      switchOrganization,
+      refresh,
+    ],
   )
 
   return <OrganizationContext.Provider value={value}>{children}</OrganizationContext.Provider>

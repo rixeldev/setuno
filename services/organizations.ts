@@ -474,11 +474,13 @@ export const acceptInvitation = async (
 /**
  * Invitations addressed to the signed-in user's own email, across every
  * organization. Uses a collection group query so an invitee can be found
- * without knowing which organization invited them.
+ * without knowing which organization invited them. Errors are surfaced to the
+ * caller (permission denied usually means the rules are not deployed yet).
  */
 export const subscribeMyInvitations = (
   email: string | null,
   onChange: (invitations: Invitation[]) => void,
+  onError?: (error: Error) => void,
 ): Unsubscribe => {
   if (!email) {
     onChange([])
@@ -488,6 +490,6 @@ export const subscribeMyInvitations = (
     query(collectionGroup(firestore, "invitations"), where("email", "==", normalizeEmail(email)), limitTo(20)),
     (snapshot) =>
       onChange(mapDocs(snapshot, mapInvitation).filter((invitation) => invitation.status === "pending")),
-    () => onChange([]),
+    (error) => onError?.(error),
   )
 }
