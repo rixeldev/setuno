@@ -23,6 +23,7 @@ import type { Performance, PerformanceInput, PerformanceStatus } from "@/interfa
 import { logActivity } from "@/services/activity"
 import { ValidationError } from "@/services/errors"
 import { ISO_DATE_PATTERN, TIME_PATTERN, toIsoDate } from "@/libs/validation"
+import { eachDayBetween } from "@/libs/format"
 
 const mapPerformance = (data: Record<string, unknown>, id: string): Performance => {
   const venue = (data.venue ?? {}) as Record<string, unknown>
@@ -32,6 +33,7 @@ const mapPerformance = (data: Record<string, unknown>, id: string): Performance 
     organizationId: String(data.organizationId ?? ""),
     name: String(data.name ?? ""),
     date: String(data.date ?? ""),
+    endDate: typeof data.endDate === "string" && data.endDate.length > 0 ? data.endDate : null,
     startTime: String(data.startTime ?? ""),
     endTime: String(data.endTime ?? ""),
     venue: {
@@ -94,6 +96,15 @@ const normalizeInput = (input: PerformanceInput): PerformanceInput => {
   if (!ISO_DATE_PATTERN.test(input.date)) {
     throw new ValidationError("Pick a valid date for the performance.", "date")
   }
+  const endDate = input.endDate && input.endDate.length > 0 ? input.endDate : null
+  if (endDate) {
+    if (!ISO_DATE_PATTERN.test(endDate)) {
+      throw new ValidationError("Pick a valid end date for the performance.", "endDate")
+    }
+    if (endDate < input.date) {
+      throw new ValidationError("The end date cannot be before the start date.", "endDate")
+    }
+  }
   if (input.startTime.length > 0 && !TIME_PATTERN.test(input.startTime)) {
     throw new ValidationError("Start time must use the HH:mm format.", "startTime")
   }
@@ -111,6 +122,7 @@ const normalizeInput = (input: PerformanceInput): PerformanceInput => {
   return {
     name,
     date: input.date,
+    endDate,
     startTime: input.startTime.trim(),
     endTime: input.endTime.trim(),
     venue: {
@@ -207,6 +219,16 @@ export const deletePerformance = async (
 /** Today's date as `yyyy-mm-dd` (used as the default performance date). */
 export const todayIsoDate = (): string => toIsoDate(new Date())
 
+/** Last day of a show: its end date when it has one, else its start date. */
+export const performanceLastDay = (performance: Performance): string => {
+  const end = performance.endDate
+  return end && end >= performance.date ? end : performance.date
+}
+
+/** Every calendar day a show occupies, so multi-day runs fill the calendar. */
+export const performanceDays = (performance: Performance): string[] =>
+  eachDayBetween(performance.date, performance.endDate)
+
 /** Splits performances into upcoming and past (docs §16). */
 export const partitionPerformances = (
   performances: Performance[],
@@ -216,12 +238,13 @@ export const partitionPerformances = (
   const past: Performance[] = []
 
   for (const performance of performances) {
-    const isUpcoming = performance.date >= today && performance.status !== "cancelled"
+    // A run that started yesterday but ends tomorrow is still upcoming.
+    const isUpcoming = performanceLastDay(performance) >= today && performance.status !== "cancelled"
     if (isUpcoming) upcoming.push(performance)
     else past.push(performance)
   }
 
-  past.sort((a, b) => b.date.localeCompare(a.date))
+  past.sort((a, b) => performanceLastDay(b).localeCompare(performanceLastDay(a)))
   return { upcoming, past }
 }
 

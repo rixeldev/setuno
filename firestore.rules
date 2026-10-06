@@ -276,7 +276,7 @@ service cloud.firestore {
         allow update: if isAdmin(organizationId)
           && request.resource.data.organizationId == organizationId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'name', 'date', 'startTime', 'endTime', 'venue', 'notes',
+            'name', 'date', 'endDate', 'startTime', 'endTime', 'venue', 'notes',
             'setlistId', 'setlistName', 'status', 'updatedAt'
           ]);
         allow delete: if isAdmin(organizationId);

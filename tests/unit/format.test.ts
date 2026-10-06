@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  eachDayBetween,
   formatDate,
   formatDateLong,
+  formatDateRange,
   formatDateTime,
   formatDuration,
   formatDurationLong,
@@ -106,6 +108,45 @@ describe("dates", () => {
     expect(formatRelativeTime(minutesAgo(60 * 24 * 3))).toBe("3 days ago")
     expect(formatRelativeTime(new Date(Date.now() + 60 * 60_000))).toBe("in 1h")
     expect(formatRelativeTime(null)).toBe("")
+  })
+
+  it("walks every day of a multi-day run", () => {
+    expect(eachDayBetween("2026-10-27", "2026-10-29")).toEqual([
+      "2026-10-27",
+      "2026-10-28",
+      "2026-10-29",
+    ])
+    expect(eachDayBetween("2026-10-27")).toEqual(["2026-10-27"])
+    expect(eachDayBetween("2026-10-29", "2026-10-27")).toEqual(["2026-10-29"])
+    expect(eachDayBetween("nope")).toEqual([])
+  })
+
+  it("caps an absurd range", () => {
+    expect(eachDayBetween("2026-01-01", "2030-01-01", 5)).toEqual([
+      "2026-01-01",
+      "2026-01-02",
+      "2026-01-03",
+      "2026-01-04",
+      "2026-01-05",
+    ])
+  })
+
+  it("builds a date range label", () => {
+    const single = formatDateRange("2026-10-27", null, "en")
+    expect(single).toContain("27")
+    expect(single).not.toContain("–")
+
+    const range = formatDateRange("2026-10-27", "2026-10-29", "en")
+    expect(range).toContain("27")
+    expect(range).toContain("29")
+    expect(range).toContain("–")
+  })
+
+  it("falls back to the start day when the end is not after it", () => {
+    const single = formatDateRange("2026-10-27", null, "en")
+    expect(formatDateRange("2026-10-27", "2026-10-27", "en")).toBe(single)
+    expect(formatDateRange("2026-10-27", "2026-10-20", "en")).toBe(single)
+    expect(formatDateRange("nope", null, "en")).toBe("—")
   })
 })
 

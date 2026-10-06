@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -12,17 +13,17 @@ import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { PerformanceCard } from "@/components/performances/PerformanceCard"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
-import { pluralize } from "@/libs/format"
 
 const TABS = [
-  { key: "upcoming", label: "Upcoming" },
-  { key: "past", label: "Past" },
+  { key: "upcoming", labelKey: "performances.upcoming" },
+  { key: "past", labelKey: "performances.past" },
 ] as const
 
 type TabKey = (typeof TABS)[number]["key"]
 
 /** Gigs and rehearsals (docs §22): upcoming first, history below. */
 export default function PerformancesScreen() {
+  const { t } = useTranslation()
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
   const { isAdmin } = useOrganization()
@@ -36,13 +37,15 @@ export default function PerformancesScreen() {
 
   return (
     <ScreenContainer
-      title="Shows"
-      subtitle={loading ? "Loading the calendar…" : pluralize(performances.length, "show")}
+      title={t("performances.shows")}
+      subtitle={
+        loading ? t("performances.loading") : t("organizations.showsCount", { count: performances.length })
+      }
       large
       headerRight={
         isAdmin ? (
           <IconButton
-            label="Schedule a show"
+            label={t("performances.schedule")}
             variant="secondary"
             onPress={() => router.push("/performances/new")}
             icon={<PlusIcon size={18} color={Theme.colors.text} />}
@@ -54,7 +57,7 @@ export default function PerformancesScreen() {
           {TABS.map((entry) => (
             <Chip
               key={entry.key}
-              label={`${entry.label} (${entry.key === "upcoming" ? upcomingPerformances.length : pastPerformances.length})`}
+              label={`${t(entry.labelKey)} (${entry.key === "upcoming" ? upcomingPerformances.length : pastPerformances.length})`}
               tone="primary"
               selected={tab === entry.key}
               onPress={() => setTab(entry.key)}
@@ -70,15 +73,15 @@ export default function PerformancesScreen() {
       ) : visible.length === 0 ? (
         <EmptyState
           icon={<CalendarCheckIcon size={24} color={Theme.colors.primary} />}
-          title={tab === "upcoming" ? "Nothing booked yet" : "No past shows"}
+          title={tab === "upcoming" ? t("dashboard.noGig") : t("performances.noPast")}
           message={
             tab === "upcoming"
               ? isAdmin
-                ? "Add your next gig or rehearsal and attach a setlist to it."
-                : "Your admin hasn't booked anything yet."
-              : "Shows you have marked as completed show up here."
+                ? t("performances.emptyUpcomingAdmin")
+                : t("performances.emptyUpcomingMember")
+              : t("performances.emptyPast")
           }
-          actionLabel={isAdmin && tab === "upcoming" ? "Schedule a show" : undefined}
+          actionLabel={isAdmin && tab === "upcoming" ? t("performances.schedule") : undefined}
           onAction={isAdmin && tab === "upcoming" ? () => router.push("/performances/new") : undefined}
         />
       ) : (
@@ -92,7 +95,7 @@ export default function PerformancesScreen() {
           ))}
           {isAdmin && tab === "upcoming" ? (
             <Button
-              label="Schedule a show"
+              label={t("performances.schedule")}
               variant="secondary"
               icon={<PlusIcon size={16} color={Theme.colors.text} />}
               onPress={() => router.push("/performances/new")}

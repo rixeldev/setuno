@@ -71,6 +71,49 @@ export const formatWeekday = (date: Date | null | undefined): string => {
   return date.toLocaleDateString(undefined, { weekday: "short" })
 }
 
+const isoFromDate = (date: Date): string =>
+  `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, "0")}-${`${date.getDate()}`.padStart(2, "0")}`
+
+/**
+ * Every `yyyy-mm-dd` from `startIso` to `endIso` (both inclusive). A missing or
+ * earlier end returns just the start day; the list is capped so a mistyped date
+ * can never flood the calendar.
+ */
+export const eachDayBetween = (
+  startIso: string,
+  endIso?: string | null,
+  maxDays = 62,
+): string[] => {
+  const start = new Date(`${startIso}T12:00:00`)
+  if (Number.isNaN(start.getTime())) return []
+  const end = endIso ? new Date(`${endIso}T12:00:00`) : start
+  if (Number.isNaN(end.getTime()) || end <= start) return [startIso]
+
+  const days: string[] = []
+  const cursor = new Date(start)
+  while (cursor <= end && days.length < maxDays) {
+    days.push(isoFromDate(cursor))
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return days
+}
+
+/** "27 oct – 29 oct" (localized) or just the start day when there is no range. */
+export const formatDateRange = (
+  startIso: string,
+  endIso?: string | null,
+  locale?: string,
+): string => {
+  const start = new Date(`${startIso}T12:00:00`)
+  if (Number.isNaN(start.getTime())) return "—"
+  const formatter = new Intl.DateTimeFormat(locale || undefined, { day: "numeric", month: "short" })
+  const label = formatter.format(start)
+  if (!endIso || endIso <= startIso) return label
+  const end = new Date(`${endIso}T12:00:00`)
+  if (Number.isNaN(end.getTime())) return label
+  return `${label} – ${formatter.format(end)}`
+}
+
 /** Pieces of a date stamp ("Sat" / "24" / "Oct") used by cards and lists. */
 export const dayStamp = (
   date: Date | null | undefined,

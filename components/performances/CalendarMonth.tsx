@@ -1,36 +1,12 @@
 import React, { useMemo } from "react"
 import { Pressable, StyleSheet, View } from "react-native"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { ChevronRightIcon } from "@/components/ui/Icons"
 import { startOfDay } from "@/libs/format"
-
-const WEEKDAYS = [
-  { short: "Mon", label: "Monday" },
-  { short: "Tue", label: "Tuesday" },
-  { short: "Wed", label: "Wednesday" },
-  { short: "Thu", label: "Thursday" },
-  { short: "Fri", label: "Friday" },
-  { short: "Sat", label: "Saturday" },
-  { short: "Sun", label: "Sunday" },
-]
-
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-]
 
 const toIso = (date: Date): string =>
   `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, "0")}-${`${date.getDate()}`.padStart(2, "0")}`
@@ -63,7 +39,17 @@ export function CalendarMonth({
   onShiftMonth,
   onSelectDay,
 }: CalendarMonthProps) {
+  const { t, i18n } = useTranslation()
   const styles = useThemedStyles(createStyles)
+  const monthLabel = useMemo(
+    () => new Intl.DateTimeFormat(i18n.language, { month: "long", year: "numeric" }).format(month),
+    [i18n.language, month],
+  )
+  const weekdayLabels = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat(i18n.language, { weekday: "short" })
+    // 2024-01-01 was a Monday, which matches the Monday-first grid below.
+    return Array.from({ length: 7 }, (_, index) => formatter.format(new Date(2024, 0, 1 + index)))
+  }, [i18n.language])
 
   const cells = useMemo<Cell[]>(() => {
     const year = month.getFullYear()
@@ -103,7 +89,7 @@ export function CalendarMonth({
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Previous month"
+          accessibilityLabel={t("common.previousMonth")}
           onPress={() => onShiftMonth(-1)}
           style={({ pressed }) => [styles.navButton, pressed && styles.pressed]}
         >
@@ -115,12 +101,12 @@ export function CalendarMonth({
         </Pressable>
 
         <AppText variant="subheading" accessibilityRole="header">
-          {MONTHS[month.getMonth()]} {month.getFullYear()}
+          {monthLabel}
         </AppText>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Next month"
+          accessibilityLabel={t("common.nextMonth")}
           onPress={() => onShiftMonth(1)}
           style={({ pressed }) => [styles.navButton, pressed && styles.pressed]}
         >
@@ -129,9 +115,9 @@ export function CalendarMonth({
       </View>
 
       <View style={styles.weekRow}>
-        {WEEKDAYS.map((day) => (
-          <AppText key={day.short} variant="caption" tone="faint" style={styles.cell}>
-            {day.short}
+        {weekdayLabels.map((day, index) => (
+          <AppText key={`${day}-${index}`} variant="caption" tone="faint" style={styles.cell}>
+            {day}
           </AppText>
         ))}
       </View>
@@ -145,7 +131,7 @@ export function CalendarMonth({
             <Pressable
               key={cell.iso}
               accessibilityRole="button"
-              accessibilityLabel={`${cell.iso}${count > 0 ? `, ${count} show${count === 1 ? "" : "s"}` : ", no shows"}`}
+              accessibilityLabel={count > 0 ? t("calendar.dayShows", { count, date: cell.iso }) : t("calendar.dayNoShows", { date: cell.iso })}
               accessibilityState={{ selected: isSelected }}
               onPress={() => onSelectDay(cell.iso)}
               style={({ pressed }) => [styles.cellButton, pressed && styles.pressed]}

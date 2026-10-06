@@ -1,16 +1,15 @@
 import React from "react"
 import { StyleSheet, View } from "react-native"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { Badge, Card } from "@/components/ui/Card"
 import { MapPinIcon } from "@/components/ui/Icons"
-import { dayStamp, formatRelativeDay, formatTime } from "@/libs/format"
+import { dayStamp, formatDateRange, formatRelativeDay, formatTime } from "@/libs/format"
 import { parseIsoDate } from "@/libs/validation"
-import { PERFORMANCE_STATUS_LABELS } from "@/interfaces"
 import type { Performance, PerformanceStatus } from "@/interfaces"
-
 export const PERFORMANCE_STATUS_TONES: Record<PerformanceStatus, "primary" | "success" | "danger"> = {
   scheduled: "primary",
   completed: "success",
@@ -25,11 +24,20 @@ interface CardProps {
 /** Full row used on the shows list. */
 export function PerformanceCard({ performance, onPress }: CardProps) {
   const styles = useThemedStyles(createStyles)
+  const { t, i18n } = useTranslation()
+  const relativeLabels = {
+    today: t("common.today"),
+    tomorrow: t("common.tomorrow"),
+    yesterday: t("common.yesterday"),
+  }
+  const dateLine = performance.endDate
+    ? formatDateRange(performance.date, performance.endDate, i18n.language)
+    : formatRelativeDay(parseIsoDate(performance.date), relativeLabels)
 
   return (
     <Card
       onPress={onPress}
-      accessibilityLabel={`${performance.name}, ${formatRelativeDay(parseIsoDate(performance.date))}`}
+      accessibilityLabel={`${performance.name}, ${dateLine}`}
       style={{ gap: Theme.spacing.s }}
     >
       <View style={styles.row}>
@@ -47,10 +55,7 @@ export function PerformanceCard({ performance, onPress }: CardProps) {
             {performance.name}
           </AppText>
           <AppText variant="caption" tone="muted" numberOfLines={1}>
-            {[
-              formatRelativeDay(parseIsoDate(performance.date)),
-              performance.startTime ? formatTime(performance.startTime) : null,
-            ]
+            {[dateLine, performance.startTime ? formatTime(performance.startTime) : null]
               .filter(Boolean)
               .join(" · ")}
           </AppText>
@@ -62,7 +67,7 @@ export function PerformanceCard({ performance, onPress }: CardProps) {
         </View>
 
         <Badge
-          label={PERFORMANCE_STATUS_LABELS[performance.status]}
+          label={t(`performances.${performance.status}`)}
           tone={PERFORMANCE_STATUS_TONES[performance.status]}
         />
       </View>
@@ -82,13 +87,19 @@ export function PerformanceCard({ performance, onPress }: CardProps) {
 /** Compact row used on the calendar screen. */
 export function PerformanceListRow({ performance, onPress }: CardProps) {
   const styles = useThemedStyles(createStyles)
+  const { t, i18n } = useTranslation()
+  const relativeLabels = {
+    today: t("common.today"),
+    tomorrow: t("common.tomorrow"),
+    yesterday: t("common.yesterday"),
+  }
 
   return (
     <Card
       onPress={onPress}
       padded={false}
       style={styles.compact}
-      accessibilityLabel={`${performance.name}, ${formatRelativeDay(parseIsoDate(performance.date))}`}
+      accessibilityLabel={`${performance.name}, ${formatRelativeDay(parseIsoDate(performance.date), relativeLabels)}`}
     >
       <View style={styles.compactRow}>
         <View style={styles.flex}>
@@ -97,6 +108,9 @@ export function PerformanceListRow({ performance, onPress }: CardProps) {
           </AppText>
           <AppText variant="caption" tone="muted" numberOfLines={1}>
             {[
+              performance.endDate
+                ? formatDateRange(performance.date, performance.endDate, i18n.language)
+                : null,
               performance.startTime ? formatTime(performance.startTime) : null,
               performance.venue.name || null,
             ]
@@ -105,7 +119,7 @@ export function PerformanceListRow({ performance, onPress }: CardProps) {
           </AppText>
         </View>
         <Badge
-          label={PERFORMANCE_STATUS_LABELS[performance.status]}
+          label={t(`performances.${performance.status}`)}
           tone={PERFORMANCE_STATUS_TONES[performance.status]}
         />
       </View>

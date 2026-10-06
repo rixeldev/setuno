@@ -13,8 +13,10 @@ export interface Performance {
   id: string
   organizationId: string
   name: string
-  /** Calendar day as `yyyy-mm-dd` (timezone independent, easy to query). */
+  /** First day as `yyyy-mm-dd` (timezone independent, easy to query). */
   date: string
+  /** Optional last day of a multi-day run (festival, tour…), else null. */
+  endDate: string | null
   /** `HH:mm` 24h local start time, empty string when unknown. */
   startTime: string
   endTime: string
@@ -32,6 +34,7 @@ export interface Performance {
 export interface PerformanceInput {
   name: string
   date: string
+  endDate: string | null
   startTime: string
   endTime: string
   venue: Venue

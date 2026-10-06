@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react"
 import { StyleSheet } from "react-native"
 import { useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -14,15 +15,22 @@ import { CalendarMonth } from "@/components/performances/CalendarMonth"
 import { PerformanceListRow } from "@/components/performances/PerformanceCard"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
-import { formatRelativeDay, formatShortDate } from "@/libs/format"
+import type { RelativeDayLabels } from "@/libs/format"
+import { formatDateRange, formatRelativeDay } from "@/libs/format"
 import { parseIsoDate } from "@/libs/validation"
-import { todayIsoDate } from "@/services/performances"
+import { performanceDays, performanceLastDay, todayIsoDate } from "@/services/performances"
 
 /**
  * Band calendar (docs §23): month grid with show markers plus the agenda for
  * the selected day.
  */
 export default function CalendarScreen() {
+  const { t, i18n } = useTranslation()
+  const dayLabels: RelativeDayLabels = {
+    today: t("common.today"),
+    tomorrow: t("common.tomorrow"),
+    yesterday: t("common.yesterday"),
+  }
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
   const { isAdmin } = useOrganization()
@@ -38,7 +46,10 @@ export default function CalendarScreen() {
     const result: Record<string, number> = {}
     for (const performance of performances) {
       if (performance.status === "cancelled") continue
-      result[performance.date] = (result[performance.date] ?? 0) + 1
+      // A multi-day run marks every day it occupies.
+      for (const day of performanceDays(performance)) {
+        result[day] = (result[day] ?? 0) + 1
+      }
     }
     return result
   }, [performances])
@@ -46,19 +57,22 @@ export default function CalendarScreen() {
   const dayShows = useMemo(
     () =>
       performances
-        .filter((performance) => performance.date === selected)
+        .filter((performance) => performanceDays(performance).includes(selected ?? ""))
         .sort((a, b) => a.startTime.localeCompare(b.startTime)),
     [performances, selected],
   )
 
   const upcoming = useMemo(
     () =>
-      performances.filter((performance) => performance.status === "scheduled" && performance.date >= todayIsoDate()),
+      performances.filter(
+        (performance) =>
+          performance.status === "scheduled" && performanceLastDay(performance) >= todayIsoDate(),
+      ),
     [performances],
   )
 
   return (
-    <ScreenContainer title="Calendar" subtitle="Every show and rehearsal" large>
+    <ScreenContainer title={t("calendar.calendar")} subtitle={t("calendar.subtitle")} large>
       {error ? <ErrorState message={error} /> : null}
 
       <Card style={styles.calendar}>
@@ -76,7 +90,7 @@ export default function CalendarScreen() {
           }}
         />
         <Button
-          label="Back to today"
+          label={t("calendar.backToToday")}
           variant="ghost"
           size="sm"
           onPress={() => {
@@ -88,16 +102,16 @@ export default function CalendarScreen() {
       </Card>
 
       <Section
-        title={selected ? formatRelativeDay(parseIsoDate(selected)) : "Pick a day"}
-        subtitle="Agenda for the selected day"
+        title={selected ? formatRelativeDay(parseIsoDate(selected), dayLabels) : t("calendar.pickDay")}
+        subtitle={t("calendar.agendaSubtitle")}
       >
         {dayShows.length === 0 ? (
           <EmptyState
             compact
             icon={<CalendarIcon size={22} color={Theme.colors.textFaint} />}
-            title="Nothing on this day"
-            message={isAdmin ? "Add a show on this date." : "Your band has nothing booked for this day."}
-            actionLabel={isAdmin ? "Schedule a show" : undefined}
+            title={t("calendar.nothingOnDay")}
+            message={isAdmin ? t("calendar.emptyAdmin") : t("calendar.emptyMember")}
+            actionLabel={isAdmin ? t("performances.schedule") : undefined}
             onAction={isAdmin ? () => router.push("/performances/new") : undefined}
           />
         ) : (
@@ -112,11 +126,11 @@ export default function CalendarScreen() {
       </Section>
 
       <Section
-        title="Still to come"
+        title={t("calendar.stillToCome")}
         action={
           isAdmin ? (
             <Button
-              label="Schedule a show"
+              label={t("performances.schedule")}
               size="sm"
               variant="secondary"
               icon={<PlusIcon size={16} color={Theme.colors.text} />}
@@ -127,7 +141,7 @@ export default function CalendarScreen() {
       >
         {upcoming.length === 0 ? (
           <AppText variant="caption" tone="faint">
-            No shows scheduled.
+            {t("calendar.noShowsScheduled")}
           </AppText>
         ) : (
           upcoming.slice(0, 8).map((performance) => (
@@ -139,8 +153,8 @@ export default function CalendarScreen() {
               <AppText variant="bodyStrong" numberOfLines={1} style={styles.flex}>
                 {performance.name}
               </AppText>
-              <AppText variant="caption" tone="muted">
-                {formatShortDate(parseIsoDate(performance.date))}
+              <AppText variant="caption" tone="muted" numberOfLines={1}>
+                {formatDateRange(performance.date, performance.endDate, i18n.language)}
               </AppText>
             </Card>
           ))
