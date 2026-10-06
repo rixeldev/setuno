@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react"
 import { Pressable, StyleSheet, View } from "react-native"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -7,24 +8,8 @@ import { AppText } from "@/components/ui/AppText"
 import { Button } from "@/components/ui/Button"
 import { Dialog } from "@/components/ui/Dialog"
 import { CalendarIcon, ChevronRightIcon } from "@/components/ui/Icons"
-import { formatRelativeDay, startOfDay } from "@/libs/format"
+import { formatRelativeDay, startOfDay, type RelativeDayLabels } from "@/libs/format"
 import { ISO_DATE_PATTERN } from "@/libs/validation"
-
-const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"]
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-]
 
 const toIso = (date: Date): string =>
   `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, "0")}-${`${date.getDate()}`.padStart(2, "0")}`
@@ -61,13 +46,32 @@ export function DateField({
   error,
   minimumDate,
   maximumDate,
-  placeholder = "Pick a date",
+  placeholder,
 }: DateFieldProps) {
   const styles = useThemedStyles(createStyles)
+  const { t, i18n } = useTranslation()
   const [open, setOpen] = useState(false)
+  const placeholderText = placeholder ?? t("common.pickDate")
 
   const selected = value && ISO_DATE_PATTERN.test(value) ? new Date(`${value}T12:00:00`) : null
   const [cursor, setCursor] = useState<Date>(() => selected ?? new Date())
+
+  // Dates are formatted with the platform Intl data, so the calendar follows
+  // the selected language without hardcoding month or weekday names.
+  const monthLabel = useMemo(
+    () => new Intl.DateTimeFormat(i18n.language, { month: "long", year: "numeric" }).format(cursor),
+    [cursor, i18n.language],
+  )
+  const weekdayLabels = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat(i18n.language, { weekday: "narrow" })
+    // 2024-01-01 was a Monday, which matches the Monday-first grid below.
+    return Array.from({ length: 7 }, (_, index) => formatter.format(new Date(2024, 0, 1 + index)))
+  }, [i18n.language])
+  const dayLabels: RelativeDayLabels = {
+    today: t("common.today"),
+    tomorrow: t("common.tomorrow"),
+    yesterday: t("common.yesterday"),
+  }
 
   const monthStart = useMemo(
     () => new Date(cursor.getFullYear(), cursor.getMonth(), 1, 12),
@@ -123,7 +127,7 @@ export function DateField({
     setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + delta, 1, 12))
   }
 
-  const displayLabel = value ? formatRelativeDay(selected) : placeholder
+  const displayLabel = value ? formatRelativeDay(selected, dayLabels) : placeholderText
 
   return (
     <View style={{ gap: 6 }}>
@@ -131,7 +135,7 @@ export function DateField({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={value ? `${displayLabel}. Tap to change the date` : placeholder}
+        accessibilityLabel={value ? `${displayLabel}. ${t("common.changeDate")}` : placeholderText}
         onPress={() => {
           setCursor(selected ?? new Date())
           setOpen(true)
@@ -148,10 +152,10 @@ export function DateField({
             tone="faint"
             onPress={() => onChange("")}
             accessibilityRole="button"
-            accessibilityLabel="Clear the date"
+            accessibilityLabel={t("common.clearDate")}
             suppressHighlighting
           >
-            Clear
+            {t("common.clear")}
           </AppText>
         ) : null}
       </Pressable>
@@ -162,11 +166,16 @@ export function DateField({
         </AppText>
       ) : null}
 
-      <Dialog visible={open} onClose={() => setOpen(false)} title={label ?? "Choose a date"} hideActions>
+      <Dialog
+        visible={open}
+        onClose={() => setOpen(false)}
+        title={label ?? t("common.chooseDate")}
+        hideActions
+      >
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Previous month"
+            accessibilityLabel={t("common.previousMonth")}
             onPress={() => shiftMonth(-1)}
             style={({ pressed }) => [styles.navButton, pressed && styles.pressed]}
           >
@@ -176,12 +185,10 @@ export function DateField({
               style={{ transform: [{ rotate: "180deg" }] }}
             />
           </Pressable>
-          <AppText variant="subheading">
-            {MONTHS[cursor.getMonth()]} {cursor.getFullYear()}
-          </AppText>
+          <AppText variant="subheading">{monthLabel}</AppText>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Next month"
+            accessibilityLabel={t("common.nextMonth")}
             onPress={() => shiftMonth(1)}
             style={({ pressed }) => [styles.navButton, pressed && styles.pressed]}
           >
@@ -190,7 +197,7 @@ export function DateField({
         </View>
 
         <View style={styles.weekRow}>
-          {WEEKDAYS.map((day, index) => (
+          {weekdayLabels.map((day, index) => (
             <AppText key={`${day}-${index}`} variant="caption" tone="faint" style={styles.cell}>
               {day}
             </AppText>
@@ -229,7 +236,7 @@ export function DateField({
         </View>
 
         <Button
-          label="Today"
+          label={t("common.today")}
           variant="ghost"
           onPress={() => {
             onChange(toIso(new Date()))

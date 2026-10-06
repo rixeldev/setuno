@@ -2,6 +2,7 @@ import React, { useState } from "react"
 import { View } from "react-native"
 import { useRouter } from "expo-router"
 import { useForm } from "react-hook-form"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { Button } from "@/components/ui/Button"
@@ -25,6 +26,7 @@ import type { Invitation } from "@/interfaces"
  */
 export default function Welcome() {
   const router = useRouter()
+  const { t } = useTranslation()
   const toast = useToast()
   const { profile, user, updateProfile } = useAuth()
   const { invitations, switchOrganization } = useOrganization()
@@ -55,10 +57,10 @@ export default function Welcome() {
         ownerName: profile?.displayName || user?.displayName || "Band admin",
       })
       reset({ name: "", description: "" })
-      toast.showSuccess(`${values.name} is ready. Add your songs to get started.`)
+      toast.showSuccess(t("auth.bandReady", { name: values.name }))
       await finish(organizationId)
     } catch (error) {
-      setFormError(toFriendlyError(error, "We couldn't create that band. Please try again."))
+      setFormError(toFriendlyError(error, t("auth.couldNotCreateBand")))
     } finally {
       setBusy(false)
     }
@@ -73,10 +75,10 @@ export default function Welcome() {
         email: profile?.email || user?.email || "",
       })
       setPendingAccept(null)
-      toast.showSuccess(`Welcome to ${invitation.organizationName}.`)
+      toast.showSuccess(t("auth.welcomeToBand", { name: invitation.organizationName }))
       await finish(invitation.organizationId)
     } catch (error) {
-      toast.showError(toFriendlyError(error, "We couldn't join that band. Please try again."))
+      toast.showError(toFriendlyError(error, t("auth.couldNotJoinBand")))
     } finally {
       setBusy(false)
     }
@@ -86,39 +88,39 @@ export default function Welcome() {
 
   return (
     <AuthLayout
-      title={displayName ? `Hi ${displayName.split(" ")[0]}, let's set you up` : "Welcome to Stage Book"}
-      subtitle="Every song, setlist and gig lives inside a band. Create one, or join one you've been invited to."
+      title={displayName ? t("auth.hiName", { name: displayName.split(" ")[0] }) : t("auth.welcome")}
+      subtitle={t("auth.welcomeIntro")}
     >
       {invitations.length > 0 ? (
         <ViewWelcome invitations={invitations} onAccept={setPendingAccept} busy={busy} />
       ) : (
         <Card style={{ gap: Theme.spacing.s }}>
           <UsersIcon size={22} color={Theme.colors.primary} />
-          <AppText variant="subheading">You have no pending invitations</AppText>
+          <AppText variant="subheading">{t("auth.noInvitations")}</AppText>
           <AppText variant="caption" tone="muted">
-            When a band admin invites you by email, the invitation shows up here.
+            {t("auth.noInvitationsHint")}
           </AppText>
         </Card>
       )}
 
       <AppText variant="label" tone="faint">
-        Or create a band
+        {t("auth.orCreateBand")}
       </AppText>
 
       <Input
-        label="Band name"
+        label={t("organizations.bandName")}
         required
         placeholder="The Riverside Blues"
         autoCapitalize="words"
         error={errors.name?.message}
         {...register("name", {
-          validate: (value) => validateRequired(value, "Give your band a name.") ?? true,
+          validate: (value) => validateRequired(value, t("auth.giveBandName")) ?? true,
         })}
       />
 
       <Input
-        label="Description"
-        placeholder="Rock covers, Thursday jams…"
+        label={t("organizations.bandDescription")}
+        placeholder={t("organizations.descriptionPlaceholder")}
         multiline
         {...register("description")}
       />
@@ -129,16 +131,27 @@ export default function Welcome() {
         </AppText>
       ) : null}
 
-      <Button label="Create band" full size="lg" loading={busy} onPress={() => void onCreate()} />
+      <Button label={t("organizations.createBand")} full size="lg" loading={busy} onPress={() => void onCreate()} />
 
-      <Button label="Sign out" variant="ghost" full onPress={() => router.replace("/(auth)/sign-in")} />
+      <Button
+        label={t("auth.signOut")}
+        variant="ghost"
+        full
+        onPress={() => router.replace("/(auth)/sign-in")}
+      />
 
       <Dialog
         visible={pendingAccept !== null}
         onClose={() => setPendingAccept(null)}
-        title={pendingAccept ? `Join ${pendingAccept.organizationName}?` : "Join band"}
-        description={`You'll join as ${pendingAccept?.role === "admin" ? "an admin" : "a musician"}. You can leave later from settings.`}
-        confirmLabel="Join band"
+        title={
+          pendingAccept
+            ? t("auth.joinBandTitle", { name: pendingAccept.organizationName })
+            : t("auth.joinBandTitle", { name: "" })
+        }
+        description={t("auth.joinBandDescription", {
+          role: pendingAccept?.role === "admin" ? t("auth.roleAdmin") : t("auth.roleMusician"),
+        })}
+        confirmLabel={t("auth.acceptInvitation")}
         confirmLoading={busy}
         onConfirm={() => {
           if (pendingAccept) void accept(pendingAccept)
@@ -158,26 +171,30 @@ function ViewWelcome({
   onAccept: (invitation: Invitation) => void
   busy: boolean
 }) {
+  const { t } = useTranslation()
   if (invitations.length === 0) return null
 
   return (
     <>
       <AppText variant="label" tone="faint">
-        Invitations for you
+        {t("auth.invitationsForYou")}
       </AppText>
       {invitations.map((invitation) => (
         <Card key={invitation.id} style={{ gap: Theme.spacing.m }}>
           <View>
-            <AppText variant="subheading">{invitation.organizationName || "A band"}</AppText>
+            <AppText variant="subheading">{invitation.organizationName || t("auth.anonymousBand")}</AppText>
             <AppText variant="caption" tone="muted">
-              Invited by {invitation.invitedByName || "an admin"}
+              {t("auth.invitedBy", { name: invitation.invitedByName || t("organizations.admin") })}
             </AppText>
           </View>
           <View style={{ flexDirection: "row", gap: Theme.spacing.s, alignItems: "center" }}>
-            <Badge label={invitation.role === "admin" ? "Admin" : "Musician"} tone="primary" />
+            <Badge
+              label={invitation.role === "admin" ? t("organizations.admin") : t("auth.musician")}
+              tone="primary"
+            />
           </View>
           <Button
-            label="Accept invitation"
+            label={t("auth.acceptInvitation")}
             disabled={busy}
             onPress={() => onAccept(invitation)}
           />

@@ -1,6 +1,7 @@
 import React, { useState } from "react"
 import { useRouter } from "expo-router"
 import { useForm } from "react-hook-form"
+import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
@@ -16,6 +17,7 @@ import { validateEmail } from "@/libs/validation"
 /** Password reset request (docs §5). Never reveals whether an account exists. */
 export default function ForgotPassword() {
   const router = useRouter()
+  const { t } = useTranslation()
   const { sendPasswordReset } = useAuth()
   const [formError, setFormError] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
@@ -33,45 +35,51 @@ export default function ForgotPassword() {
       await sendPasswordReset(values.email)
       setSent(true)
     } catch (error) {
-      setFormError(toFriendlyError(error, "We couldn't send the reset email. Please try again."))
+      setFormError(toFriendlyError(error, t("auth.couldNotSendReset")))
     }
   })
 
   if (sent) {
     return (
-      <AuthLayout title="Check your inbox" subtitle="If that address has a Stage Book account, a reset link is on its way.">
+      <AuthLayout back title={t("auth.checkInbox")} subtitle={t("auth.checkInboxSubtitle")}>
         <Card style={{ gap: Theme.spacing.m }}>
           <CheckCircleIcon size={28} color={Theme.colors.success} />
-          <AppText variant="body">We sent a password reset link to {getValues("email")}.</AppText>
+          <AppText variant="body">{t("auth.resetSentTo", { email: getValues("email") })}</AppText>
           <AppText variant="caption" tone="muted">
-            The link expires in an hour. If it doesn’t arrive, check your spam folder or try again.
+            {t("auth.resetHint")}
           </AppText>
         </Card>
-        <Button label="Back to sign in" variant="secondary" full onPress={() => router.replace("/(auth)/sign-in")} />
+        <Button
+          label={t("auth.backToSignIn")}
+          variant="secondary"
+          full
+          onPress={() => router.replace("/(auth)/sign-in")}
+        />
       </AuthLayout>
     )
   }
 
   return (
     <AuthLayout
-      title="Reset your password"
-      subtitle="Enter your email and we'll send you a reset link."
+      back
+      title={t("auth.resetTitle")}
+      subtitle={t("auth.resetSubtitle")}
       footer={
         <AppText variant="body" tone="muted">
-          Remembered it?{" "}
+          {t("auth.rememberedIt")}{" "}
           <AppText
             variant="body"
             tone="primary"
             style={{ fontWeight: "700" }}
             onPress={() => router.replace("/(auth)/sign-in")}
           >
-            Sign in
+            {t("auth.signIn")}
           </AppText>
         </AppText>
       }
     >
       <Input
-        label="Email"
+        label={t("auth.email")}
         required
         autoCapitalize="none"
         autoCorrect={false}
@@ -80,7 +88,7 @@ export default function ForgotPassword() {
         icon={<MailIcon size={16} color={Theme.colors.textFaint} />}
         error={errors.email?.message}
         onSubmitEditing={() => void onSubmit()}
-        {...register("email", { validate: (value) => validateEmail(value) ?? true })}
+        {...register("email", { validate: (value) => validateEmail(value, t("auth.email")) ?? true })}
       />
 
       {formError ? (
@@ -89,7 +97,13 @@ export default function ForgotPassword() {
         </AppText>
       ) : null}
 
-      <Button label="Send reset link" full size="lg" loading={isSubmitting} onPress={() => void onSubmit()} />
+      <Button
+        label={t("auth.sendResetLink")}
+        full
+        size="lg"
+        loading={isSubmitting}
+        onPress={() => void onSubmit()}
+      />
     </AuthLayout>
   )
 }

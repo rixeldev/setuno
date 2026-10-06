@@ -35,9 +35,7 @@ export default function SignIn() {
       // A dismissed picker returns `false` and simply leaves the form alone.
       if (completed) router.replace("/")
     } catch (error) {
-      setFormError(
-        toFriendlyError(error, "We couldn't sign you in with Google. Please try again."),
-      )
+      setFormError(toFriendlyError(error, t("auth.couldNotSignInGoogle")))
     } finally {
       setGoogleLoading(false)
     }
@@ -57,27 +55,27 @@ export default function SignIn() {
       // and organization resolve.
       router.replace("/")
     } catch (error) {
-      setFormError(toFriendlyError(error, "We couldn't sign you in. Please try again."))
+      setFormError(toFriendlyError(error, t("auth.couldNotSignIn")))
     }
   })
 
   return (
     <AuthLayout
-      title="Welcome back"
-      subtitle="Sign in to reach your band's chord book."
+      title={t("auth.welcomeBack")}
+      subtitle={t("auth.signInSubtitle")}
       footer={
         <View>
           <AppText variant="body" tone="muted">
-            New to Stage Book?{" "}
+            {t("auth.newToStageBook")}{" "}
             <Link href="/(auth)/sign-up" style={{ color: Theme.colors.primary, fontWeight: "700" }}>
-              Create an account
+              {t("auth.createAnAccount")}
             </Link>
           </AppText>
         </View>
       }
     >
       <Input
-        label="Email"
+        label={t("auth.email")}
         required
         autoCapitalize="none"
         autoCorrect={false}
@@ -88,12 +86,12 @@ export default function SignIn() {
         icon={<MailIcon size={16} color={Theme.colors.textFaint} />}
         error={errors.email?.message}
         {...register("email", {
-          validate: (value) => validateEmail(value) ?? true,
+          validate: (value) => validateEmail(value, t("auth.email")) ?? true,
         })}
       />
 
       <Input
-        label="Password"
+        label={t("auth.password")}
         required
         secure
         textContentType="password"
@@ -103,13 +101,13 @@ export default function SignIn() {
         error={errors.password?.message}
         onSubmitEditing={() => void onSubmit()}
         {...register("password", {
-          validate: (value) => validatePassword(value) ?? true,
+          validate: (value) => validatePassword(value, t("auth.password")) ?? true,
         })}
       />
 
       <Link href="/(auth)/forgot-password">
         <AppText variant="caption" tone="primary" style={{ alignSelf: "flex-end" }}>
-          Forgot password?
+          {t("auth.forgotPassword")}
         </AppText>
       </Link>
 
@@ -120,7 +118,7 @@ export default function SignIn() {
       ) : null}
 
       <Button
-        label="Sign in"
+        label={t("auth.signIn")}
         full
         size="lg"
         loading={isSubmitting}

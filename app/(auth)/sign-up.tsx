@@ -37,9 +37,7 @@ export default function SignUp() {
       // Returning `false` means the picker was dismissed: stay on the form.
       if (completed) router.replace("/")
     } catch (error) {
-      setFormError(
-        toFriendlyError(error, "We couldn't sign you in with Google. Please try again."),
-      )
+      setFormError(toFriendlyError(error, t("auth.couldNotSignInGoogle")))
     } finally {
       setGoogleLoading(false)
     }
@@ -60,25 +58,26 @@ export default function SignUp() {
       await signUp({ email: values.email, password: values.password, displayName: values.displayName })
       router.replace("/")
     } catch (error) {
-      setFormError(toFriendlyError(error, "We couldn't create your account. Please try again."))
+      setFormError(toFriendlyError(error, t("auth.couldNotCreateAccount")))
     }
   })
 
   return (
     <AuthLayout
-      title="Create your account"
-      subtitle="One account, as many bands as you like."
+      title={t("auth.createYourAccount")}
+      subtitle={t("auth.signUpSubtitle")}
+      back
       footer={
         <AppText variant="body" tone="muted">
-          Already have an account?{" "}
+          {t("auth.alreadyHaveAccountQuestion")}{" "}
           <Link href="/(auth)/sign-in" style={{ color: Theme.colors.primary, fontWeight: "700" }}>
-            Sign in
+            {t("auth.signIn")}
           </Link>
         </AppText>
       }
     >
       <Input
-        label="Your name"
+        label={t("auth.fullName")}
         required
         autoCapitalize="words"
         textContentType="name"
@@ -86,12 +85,12 @@ export default function SignUp() {
         icon={<UserIcon size={16} color={Theme.colors.textFaint} />}
         error={errors.displayName?.message}
         {...register("displayName", {
-          validate: (value) => validateRequired(value, "Enter the name your band knows you by.") ?? true,
+          validate: (value) => validateRequired(value, t("auth.nameHint")) ?? true,
         })}
       />
 
       <Input
-        label="Email"
+        label={t("auth.email")}
         required
         autoCapitalize="none"
         autoCorrect={false}
@@ -100,22 +99,22 @@ export default function SignUp() {
         placeholder="you@band.com"
         icon={<MailIcon size={16} color={Theme.colors.textFaint} />}
         error={errors.email?.message}
-        {...register("email", { validate: (value) => validateEmail(value) ?? true })}
+        {...register("email", { validate: (value) => validateEmail(value, t("auth.email")) ?? true })}
       />
 
       <Input
-        label="Password"
+        label={t("auth.password")}
         required
         secure
         textContentType="newPassword"
-        placeholder="At least 6 characters"
+        placeholder={t("auth.passwordPlaceholder")}
         icon={<LockIcon size={16} color={Theme.colors.textFaint} />}
         error={errors.password?.message}
-        {...register("password", { validate: (value) => validatePassword(value) ?? true })}
+        {...register("password", { validate: (value) => validatePassword(value, t("auth.password")) ?? true })}
       />
 
       <Input
-        label="Confirm password"
+        label={t("auth.confirmPassword")}
         required
         secure
         textContentType="newPassword"
@@ -123,7 +122,7 @@ export default function SignUp() {
         error={errors.confirm?.message}
         {...register("confirm", {
           validate: (value) =>
-            value === getValues("password") ? true : "The two passwords don't match.",
+            value === getValues("password") ? true : t("auth.passwordsDontMatch"),
         })}
       />
 
@@ -133,7 +132,13 @@ export default function SignUp() {
         </AppText>
       ) : null}
 
-      <Button label="Create account" full size="lg" loading={isSubmitting} onPress={() => void onSubmit()} />
+      <Button
+        label={t("auth.createAccount")}
+        full
+        size="lg"
+        loading={isSubmitting}
+        onPress={() => void onSubmit()}
+      />
 
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
         <View style={{ flex: 1, height: 1, backgroundColor: Theme.colors.borderSoft }} />
