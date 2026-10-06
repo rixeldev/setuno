@@ -344,11 +344,10 @@ const createStyles = () =>
       borderTopColor: Theme.colors.border,
     },
     tab: { flex: 1, alignItems: "center", gap: 3, paddingVertical: 4 },
-    // A fixed size (instead of padding) keeps the active pill perfectly round
-    // on native as well as on web.
+    // Round focus bubble behind the icon (not a rectangle).
     tabIcon: {
-      width: 54,
-      height: 30,
+      width: 38,
+      height: 38,
       alignItems: "center",
       justifyContent: "center",
       borderRadius: Theme.radii.pill,
@@ -356,8 +355,8 @@ const createStyles = () =>
     tabIconActive: { backgroundColor: Theme.colors.primarySoft },
     tabBadge: {
       position: "absolute",
-      top: -4,
-      right: -8,
+      top: -2,
+      right: -4,
       minWidth: 16,
       height: 16,
       paddingHorizontal: 4,
