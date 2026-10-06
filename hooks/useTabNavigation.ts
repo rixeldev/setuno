@@ -28,8 +28,10 @@ export function useTabNavigation(): TabNavigation {
       if (target === current && pathname === href) return
 
       // Collapse whatever the previous tab left behind, then show the target.
-      // `dismissAll` returns to the anchor (the dashboard).
-      router.dismissAll()
+      // `dismissAll` returns to the anchor (the dashboard); dispatching it with
+      // nothing to dismiss logs an unhandled POP_TO_TOP warning, hence the
+      // guard.
+      if (router.canDismiss()) router.dismissAll()
       if (target !== 0) router.push(href as never)
     },
     [pathname, router],
