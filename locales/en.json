@@ -513,7 +513,9 @@
     "switchNotation": "Switch between letters and solfège",
     "notationLetters": "A B C",
     "notationSolfege": "Do Re Mi",
-    "notesPlaceholder": "Start quietly, drop to capo 2 for the last chorus…"
+    "notesPlaceholder": "Start quietly, drop to capo 2 for the last chorus…",
+    "previousSong": "Previous song",
+    "nextSong": "Next song"
   },
   "suggestions": {
     "suggestions": "Suggestions",

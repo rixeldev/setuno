@@ -26,6 +26,7 @@ import { AppBackground } from "@/components/app/AppBackground"
 import { PageHeader } from "@/components/ui/PageHeader"
 import { SongContent } from "@/components/songs/SongContent"
 import { SongControls } from "@/components/songs/SongControls"
+import { SongNavArrows } from "@/components/songs/SongNavArrows"
 import { useToast } from "@/components/ui/Toast"
 import { useAuth } from "@/hooks/useAuth"
 import { useResponsive } from "@/hooks/useResponsive"
@@ -33,6 +34,7 @@ import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { deleteSong, subscribeSong } from "@/services/songs"
 import { updatePreferences } from "@/services/users"
+import { todayIsoDate } from "@/services/performances"
 import { updateCachedPreferences, usePreferences } from "@/services/prefs"
 import { toFriendlyError } from "@/services/errors"
 import { displayKey as spellKey, transposeKey } from "@/libs/chords"
@@ -40,6 +42,7 @@ import { formatRelativeTime, formatDuration } from "@/libs/format"
 import { toDate } from "@/interfaces/timestamp"
 import type { UserPreferences } from "@/interfaces"
 import { songLyricsText, sectionLabelFor } from "@/libs/songUtils"
+import { findSetlistNavigation } from "@/libs/setlistNavigation"
 import * as Clipboard from "expo-clipboard"
 
 /**
@@ -61,7 +64,7 @@ export default function SongScreen() {
 
   const { profile } = useAuth()
   const { organizationId, isAdmin } = useOrganization()
-  const { songLibrary, loading } = useOrgData()
+  const { songLibrary, setlists, performances, loading } = useOrgData()
   const [song, setSong] = useState(songId ? (songLibrary.get(songId) ?? null) : null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -95,6 +98,13 @@ export default function SongScreen() {
     if (!song) return ""
     return spellKey(transposeKey(song.key, semitones), notation)
   }, [song, semitones, notation])
+
+  // Corner arrows to walk the running order: only when this song belongs to a
+  // setlist attached to an event (a "list of an event", see the lib helper).
+  const navigation = useMemo(
+    () => (song ? findSetlistNavigation(song.id, setlists, performances, todayIsoDate()) : null),
+    [performances, setlists, song],
+  )
 
   // Opening a different song resets the reader controls to their defaults
   // (adjust state while rendering, as documented by React).
@@ -207,7 +217,10 @@ export default function SongScreen() {
         </View>
         <ScrollView
           style={styles.immersiveScroll}
-          contentContainerStyle={styles.immersiveContent}
+          contentContainerStyle={[
+            styles.immersiveContent,
+            navigation ? styles.withNavPadding : null,
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -219,6 +232,14 @@ export default function SongScreen() {
           </View>
           {lyrics}
         </ScrollView>
+
+        {navigation ? (
+          <SongNavArrows
+            previousId={navigation.previousId}
+            nextId={navigation.nextId}
+            onNavigate={(next) => router.replace(`/songs/${next}`)}
+          />
+        ) : null}
       </View>
     )
   }
@@ -280,7 +301,7 @@ export default function SongScreen() {
       />
 
       <ScreenContainer scroll padded={false} style={[styles.scrollBody, { paddingHorizontal: gutter }]}>
-        <View style={styles.content}>
+        <View style={[styles.content, navigation ? styles.withNavPadding : null]}>
           {details.length > 0 ? (
             <AppText variant="caption" tone="faint">
               {details.join("  ·  ")}
@@ -384,6 +405,14 @@ export default function SongScreen() {
         confirmLoading={deleting}
         onConfirm={() => void remove()}
       />
+
+      {navigation ? (
+        <SongNavArrows
+          previousId={navigation.previousId}
+          nextId={navigation.nextId}
+          onNavigate={(next) => router.replace(`/songs/${next}`)}
+        />
+      ) : null}
     </View>
   )
 }
@@ -447,4 +476,6 @@ const createStyles = () =>
       paddingBottom: Theme.spacing.huge,
     },
     immersiveTitle: { gap: 2 },
+    // Room for the corner arrows so they never cover the last lines.
+    withNavPadding: { paddingBottom: Theme.spacing.huge + 56 },
   })

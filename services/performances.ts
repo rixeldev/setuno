@@ -23,7 +23,7 @@ import type { Performance, PerformanceInput, PerformanceStatus } from "@/interfa
 import { logActivity } from "@/services/activity"
 import { ValidationError } from "@/services/errors"
 import { ISO_DATE_PATTERN, TIME_PATTERN, toIsoDate } from "@/libs/validation"
-import { eachDayBetween } from "@/libs/format"
+import { performanceLastDay } from "@/libs/performances"
 
 const MAX_SETLISTS = 20
 
@@ -239,15 +239,8 @@ export const deletePerformance = async (
 /** Today's date as `yyyy-mm-dd` (used as the default performance date). */
 export const todayIsoDate = (): string => toIsoDate(new Date())
 
-/** Last day of a show: its end date when it has one, else its start date. */
-export const performanceLastDay = (performance: Performance): string => {
-  const end = performance.endDate
-  return end && end >= performance.date ? end : performance.date
-}
-
-/** Every calendar day a show occupies, so multi-day runs fill the calendar. */
-export const performanceDays = (performance: Performance): string[] =>
-  eachDayBetween(performance.date, performance.endDate)
+// Pure helpers live in `libs/performances` so unit tests never touch Firestore.
+export { performanceDays, performanceLastDay } from "@/libs/performances"
 
 /** Splits performances into upcoming and past (docs §16). */
 export const partitionPerformances = (

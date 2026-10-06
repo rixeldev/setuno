@@ -447,7 +447,9 @@
     "switchNotation": "Cambiar entre cifrado americano y latino",
     "notationLetters": "A B C",
     "notationSolfege": "Do Re Mi",
-    "notesPlaceholder": "Empieza suave, baja a cejilla 2 en el último estribillo…"
+    "notesPlaceholder": "Empieza suave, baja a cejilla 2 en el último estribillo…",
+    "previousSong": "Canción anterior",
+    "nextSong": "Canción siguiente"
   },
   "suggestions": {
     "suggestions": "Sugerencias",
