@@ -13,6 +13,8 @@ import { AuthProvider } from "@/hooks/useAuth"
 import { OrganizationProvider } from "@/hooks/useOrganization"
 import { OrgDataProvider } from "@/hooks/useOrgData"
 import { ToastProvider } from "@/components/ui/Toast"
+import { StartupGate } from "@/components/app/StartupGate"
+import { SPLASH_BACKGROUND } from "@/components/app/StartupSplash"
 import { hydrateAppearance } from "@/services/themeManager"
 import { hydrateLanguage } from "@/services/i18next"
 import { hydratePreferences } from "@/services/prefs"
@@ -20,7 +22,14 @@ import { hydrateRecentChords } from "@/services/recentChords"
 import { startSyncWatcher } from "@/services/sync"
 import { installWebDocumentStyles } from "@/libs/webStyles"
 
+// The native splash covers the first frames; the animated one (StartupSplash)
+// takes over as soon as it is painted (docs §19).
 SplashScreen.preventAutoHideAsync().catch(() => undefined)
+try {
+  SplashScreen.setOptions({ duration: 280, fade: true })
+} catch {
+  // setOptions does not exist on web.
+}
 
 /**
  * Root layout: fonts, appearance, data providers and the route tree.
@@ -63,12 +72,9 @@ export default function Layout() {
 
   const ready = (fontsLoaded || fontError !== null) && preferencesReady
 
-  useEffect(() => {
-    if (ready) SplashScreen.hideAsync().catch(() => undefined)
-  }, [ready])
-
   if (!ready) {
-    return <View style={{ flex: 1, backgroundColor: Theme.colors.background }} />
+    // Still under the native splash: paint its colour so nothing flashes.
+    return <View style={{ flex: 1, backgroundColor: SPLASH_BACKGROUND }} />
   }
 
   return (
@@ -79,18 +85,20 @@ export default function Layout() {
           <AuthProvider>
             <OrganizationProvider>
               <OrgDataProvider>
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    animation: "slide_from_right",
-                    animationDuration: 180,
-                    contentStyle: { backgroundColor: Theme.colors.background },
-                  }}
-                >
-                  <Stack.Screen name="index" />
-                  <Stack.Screen name="(auth)" />
-                  <Stack.Screen name="(app)" />
-                </Stack>
+                <StartupGate>
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      animation: "slide_from_right",
+                      animationDuration: 180,
+                      contentStyle: { backgroundColor: Theme.colors.background },
+                    }}
+                  >
+                    <Stack.Screen name="index" />
+                    <Stack.Screen name="(auth)" />
+                    <Stack.Screen name="(app)" />
+                  </Stack>
+                </StartupGate>
               </OrgDataProvider>
             </OrganizationProvider>
           </AuthProvider>
