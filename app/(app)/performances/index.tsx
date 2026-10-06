@@ -11,6 +11,7 @@ import { EmptyState, ErrorState, SkeletonList } from "@/components/ui/States"
 import { CalendarCheckIcon, PlusIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { PerformanceCard } from "@/components/performances/PerformanceCard"
+import { BannerAdSlot } from "@/components/ads/BannerAdSlot"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 
@@ -103,6 +104,8 @@ export default function PerformancesScreen() {
           ) : null}
         </View>
       )}
+
+      <BannerAdSlot />
     </ScreenContainer>
   )
 }

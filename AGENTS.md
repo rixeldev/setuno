@@ -72,6 +72,12 @@ npx expo-doctor         # diagnose dependency and config issues
 - **Writes are offline-first**: Firestore stores every write in the on-device cache and replays the queue by itself (native persistence is on by default; on web `db/firestoreInstance.web.ts` enables IndexedDB via `persistentLocalCache`). Never bypass `db/Fire.ts`, and never assume a write needs connectivity to succeed.
 - Connectivity + queue state live in `services/sync.ts` (`useSyncState()`), rendered only by `components/app/SyncBanner.tsx`. Keep the banner a pure render of that state — do not add connectivity checks (or timers) to screens.
 
+## Ads
+
+- Google Mobile Ads is native-only and platform-split like `googleAuth`: `services/ads.ts` + `components/ads/BannerAdSlot.tsx` for native, with `.web.ts` shims that no-op so web never imports the SDK.
+- Banners live in a few strategic spots only: the dashboard (bottom, above the navigation) and the end of the songbook and events lists. The slot collapses to zero height until an ad loads, so it is invisible when there is no fill (offline, blocker, web).
+- Dev builds use the SDK's official test unit and Google's test app IDs in `app.config.js`. Set real app IDs and `EXPO_PUBLIC_ADMOB_BANNER_ID` before release; ads require a development build (not Expo Go).
+
 ## Internationalization
 
 - i18next is configured in `services/i18next.ts`; locale bundles are `locales/en.json` and `locales/es.json`.

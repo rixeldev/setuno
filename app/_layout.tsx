@@ -19,6 +19,7 @@ import { hydrateAppearance } from "@/services/themeManager"
 import { hydrateLanguage } from "@/services/i18next"
 import { hydratePreferences } from "@/services/prefs"
 import { hydrateRecentChords } from "@/services/recentChords"
+import { initializeAds } from "@/services/ads"
 import { startSyncWatcher } from "@/services/sync"
 import { installWebDocumentStyles } from "@/libs/webStyles"
 
@@ -64,6 +65,11 @@ export default function Layout() {
   // Offline writes live in the Firestore cache; this keeps the UI informed and
   // drains the queue as soon as the connection is back (docs §37).
   useEffect(() => startSyncWatcher(), [])
+
+  // Google Mobile Ads warm-up (no-op on web, see `services/ads.web.ts`).
+  useEffect(() => {
+    initializeAds()
+  }, [])
 
   // Clears the browser's default focus ring around text fields (web only).
   useEffect(() => {

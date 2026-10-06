@@ -14,6 +14,7 @@ import { EmptyState, ErrorState, SkeletonList } from "@/components/ui/States"
 import { FilterIcon, PlusIcon, SearchIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { SongRow } from "@/components/app/SongRow"
+import { BannerAdSlot } from "@/components/ads/BannerAdSlot"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import {
@@ -155,6 +156,8 @@ export default function SongsScreen() {
           ))}
         </View>
       )}
+
+      <BannerAdSlot />
 
       <Dialog
         visible={facet !== null}

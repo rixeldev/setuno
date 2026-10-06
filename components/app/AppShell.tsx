@@ -6,6 +6,7 @@ import { usePathname } from "expo-router"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { BottomBar, SidebarNav } from "@/components/app/AppNavigation"
 import { SyncBanner } from "@/components/app/SyncBanner"
+import { BannerAdSlot } from "@/components/ads/BannerAdSlot"
 import { useResponsive } from "@/hooks/useResponsive"
 import { isFocusRoute } from "@/libs/navigation"
 
@@ -21,6 +22,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { usesSidebar } = useResponsive()
   const pathname = usePathname()
   const focused = isFocusRoute(pathname)
+  // One banner, on the dashboard, sitting right above the navigation. It hides
+  // itself when there is nothing to show (no fill, offline, web).
+  const showDashboardBanner = pathname === "/" && !focused
 
   if (usesSidebar) {
     return (
@@ -29,6 +33,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <View style={styles.desktopContent}>
           <SyncBanner />
           {children}
+          {showDashboardBanner ? <BannerAdSlot /> : null}
         </View>
       </View>
     )
@@ -40,6 +45,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SyncBanner />
         {children}
       </SafeAreaView>
+      {showDashboardBanner ? <BannerAdSlot /> : null}
       {focused ? null : <BottomBar />}
     </View>
   )
