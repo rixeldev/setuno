@@ -31,6 +31,9 @@ export default function OrganizationsScreen() {
 
   const [switching, setSwitching] = useState<string | null>(null)
   const [accepting, setAccepting] = useState<Invitation | null>(null)
+  // Kept separate from `accepting` so the dialog keeps the band name while it
+  // fades out (otherwise the generic fallback text flashes for a frame).
+  const [joinOpen, setJoinOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
   /** Closes the modal, falling back to the dashboard when opened at the root. */
@@ -61,7 +64,7 @@ export default function OrganizationsScreen() {
         photoURL: profile?.photoURL ?? user?.photoURL ?? null,
         email: profile?.email || user?.email || "",
       })
-      setAccepting(null)
+      setJoinOpen(false)
       toast.showSuccess(t("auth.welcomeToBand", { name: invitation.organizationName }))
       await switchOrganization(invitation.organizationId)
       close()
@@ -151,7 +154,10 @@ export default function OrganizationsScreen() {
                 label={t("auth.acceptInvitation")}
                 icon={<CheckCircleIcon size={16} color={Theme.colors.onPrimary} />}
                 disabled={busy}
-                onPress={() => setAccepting(invitation)}
+                onPress={() => {
+                  setAccepting(invitation)
+                  setJoinOpen(true)
+                }}
               />
             </Card>
           ))}
@@ -165,8 +171,8 @@ export default function OrganizationsScreen() {
       ) : null}
 
       <Dialog
-        visible={accepting !== null}
-        onClose={() => setAccepting(null)}
+        visible={joinOpen}
+        onClose={() => setJoinOpen(false)}
         title={accepting ? t("auth.joinBandTitle", { name: accepting.organizationName }) : t("organizations.joinBand")}
         description={t("auth.joinBandDescription", {
           role: accepting?.role === "admin" ? t("auth.roleAdmin") : t("auth.roleMusician"),

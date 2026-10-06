@@ -43,6 +43,10 @@ export default function MembersScreen() {
   const [busy, setBusy] = useState(false)
   const [menuMember, setMenuMember] = useState<OrganizationMember | null>(null)
   const [pendingRemoval, setPendingRemoval] = useState<OrganizationMember | null>(null)
+  // Visibility is separate from the entity so the sheet/dialog keep the member
+  // information while they fade out (no fallback text flashing for a frame).
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [removeOpen, setRemoveOpen] = useState(false)
 
   const actor = { id: profile?.uid ?? "", name: profile?.displayName || "An admin" }
   const pendingInvitations = useMemo(
@@ -99,7 +103,7 @@ export default function MembersScreen() {
     try {
       await removeMember(organizationId ?? "", pendingRemoval.uid, actor)
       toast.showSuccess(t("organizations.memberRemoved", { name: pendingRemoval.displayName }))
-      setPendingRemoval(null)
+      setRemoveOpen(false)
     } catch (err) {
       toast.showError(toFriendlyError(err, t("members.couldNotRemove")))
     } finally {
@@ -195,7 +199,10 @@ export default function MembersScreen() {
                   <IconButton
                     label={t("members.actions", { name: member.displayName })}
                     size={32}
-                    onPress={() => setMenuMember(member)}
+                    onPress={() => {
+                      setMenuMember(member)
+                      setMenuOpen(true)
+                    }}
                     icon={<DotsIcon size={16} color={Theme.colors.textMuted} />}
                   />
                 ) : null}
@@ -245,8 +252,8 @@ export default function MembersScreen() {
       </AppText>
 
       <BottomSheet
-        visible={menuMember !== null}
-        onClose={() => setMenuMember(null)}
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
         title={menuMember?.displayName ?? ""}
         subtitle={menuMember ? t(`organizations.${menuMember.role}`) : undefined}
       >
@@ -258,7 +265,7 @@ export default function MembersScreen() {
               }
               onPress={() => {
                 const member = menuMember
-                setMenuMember(null)
+                setMenuOpen(false)
                 void changeRole(member, member.role === "admin" ? "member" : "admin")
               }}
             />
@@ -266,7 +273,8 @@ export default function MembersScreen() {
               label={t("organizations.removeMember")}
               onPress={() => {
                 setPendingRemoval(menuMember)
-                setMenuMember(null)
+                setMenuOpen(false)
+                setRemoveOpen(true)
               }}
             />
           </>
@@ -307,8 +315,8 @@ export default function MembersScreen() {
       </Dialog>
 
       <Dialog
-        visible={pendingRemoval !== null}
-        onClose={() => setPendingRemoval(null)}
+        visible={removeOpen}
+        onClose={() => setRemoveOpen(false)}
         title={t("members.removeTitle", { name: pendingRemoval?.displayName ?? t("members.thisMember") })}
         description={t("members.removeDescription", {
           band: organization?.name ?? t("members.thisBand"),
