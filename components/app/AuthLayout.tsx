@@ -1,5 +1,5 @@
 import React from "react"
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native"
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native"
 import { router } from "expo-router"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useTranslation } from "react-i18next"
@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next"
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
-import { ArrowLeftIcon, LogoIcon } from "@/components/ui/Icons"
+import { ArrowLeftIcon } from "@/components/ui/Icons"
 import { AppBackground } from "@/components/app/AppBackground"
 import { useResponsive } from "@/hooks/useResponsive"
 
@@ -66,9 +66,11 @@ export function AuthLayout({ title, subtitle, children, footer, back = false }: 
       >
         <View style={[styles.card, isDesktop && styles.cardDesktop]}>
           <View style={styles.brand}>
-            <View style={styles.logo}>
-              <LogoIcon size={30} color={Theme.colors.primary} />
-            </View>
+            <Image
+              source={require("../../assets/icon.png")}
+              style={styles.logo}
+              accessibilityIgnoresInvertColors
+            />
             <AppText variant="title">Stage Book</AppText>
             <AppText variant="caption" tone="muted" style={styles.centered}>
               {t("auth.tagline")}
@@ -76,7 +78,9 @@ export function AuthLayout({ title, subtitle, children, footer, back = false }: 
           </View>
 
           <View style={styles.header}>
-            <AppText variant="display">{title}</AppText>
+            <AppText variant="display" style={styles.centered}>
+              {title}
+            </AppText>
             {subtitle ? (
               <AppText variant="body" tone="muted" style={styles.centered}>
                 {subtitle}
@@ -116,18 +120,14 @@ const createStyles = () =>
     card: { width: "100%", maxWidth: 440, gap: Theme.spacing.xxl },
     cardDesktop: { maxWidth: 480 },
     brand: { alignItems: "center", gap: Theme.spacing.s },
+    // The launcher icon doubles as the brand mark.
     logo: {
-      width: 60,
-      height: 60,
-      borderRadius: Theme.radii.pill,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: Theme.colors.primarySoft,
-      borderWidth: 1,
-      borderColor: Theme.colors.borderSoft,
+      width: 76,
+      height: 76,
+      borderRadius: Theme.radii.xl,
       marginBottom: Theme.spacing.xs,
     },
-    header: { gap: Theme.spacing.xs },
+    header: { alignItems: "center", gap: Theme.spacing.xs },
     body: { gap: Theme.spacing.l },
     footer: { alignItems: "center", gap: Theme.spacing.s },
     centered: { textAlign: "center" },
