@@ -12,6 +12,7 @@ import { Theme } from "@/constants/Theme"
 import { AuthProvider } from "@/hooks/useAuth"
 import { OrganizationProvider } from "@/hooks/useOrganization"
 import { OrgDataProvider } from "@/hooks/useOrgData"
+import { TabTransitionProvider } from "@/hooks/useTabTransition"
 import { ToastProvider } from "@/components/ui/Toast"
 import { StartupGate } from "@/components/app/StartupGate"
 import { SPLASH_BACKGROUND } from "@/components/app/StartupSplash"
@@ -88,26 +89,28 @@ export default function Layout() {
       <StatusBar />
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ToastProvider>
-          <AuthProvider>
-            <OrganizationProvider>
-              <OrgDataProvider>
-                <StartupGate>
-                  <Stack
-                    screenOptions={{
-                      headerShown: false,
-                      animation: "slide_from_right",
-                      animationDuration: 180,
-                      contentStyle: { backgroundColor: Theme.colors.background },
-                    }}
-                  >
-                    <Stack.Screen name="index" />
-                    <Stack.Screen name="(auth)" />
-                    <Stack.Screen name="(app)" />
-                  </Stack>
-                </StartupGate>
-              </OrgDataProvider>
-            </OrganizationProvider>
-          </AuthProvider>
+          <TabTransitionProvider>
+            <AuthProvider>
+              <OrganizationProvider>
+                <OrgDataProvider>
+                  <StartupGate>
+                    <Stack
+                      screenOptions={{
+                        headerShown: false,
+                        animation: "slide_from_right",
+                        animationDuration: 180,
+                        contentStyle: { backgroundColor: Theme.colors.background },
+                      }}
+                    >
+                      <Stack.Screen name="index" />
+                      <Stack.Screen name="(auth)" />
+                      <Stack.Screen name="(app)" />
+                    </Stack>
+                  </StartupGate>
+                </OrgDataProvider>
+              </OrganizationProvider>
+            </AuthProvider>
+          </TabTransitionProvider>
         </ToastProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>

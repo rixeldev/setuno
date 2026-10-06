@@ -14,7 +14,8 @@ import { ChevronDownIcon, CloseIcon, LogoIcon, SwapIcon } from "@/components/ui/
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
-import { MOBILE_NAV, SIDEBAR_NAV, isNavActive } from "@/libs/navigation"
+import { useTabTransition } from "@/hooks/useTabTransition"
+import { MOBILE_NAV, SIDEBAR_NAV, isNavActive, isTabActive } from "@/libs/navigation"
 
 /**
  * Organization switcher: shows the active band and lets the user move between
@@ -197,17 +198,17 @@ export function SidebarNav() {
 export function BottomBar() {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
-  const router = useRouter()
   const pathname = usePathname()
   const insets = useSafeAreaInsets()
   const { pendingSuggestions } = useOrgData()
+  const { goToTab } = useTabTransition()
 
   const items = useMemo(() => MOBILE_NAV, [])
 
   return (
     <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       {items.map((item) => {
-        const active = isNavActive(item.href, pathname)
+        const active = isTabActive(item.href, pathname)
         const badge = item.badge === "suggestions" ? pendingSuggestions.length : 0
         const Icon = item.icon
         return (
@@ -216,7 +217,7 @@ export function BottomBar() {
             accessibilityRole="link"
             accessibilityLabel={t(item.label)}
             accessibilityState={{ selected: active }}
-            onPress={() => router.push(item.href as never)}
+            onPress={() => goToTab(item.href)}
             style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
           >
             <View style={[styles.tabIcon, active && styles.tabIconActive]}>
@@ -343,11 +344,13 @@ const createStyles = () =>
       borderTopColor: Theme.colors.border,
     },
     tab: { flex: 1, alignItems: "center", gap: 3, paddingVertical: 4 },
+    // A fixed size (instead of padding) keeps the active pill perfectly round
+    // on native as well as on web.
     tabIcon: {
+      width: 54,
+      height: 30,
       alignItems: "center",
       justifyContent: "center",
-      paddingHorizontal: 14,
-      paddingVertical: 5,
       borderRadius: Theme.radii.pill,
     },
     tabIconActive: { backgroundColor: Theme.colors.primarySoft },

@@ -75,6 +75,28 @@ export const isNavActive = (href: string, pathname: string): boolean => {
 }
 
 /**
+ * Mobile tab index a pathname belongs to, or `-1` when it matches none.
+ * Routes reachable from “More” count as the More tab, so switching from a
+ * settings screen back to a tab animates as if the bar were the origin.
+ */
+export const tabIndexFor = (pathname: string): number => {
+  const direct = MOBILE_NAV.findIndex((item) => isNavActive(item.href, pathname))
+  if (direct !== -1) return direct
+  if (MORE_NAV.some((item) => isNavActive(item.href, pathname))) {
+    return MOBILE_NAV.findIndex((item) => item.href === "/more")
+  }
+  return -1
+}
+
+/**
+ * Bottom-bar active state. “More” also owns the routes it hosts (settings,
+ * members, suggestions...), so the tab stays highlighted while they are open.
+ */
+export const isTabActive = (href: string, pathname: string): boolean =>
+  isNavActive(href, pathname) ||
+  (href === "/more" && MORE_NAV.some((item) => isNavActive(item.href, pathname)))
+
+/**
  * Editing flows that take over the app: while one is open the shell hides its
  * navigation (bottom bar / sidebar) so a stray tap cannot throw work away. The
  * song reader does the same: reading a song is a focused, full-width task.
