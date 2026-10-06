@@ -10,7 +10,7 @@
 
 <p align="center">
   <img alt="Expo" src="https://img.shields.io/badge/Expo-SDK%2057-000?logo=expo&logoColor=white">
-  <img alt="React Native" src="https://img.shields.io/badge/React%20Native-0.81-61DAFB?logo=react&logoColor=black">
+  <img alt="React Native" src="https://img.shields.io/badge/React%20Native-0.86-61DAFB?logo=react&logoColor=black">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white">
   <img alt="Firebase" src="https://img.shields.io/badge/Firebase-Firestore-FFCA28?logo=firebase&logoColor=black">
   <img alt="i18n" src="https://img.shields.io/badge/i18n-EN%20%7C%20ES-8A2BE2">
@@ -58,18 +58,21 @@ a sidebar layout on the web.
 | **Performances** | Schedule gigs with venue, times, status and an attached setlist |
 | **Calendar** | Month view of upcoming and past shows |
 | **Dashboard** | Next show, quick actions, library stats, recent activity feed |
-| **Settings** | Profile, appearance (light/dark/accent), band settings, danger zone |
+| **Settings** | Profile, theme (dark/light/system), language (EN/ES), band settings, danger zone |
+| **Modals** | Members, suggestions, the band switcher and profile open as modal sheets over the current screen |
 | **i18n** | Full English and Spanish translations |
 | **Realtime** | Live Firestore listeners keep every device in sync |
+| **Offline** | Writes are stored on the device and synchronized automatically when the connection returns |
 
 ---
 
 ## Tech stack
 
-- **Expo SDK 57** + **React Native 0.81** (Continuous Native Generation — no hand-written `ios/`/`android/`)
+- **Expo SDK 57** + **React Native 0.86** (Continuous Native Generation — no hand-written `ios/`/`android/`)
 - **Expo Router** for file-based navigation
 - **TypeScript** (strict) — `any` is avoided throughout
 - **Firebase**: Firestore, Auth, Storage, Cloud Functions
+- **Custom translucent overlays** (`SheetSurface`): dialog, bottom sheet and modal screens share one spring entrance
 - **i18next** + `react-i18next` for localization
 - **Vitest** for unit and integration tests
 - **ESLint** (flat config) + Prettier
@@ -153,11 +156,11 @@ app/                    Expo Router — every file here is a screen
     setlists/           Setlists list, create, detail, edit
     performances/       Gigs list, create, detail, edit
     calendar.tsx        Month calendar
-    members.tsx         Members, invitations, roles
-    organizations/      Switch band, create band
-    settings/           Profile, band, appearance
+    members.tsx         Members, invitations, roles (modal)
+    organizations/      Switch band, create band (modals)
+    settings/           Settings hub (language + theme sheets), profile modal, band
     more.tsx            Mobile overflow menu
-components/             UI kit (ui/), screen widgets (app/), domain (songs/, setlists/, performances/)
+components/             UI kit (ui/, incl. BottomSheet), screen widgets (app/, incl. ModalScreen), domain (songs/, setlists/, performances/), settings sheets
 hooks/                  useAuth, useOrganization, useOrgData, useThemedStyles
 services/               Firebase data layer (songs, setlists, performances, suggestions, auth, users…)
 db/                     Fire.ts (single Firebase entry point) + firebaseConfig.ts
@@ -183,15 +186,37 @@ only code that talks to Firestore, and screens only talk to services.
 and `firebase/auth` to `shims/*.web.ts`, so the identical service layer runs in the browser against
 the web SDK. Validated with `pnpm export:web`.
 
+**Offline-first.** Firestore keeps every write in the on-device cache first and replays the queue by
+itself when the connection returns (native persistence is on by default; the web build enables an
+IndexedDB `persistentLocalCache` in `db/firestoreInstance.web.ts`, so a reload does not lose pending
+writes). `services/sync.ts` watches connectivity and the queue, and `components/app/SyncBanner.tsx`
+tells the user what is happening: saved on the device → syncing → everything up to date.
+
 **Single source of truth for org data.** `hooks/useOrgData.tsx` opens one live listener per
 collection (songs, setlists, performances, suggestions, members, invitations, activity) and shares
 the snapshot with every screen through context. The snapshot is tagged with the active organization
 id, so switching bands never shows the previous band's data.
 
 **Design system.** `constants/Theme.ts` holds the Stage Book tokens (colors, spacing, radii).
-Styles are built with `useThemedStyles(createStyles)`, which rebuilds once per palette change.
-Reusable primitives live in `components/ui/` (`Button`, `Input`, `Card`, `Dialog`, `Toast`,
-`States`, `PageHeader`, `Icons`…).
+Styles are built with `useThemedStyles(createStyles)`, which rebuilds once per palette change — the
+theme follows dark, light or the device scheme (`"system"`). The palette is derived from six accents
+(`libs/appearance.ts`): dark surfaces get a subtle tint of the accent, and light mode darkens the
+accent itself so text and icons keep AA contrast. Reusable primitives live in
+`components/ui/` (`Button`, `Input`, `Card`, `Dialog`, `BottomSheet`, `Toast`, `States`,
+`PageHeader`, `Icons`…). Every screen carries an accessible go-back button in its header
+(`PageHeader` shows it automatically when the router can go back).
+
+**Modals & bottom sheets.** Screens that interrupt the current task — `members`, the suggestions
+inbox, `settings/profile`, the band switcher and *New band* — are registered with
+`presentation: "transparentModal"` in `app/(app)/_layout.tsx` and rendered through
+`components/app/ModalScreen.tsx`: a spring-animated panel floating on a **translucent** backdrop
+(bottom sheet on phones, centred dialog on web). Short option pickers (language, theme) use the same
+`components/ui/SheetSurface.tsx` primitive, so every overlay animates and dims identically.
+
+**Editing flows are protected.** While a song, setlist or show form is open, `AppShell` hides the
+bottom bar/sidebar (`isFocusRoute()`), and every form runs `useUnsavedChanges()` with
+`DiscardChangesDialog` so back gestures, tab presses or closing the browser ask before throwing the
+draft away.
 
 **Transposition is presentation-only.** `libs/chords.ts` and `libs/songUtils.ts` transpose for
 display; the stored song document is never rewritten by a viewer changing their local key.
@@ -227,6 +252,9 @@ const { t } = useTranslation()
 t("songs.newSong")
 t("toasts.suggestionSent")
 ```
+
+The app starts in the **device language**. The Settings → Language sheet offers **English / Español**;
+choosing one stores it on the device (`services/i18next.ts`) and it is restored before the first frame.
 
 **Keep both locale files in sync** — every new user-facing string needs a key in `en.json` *and*
 `es.json`. Interpolation uses `{{variable}}`; plurals use `_one` / `_other` suffixes.
