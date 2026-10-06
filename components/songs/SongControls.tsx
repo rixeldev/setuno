@@ -35,7 +35,8 @@ const STEP_SIZE = 28
 
 /**
  * Performance controls of the song reader: transpose, capo, text size and chord
- * visibility. Transposition is display-only, the saved song never changes.
+ * visibility, with the notation toggle sitting next to the key it affects.
+ * Transposition is display-only, the saved song never changes.
  *
  * The four groups lay out in a compact grid that always fits the screen — on
  * very narrow devices they wrap to a second row instead of hiding behind a
@@ -63,20 +64,34 @@ export function SongControls({
     <View style={[styles.host, { paddingHorizontal: gutter }]}>
       <View style={[styles.inner, { maxWidth: contentMaxWidth }]}>
         <View style={styles.keyRow}>
-          <MusicIcon size={15} color={Theme.colors.primary} />
-          <AppText variant="subheading" tone="primary">
-            {displayKey || "—"}
-          </AppText>
-          {semitones !== 0 ? (
-            <AppText variant="caption" tone="muted">
-              {t("songs.keyWas", { key: originalKey })}
+          <View style={styles.keyInfo}>
+            <MusicIcon size={15} color={Theme.colors.primary} />
+            <AppText variant="subheading" tone="primary">
+              {displayKey || "—"}
             </AppText>
-          ) : null}
-          {capo > 0 ? (
-            <AppText variant="caption" tone="faint">
-              {t("songs.capoShort", { capo })}
+            {semitones !== 0 ? (
+              <AppText variant="caption" tone="muted" numberOfLines={1}>
+                {t("songs.keyWas", { key: originalKey })}
+              </AppText>
+            ) : null}
+            {capo > 0 ? (
+              <AppText variant="caption" tone="faint" numberOfLines={1}>
+                {t("songs.capoShort", { capo })}
+              </AppText>
+            ) : null}
+          </View>
+
+          <Pressable
+            onPress={() => onNotationChange(notation === "letters" ? "solfege" : "letters")}
+            accessibilityRole="button"
+            accessibilityLabel={t("songs.switchNotation")}
+            accessibilityState={{ selected: notation === "solfege" }}
+            style={({ pressed }) => [styles.notationChip, pressed && styles.pressed]}
+          >
+            <AppText variant="caption" tone="primary" numberOfLines={1}>
+              {notation === "letters" ? t("songs.notationLetters") : t("songs.notationSolfege")}
             </AppText>
-          ) : null}
+          </Pressable>
         </View>
 
         <View style={styles.groups}>
@@ -187,25 +202,6 @@ export function SongControls({
               />
             </View>
           </View>
-
-          <View style={styles.group}>
-            <AppText variant="caption" tone="faint" style={styles.groupLabel}>
-              {t("songs.notation")}
-            </AppText>
-            <View style={styles.stepper}>
-              <Pressable
-                onPress={() => onNotationChange(notation === "letters" ? "solfege" : "letters")}
-                accessibilityRole="button"
-                accessibilityLabel={t("songs.switchNotation")}
-                accessibilityState={{ selected: notation === "solfege" }}
-                style={({ pressed }) => [styles.notationChip, pressed && styles.pressed]}
-              >
-                <AppText variant="caption" tone="primary" numberOfLines={1}>
-                  {notation === "letters" ? t("songs.notationLetters") : t("songs.notationSolfege")}
-                </AppText>
-              </Pressable>
-            </View>
-          </View>
         </View>
       </View>
     </View>
@@ -225,6 +221,13 @@ const createStyles = () =>
     },
     inner: { width: "100%", alignSelf: "center", gap: Theme.spacing.m },
     keyRow: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.s },
+    keyInfo: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.s,
+    },
     groups: {
       flexDirection: "row",
       flexWrap: "wrap",
