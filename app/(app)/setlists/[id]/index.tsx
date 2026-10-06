@@ -266,7 +266,13 @@ export default function SetlistDetail() {
                         .join(" · ")}
                     </AppText>
                   </View>
-                  {entry.key ? <Badge label={displayKey(entry.key, notation)} tone="accent" /> : null}
+                  {entry.key ? (
+                    <Badge
+                      label={displayKey(entry.key, notation)}
+                      tone="accent"
+                      style={styles.keyBadge}
+                    />
+                  ) : null}
                 </Pressable>
 
                 {editing ? (
@@ -457,13 +463,21 @@ const createStyles = () =>
     songDivider: { borderTopWidth: 1, borderTopColor: Theme.colors.borderSoft },
     songMain: {
       flex: 1,
+      minHeight: 56,
       flexDirection: "row",
       alignItems: "center",
       gap: Theme.spacing.m,
       paddingVertical: Theme.spacing.m,
       paddingLeft: Theme.spacing.l,
+      paddingRight: Theme.spacing.l,
     },
     order: { width: 20, textAlign: "right" },
+    keyBadge: {
+      borderWidth: 1,
+      borderColor: Theme.colors.accent,
+      paddingHorizontal: Theme.spacing.m,
+      paddingVertical: 4,
+    },
     rowActions: { flexDirection: "row", alignItems: "center", paddingRight: Theme.spacing.xs },
     shows: { gap: Theme.spacing.xs },
     showLine: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.m },
