@@ -266,7 +266,8 @@
     "createAnotherBand": "Create another band",
     "bandSwitched": "Band switched.",
     "couldNotSwitch": "We couldn't switch bands.",
-    "invitationHint": "No pending invitations. When a band invites {{email}}, it will show up here to join with one tap."
+    "invitationHint": "No pending invitations. When a band invites {{email}}, it will show up here to join with one tap.",
+    "invitationsUnavailable": "We could not check your invitations. Please try again in a moment."
   },
   "members": {
     "inviteSomeone": "Invite someone",

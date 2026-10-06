@@ -135,7 +135,7 @@ export default function OrganizationsScreen() {
       )}
 
       {invitationsError ? (
-        <ErrorState message={invitationsError} />
+        <ErrorState message={t("organizations.invitationsUnavailable")} />
       ) : invitations.length > 0 ? (
         <Section title={t("auth.invitationsForYou")} subtitle={t("organizations.joinWithOneTap")}>
           {invitations.map((invitation) => (
