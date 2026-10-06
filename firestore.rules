@@ -39,7 +39,7 @@ service cloud.firestore {
     /** Lowercased email on the auth token; the invitation key is built from it. */
     function tokenEmail() {
       return signedIn() && request.auth.token.email is string
-        ? request.auth.token.email.lowerAsciiToLower()
+        ? request.auth.token.email.lower()
         : '';
     }
 
@@ -89,8 +89,8 @@ service cloud.firestore {
 
     function validEmail(address) {
       return address is string && address.size() > 3 && address.size() <= 320
-        && address.lowerAsciiToLower() == address
-        && address.contains('@');
+        && address.lower() == address
+        && address.matches('.*@.*');
     }
 
     // -------------------------------------------------------------------- users
