@@ -76,7 +76,11 @@ npx expo-doctor         # diagnose dependency and config issues
 
 - Google Mobile Ads is native-only and platform-split like `googleAuth`: `services/ads.ts` + `components/ads/BannerAdSlot.tsx` for native, with `.web.ts` shims that no-op so web never imports the SDK.
 - Banners live in a few strategic spots only: the dashboard (bottom, above the navigation) and the end of the songbook and events lists. The slot collapses to zero height until an ad loads, so it is invisible when there is no fill (offline, blocker, web).
-- Dev builds use the SDK's official test unit and Google's test app IDs in `app.config.js`. Set real app IDs and `EXPO_PUBLIC_ADMOB_BANNER_ID` before release; ads require a development build (not Expo Go).
+- Dev builds use the SDK's official test unit; release builds use `adBannerId` from `db/firebaseConfig.ts` (override with `EXPO_PUBLIC_ADMOB_BANNER_ID`). Ads require a development build (not Expo Go).
+
+## Firebase rules deploy
+
+- The Firestore project is pinned in `.firebaserc` (`stage-book-477a6`) and `firebase.json` points at `firestore.rules`; publish with `npx firebase-tools login` (once) then `pnpm deploy:rules`. Collection-group queries (invitations) only work with the recursive-wildcard rule in that file, so deploy rules together with app changes that rely on them.
 
 ## Internationalization
 
