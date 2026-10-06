@@ -14,7 +14,7 @@ import { ChevronDownIcon, CloseIcon, LogoIcon, SwapIcon } from "@/components/ui/
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
-import { useTabTransition } from "@/hooks/useTabTransition"
+import { useTabNavigation } from "@/hooks/useTabNavigation"
 import { MOBILE_NAV, SIDEBAR_NAV, isNavActive, isTabActive } from "@/libs/navigation"
 
 /**
@@ -201,7 +201,7 @@ export function BottomBar() {
   const pathname = usePathname()
   const insets = useSafeAreaInsets()
   const { pendingSuggestions } = useOrgData()
-  const { goToTab } = useTabTransition()
+  const { goToTab } = useTabNavigation()
 
   const items = useMemo(() => MOBILE_NAV, [])
 

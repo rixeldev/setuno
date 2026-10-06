@@ -76,8 +76,8 @@ export const isNavActive = (href: string, pathname: string): boolean => {
 
 /**
  * Mobile tab index a pathname belongs to, or `-1` when it matches none.
- * Routes reachable from “More” count as the More tab, so switching from a
- * settings screen back to a tab animates as if the bar were the origin.
+ * Routes reachable from “More” count as the More tab: tapping a bar entry
+ * from a settings screen treats the bar as the origin.
  */
 export const tabIndexFor = (pathname: string): number => {
   const direct = MOBILE_NAV.findIndex((item) => isNavActive(item.href, pathname))
