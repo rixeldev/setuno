@@ -10,6 +10,7 @@ import React, {
 
 import {
   fetchMember,
+  fetchMyOrganizations,
   fetchOrganization,
   subscribeMember,
   subscribeMyInvitations,
@@ -121,6 +122,21 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     let retryTimer: ReturnType<typeof setTimeout> | null = null
     let slowTimer: ReturnType<typeof setTimeout> | null = null
 
+    /** Direct server read: recovers the list or explains why it cannot. */
+    const resolveFromServer = async (): Promise<void> => {
+      try {
+        const items = await fetchMyOrganizations(uid)
+        if (cancelled) return
+        attempts = 0
+        setBandsError(null)
+        setBandRefs(items)
+        setLoadedFor(uid)
+      } catch (error) {
+        if (cancelled) return
+        setBandsError(toFriendlyError(error, "We couldn't load your bands."))
+      }
+    }
+
     const listen = (): void => {
       unsubscribe()
       if (slowTimer) {
@@ -152,6 +168,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
                   "Your bands are taking longer than expected. Try again.",
                 ),
               )
+              // The one-shot read either recovers the list or surfaces the real
+              // reason (offline, permissions…) instead of a vague timeout.
+              void resolveFromServer()
             }, BANDS_SERVER_DEADLINE_MS)
           }
         },
@@ -161,6 +180,10 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           if (attempts <= BANDS_RETRIES) {
             retryTimer = setTimeout(listen, Math.min(800 * 2 ** (attempts - 1), 8000))
             return
+          }
+          if (slowTimer) {
+            clearTimeout(slowTimer)
+            slowTimer = null
           }
           setBandsError(toFriendlyError(error, "We couldn't load your bands."))
           // Keep the app usable with whatever we have; the dashboard offers a

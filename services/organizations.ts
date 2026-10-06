@@ -8,6 +8,7 @@ import {
   firestore,
   getDoc,
   getDocs,
+  getDocsFromServer,
   limitTo,
   mapDoc,
   mapDocs,
@@ -339,6 +340,16 @@ export const removeMember = async (
     targetType: "member",
     targetId: memberUid,
   })
+}
+
+/**
+ * One-shot read of the user's band list, straight from the server. Used as a
+ * recovery when the live listener takes too long to get an answer: it either
+ * returns the list or fails with the concrete reason (offline, permissions...).
+ */
+export const fetchMyOrganizations = async (uid: string): Promise<OrganizationRef[]> => {
+  const snapshot = await getDocsFromServer(collection(firestore, paths.userOrganizations(uid)))
+  return mapDocs(snapshot, mapOrganizationRef)
 }
 
 /** Live list of the organizations a user belongs to (drives the org switcher). */
