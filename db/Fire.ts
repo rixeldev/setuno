@@ -12,18 +12,21 @@ import {
   Timestamp,
   collection,
   collectionGroup,
-  getFirestore,
   deleteDoc,
+  disableNetwork,
   doc,
+  enableNetwork,
   getDoc,
   getDocs,
   limit as limitTo,
   onSnapshot,
+  onSnapshotsInSync,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  waitForPendingWrites,
   where,
   writeBatch,
   type DocumentData,
@@ -35,23 +38,27 @@ import {
 import type { FirebaseApp } from "@react-native-firebase/app"
 
 import { app, auth } from "@/db/firebaseConfig"
+import { createFirestore } from "@/db/firestoreInstance"
 
 export {
   Timestamp,
   collection,
   collectionGroup,
-  getFirestore,
   deleteDoc,
+  disableNetwork,
   doc,
+  enableNetwork,
   getDoc,
   getDocs,
   limitTo,
   onSnapshot,
+  onSnapshotsInSync,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  waitForPendingWrites,
   where,
   writeBatch,
 }
@@ -66,7 +73,7 @@ export type { DocumentData, DocumentSnapshot, QuerySnapshot, Unsubscribe }
 export type SubscribeErrorHandler = (error: Error) => void
 
 /** Firestore instance shared by every service (from the shared Firebase app). */
-export const firestore = getFirestore(app as FirebaseApp)
+export const firestore = createFirestore(app as FirebaseApp)
 
 /** Firestore database paths, centralised to avoid typo-driven bugs. */
 export const paths = {
