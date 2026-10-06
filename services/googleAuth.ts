@@ -43,8 +43,12 @@ export const signInWithGoogle = async (): Promise<boolean> => {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true })
     const response = await GoogleSignin.signIn()
     if (!isSuccessResponse(response)) return false
-    const { idToken, accessToken } = await GoogleSignin.getTokens()
-    const credential = GoogleAuthProvider.credential(idToken, accessToken)
+    // The ID token already travels in the sign-in response: using it directly
+    // avoids the extra `getTokens()` network round-trip, which was the slow,
+    // flaky step of the flow. Fall back only when the token is missing.
+    const idToken = response.data.idToken ?? (await GoogleSignin.getTokens()).idToken
+    if (!idToken) throw new Error("Google did not return an ID token.")
+    const credential = GoogleAuthProvider.credential(idToken)
     await signInWithCredential(auth, credential)
     return true
   } catch (error) {

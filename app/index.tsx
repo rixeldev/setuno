@@ -4,19 +4,19 @@ import { Redirect } from "expo-router"
 
 import { Theme } from "@/constants/Theme"
 import { useAuth } from "@/hooks/useAuth"
-import { useOrganization } from "@/hooks/useOrganization"
 
 /**
- * Session gate: decides where a user lands based on authentication and band
- * membership (signed out → auth, otherwise the app). Bandless users start on
- * the dashboard and create a band from inside the app (docs §7).
+ * Session gate: decides where a user lands based on authentication (docs §7).
+ *
+ * It deliberately does not wait for the band list: signed-in users go straight
+ * into the app, which renders its own loading states, so a slow or offline
+ * band query can never trap them on a spinner — nor flash the wrong screen.
  */
 export default function Index() {
   const styles = useGateStyles()
   const { status } = useAuth()
-  const { state } = useOrganization()
 
-  if (status === "initializing" || (status === "signed-in" && state === "loading")) {
+  if (status === "initializing") {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={Theme.colors.primary} />

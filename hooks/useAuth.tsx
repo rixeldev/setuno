@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const profileUnsubscribe = useRef<(() => void) | null>(null)
 
   useEffect(() => {
-    const unsubscribe = subscribeAuthState(async (nextUser) => {
+    const unsubscribe = subscribeAuthState((nextUser) => {
       setUser(nextUser)
       setStatus(nextUser ? "signed-in" : "signed-out")
 
@@ -52,18 +52,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(null)
 
       if (!nextUser) return
-      // Create/backfill the profile document, then keep it live.
-      try {
-        await ensureUserProfile({
-          uid: nextUser.uid,
-          email: nextUser.email ?? "",
-          displayName: nextUser.displayName ?? "",
-          photoURL: nextUser.photoURL,
-        })
-      } catch {
-        // The profile listener below will surface any read error.
-      }
+      // Keep the profile live straight away (cache-first) and backfill the
+      // document in the background: a slow or offline `getDoc` must never hold
+      // up the session, which is what made cold starts feel stuck.
       profileUnsubscribe.current = subscribeUserProfile(nextUser.uid, setProfile)
+      void ensureUserProfile({
+        uid: nextUser.uid,
+        email: nextUser.email ?? "",
+        displayName: nextUser.displayName ?? "",
+        photoURL: nextUser.photoURL,
+      }).catch(() => undefined)
     })
 
     return () => {

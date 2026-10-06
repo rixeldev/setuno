@@ -1,8 +1,18 @@
 import React from "react"
-import { Stack } from "expo-router"
+import { Redirect, Stack } from "expo-router"
 
-/** Authentication and onboarding screens (no shell chrome). */
+import { useAuth } from "@/hooks/useAuth"
+
+/**
+ * Authentication screens (no shell chrome). Signed-in users are sent straight
+ * back into the app: this heals the brief race where a sign-in lands a moment
+ * before the root gate has seen the new session.
+ */
 export default function AuthLayout() {
+  const { status } = useAuth()
+
+  if (status === "signed-in") return <Redirect href="/" />
+
   return (
     <Stack
       screenOptions={{
