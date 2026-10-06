@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useMemo, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { useRouter } from "expo-router"
 import { useTranslation } from "react-i18next"
@@ -22,6 +22,7 @@ import { useOrgData } from "@/hooks/useOrgData"
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges"
 import { createPerformance, updatePerformance } from "@/services/performances"
 import { toFriendlyError } from "@/services/errors"
+import { formatDurationLong } from "@/libs/format"
 import { ISO_DATE_PATTERN, validateRequired, validateTime } from "@/libs/validation"
 import type { Performance, PerformanceInput, PerformanceStatus } from "@/interfaces"
 
@@ -41,7 +42,7 @@ interface PerformanceFormState {
   venueAddress: string
   venueNotes: string
   notes: string
-  setlistId: string | null
+  setlistIds: string[]
   status: PerformanceStatus
 }
 
@@ -58,7 +59,7 @@ const formStateFrom = (performance: Performance | null | undefined): Performance
   venueAddress: performance?.venue.address ?? "",
   venueNotes: performance?.venue.notes ?? "",
   notes: performance?.notes ?? "",
-  setlistId: performance?.setlistId ?? null,
+  setlistIds: performance?.setlists.map((entry) => entry.id) ?? [],
   status: performance?.status ?? "scheduled",
 })
 
@@ -86,14 +87,38 @@ export function PerformanceForm({ performance, onSaved }: PerformanceFormProps) 
   const [venueAddress, setVenueAddress] = useState(performance?.venue.address ?? "")
   const [venueNotes, setVenueNotes] = useState(performance?.venue.notes ?? "")
   const [notes, setNotes] = useState(performance?.notes ?? "")
-  const [setlistId, setSetlistId] = useState<string | null>(performance?.setlistId ?? null)
+  const [setlistIds, setSetlistIds] = useState<string[]>(
+    performance?.setlists.map((entry) => entry.id) ?? [],
+  )
   const [status, setStatus] = useState<PerformanceStatus>(performance?.status ?? "scheduled")
   const [setlistPicker, setSetlistPicker] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [baseline, setBaseline] = useState(() => serializeForm(formStateFrom(performance)))
 
-  const setlist = setlists.find((entry) => entry.id === setlistId) ?? null
+  // Selection order is preserved; a setlist missing from the library keeps the
+  // name it was attached with, so nothing is silently dropped on save.
+  const selectedSetlists = useMemo(
+    () =>
+      setlistIds.map((id) => {
+        const doc = setlists.find((entry) => entry.id === id)
+        if (doc) return { id: doc.id, name: doc.name }
+        const stored = performance?.setlists.find((entry) => entry.id === id)
+        return { id, name: stored?.name ?? "" }
+      }),
+    [performance, setlistIds, setlists],
+  )
+  const selectedDocs = setlistIds
+    .map((id) => setlists.find((entry) => entry.id === id))
+    .filter((entry) => entry !== undefined)
+  const totalSongs = selectedDocs.reduce((sum, entry) => sum + entry.songs.length, 0)
+  const totalDuration = selectedDocs.reduce((sum, entry) => sum + entry.estimatedDurationSec, 0)
+
+  const toggleSetlist = (id: string): void => {
+    setSetlistIds((current) =>
+      current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id],
+    )
+  }
 
   const currentState: PerformanceFormState = {
     name,
@@ -105,7 +130,7 @@ export function PerformanceForm({ performance, onSaved }: PerformanceFormProps) 
     venueAddress,
     venueNotes,
     notes,
-    setlistId,
+    setlistIds,
     status,
   }
   const hasUnsavedChanges = serializeForm(currentState) !== baseline && !saving
@@ -139,7 +164,7 @@ export function PerformanceForm({ performance, onSaved }: PerformanceFormProps) 
         notes: venueNotes.trim(),
       },
       notes: notes.trim(),
-      setlistId,
+      setlists: selectedSetlists,
       status,
     }
 
@@ -147,12 +172,12 @@ export function PerformanceForm({ performance, onSaved }: PerformanceFormProps) 
     try {
       const author = { id: profile?.uid ?? "", name: profile?.displayName || "An admin" }
       if (performance) {
-        await updatePerformance(organizationId ?? "", performance.id, input, setlist?.name ?? null, author)
+        await updatePerformance(organizationId ?? "", performance.id, input, author)
         toast.showSuccess(t("performances.performanceUpdated", { name: input.name }))
         setBaseline(serializeForm(currentState))
         onSaved?.(performance.id)
       } else {
-        const id = await createPerformance(organizationId ?? "", input, setlist?.name ?? null, author)
+        const id = await createPerformance(organizationId ?? "", input, author)
         toast.showSuccess(t("performances.performanceCreated", { name: input.name }))
         setBaseline(serializeForm(currentState))
         onSaved?.(id)
@@ -273,16 +298,28 @@ export function PerformanceForm({ performance, onSaved }: PerformanceFormProps) 
         <AppText variant="label" tone="faint">
           {t("performances.setlist")}
         </AppText>
+        {selectedSetlists.length > 0 ? (
+          <View style={styles.wrap}>
+            {selectedSetlists.map((entry) => (
+              <Chip key={entry.id} label={entry.name} tone="primary" selected />
+            ))}
+          </View>
+        ) : null}
         <Button
-          label={setlist ? setlist.name : t("performances.attachSetlist")}
-          variant={setlist ? "secondary" : "ghost"}
+          label={
+            selectedSetlists.length > 0
+              ? t("performances.changeSetlists")
+              : t("performances.attachSetlists")
+          }
+          variant={selectedSetlists.length > 0 ? "secondary" : "ghost"}
           onPress={() => setSetlistPicker(true)}
-          iconRight={setlist ? <AppText variant="body" tone="muted">{t("common.change")}</AppText> : undefined}
         />
-        {setlist ? (
+        {selectedSetlists.length > 0 ? (
           <AppText variant="caption" tone="faint">
-            {t("organizations.songsCount", { count: setlist.songs.length })} ·{" "}
-            {setlist.estimatedDurationSec > 0 ? t("performances.timedEstimate") : t("performances.noEstimate")}
+            {t("setlists.songsCount", {
+              count: totalSongs,
+              duration: formatDurationLong(totalDuration),
+            })}
           </AppText>
         ) : null}
       </Card>
@@ -307,28 +344,17 @@ export function PerformanceForm({ performance, onSaved }: PerformanceFormProps) 
       <Dialog
         visible={setlistPicker}
         onClose={() => setSetlistPicker(false)}
-        title={t("performances.attachSetlist")}
+        title={t("performances.attachSetlists")}
         hideActions
       >
         <View style={{ gap: 6 }}>
-          <Chip
-            label={t("performances.noSetlist")}
-            selected={setlistId === null}
-            onPress={() => {
-              setSetlistId(null)
-              setSetlistPicker(false)
-            }}
-          />
           {setlists.map((entry) => (
             <Chip
               key={entry.id}
               label={entry.name}
               tone="primary"
-              selected={setlistId === entry.id}
-              onPress={() => {
-                setSetlistId(entry.id)
-                setSetlistPicker(false)
-              }}
+              selected={setlistIds.includes(entry.id)}
+              onPress={() => toggleSetlist(entry.id)}
             />
           ))}
           {setlists.length === 0 ? (
@@ -337,6 +363,7 @@ export function PerformanceForm({ performance, onSaved }: PerformanceFormProps) 
             </AppText>
           ) : null}
         </View>
+        <Button label={t("common.done")} variant="secondary" onPress={() => setSetlistPicker(false)} />
       </Dialog>
     </ModalScreen>
   )

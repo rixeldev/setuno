@@ -650,7 +650,7 @@
     "startTime": "Hora de inicio",
     "endTime": "Hora de fin",
     "status": "Estado",
-    "setlist": "Lista",
+    "setlist": "Listas",
     "selectSetlist": "Elegir una lista",
     "noSetlist": "Sin lista",
     "notes": "Notas",
@@ -712,7 +712,7 @@
     "moreSongs_one": "+{{count}} canción más",
     "moreSongs_other": "+{{count}} canciones más",
     "openSetlist": "Abrir la lista",
-    "noSetlistAttached": "Aún no hay lista adjunta.",
+    "noSetlistAttached": "Aún no hay listas adjuntas.",
     "endBeforeStart": "La hora de fin es anterior a la de inicio.",
     "end": "Fin",
     "addressPlaceholder": "Calle Riverside 14",
@@ -721,7 +721,9 @@
     "saveChanges": "Guardar cambios",
     "addShow": "Añadir evento",
     "noSetlistsAvailable": "Aún no tienes listas. Puedes añadir el evento y adjuntar una más tarde.",
-    "discardWhat": "cambios en este evento"
+    "discardWhat": "cambios en este evento",
+    "attachSetlists": "Adjuntar listas",
+    "changeSetlists": "Cambiar listas"
   },
   "calendar": {
     "calendar": "Calendario",

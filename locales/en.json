@@ -704,7 +704,7 @@
     "scheduled": "Scheduled",
     "completed": "Completed",
     "cancelled": "Cancelled",
-    "setlist": "Setlist",
+    "setlist": "Setlists",
     "selectSetlist": "Select a setlist",
     "noSetlist": "No setlist",
     "notes": "Notes",
@@ -769,7 +769,7 @@
     "moreSongs_one": "+{{count}} more song",
     "moreSongs_other": "+{{count}} more songs",
     "openSetlist": "Open the setlist",
-    "noSetlistAttached": "No setlist attached yet.",
+    "noSetlistAttached": "No setlists attached yet.",
     "endBeforeStart": "The end time is before the start time.",
     "end": "End",
     "addressPlaceholder": "14 Riverside Lane",
@@ -778,7 +778,9 @@
     "saveChanges": "Save changes",
     "addShow": "Add event",
     "noSetlistsAvailable": "You have no setlists yet. You can still add the event and attach one later.",
-    "discardWhat": "changes to this event"
+    "discardWhat": "changes to this event",
+    "attachSetlists": "Attach setlists",
+    "changeSetlists": "Change setlists"
   },
   "calendar": {
     "calendar": "Calendar",

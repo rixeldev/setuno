@@ -37,6 +37,7 @@ import {
   formatTime,
 } from "@/libs/format"
 import { parseIsoDate } from "@/libs/validation"
+import { setlistSummary } from "@/libs/performanceSetlists"
 
 const MAX_RECENT_SONGS = 3
 const MAX_UPCOMING = 3
@@ -296,6 +297,7 @@ export default function Dashboard() {
       ]
 
   const stamp = nextShow ? dayStamp(parseIsoDate(nextShow.date)) : null
+  const nextSetlistLabel = nextShow ? setlistSummary(nextShow.setlists) : ""
   const bandName = organization?.name || t("dashboard.dashboard")
   // Long band names step down a size and wrap instead of showing an ellipsis.
   const longBandName = bandName.length > 34
@@ -400,11 +402,11 @@ export default function Dashboard() {
                 </View>
               ) : null}
 
-              {nextShow.setlistName ? (
+              {nextSetlistLabel ? (
                 <View style={styles.heroChip}>
                   <ListIcon size={12} color={Theme.colors.onPrimary} />
                   <AppText variant="caption" tone="inverse" numberOfLines={1}>
-                    {nextShow.setlistName}
+                    {nextSetlistLabel}
                   </AppText>
                 </View>
               ) : null}

@@ -9,6 +9,12 @@ export interface Venue {
   notes: string
 }
 
+/** A setlist attached to an event (denormalised so names render offline). */
+export interface PerformanceSetlist {
+  id: string
+  name: string
+}
+
 export interface Performance {
   id: string
   organizationId: string
@@ -22,9 +28,8 @@ export interface Performance {
   endTime: string
   venue: Venue
   notes: string
-  /** Optional setlist attached to this show. */
-  setlistId: string | null
-  setlistName: string | null
+  /** Setlists attached to this show, in the order they were added. */
+  setlists: PerformanceSetlist[]
   status: PerformanceStatus
   createdBy: string
   createdAt: TimestampLike
@@ -39,7 +44,7 @@ export interface PerformanceInput {
   endTime: string
   venue: Venue
   notes: string
-  setlistId: string | null
+  setlists: PerformanceSetlist[]
   status: PerformanceStatus
 }
 

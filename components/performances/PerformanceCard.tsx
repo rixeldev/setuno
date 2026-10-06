@@ -8,6 +8,7 @@ import { AppText } from "@/components/ui/AppText"
 import { Badge, Card } from "@/components/ui/Card"
 import { MapPinIcon } from "@/components/ui/Icons"
 import { dayStamp, formatDateRange, formatRelativeDay, formatTime } from "@/libs/format"
+import { setlistSummary } from "@/libs/performanceSetlists"
 import { parseIsoDate } from "@/libs/validation"
 import type { Performance, PerformanceStatus } from "@/interfaces"
 export const PERFORMANCE_STATUS_TONES: Record<PerformanceStatus, "primary" | "success" | "danger"> = {
@@ -59,9 +60,11 @@ export function PerformanceCard({ performance, onPress }: CardProps) {
               .filter(Boolean)
               .join(" · ")}
           </AppText>
-          {performance.venue.name || performance.setlistName ? (
+          {performance.venue.name || performance.setlists.length > 0 ? (
             <AppText variant="caption" tone="faint" numberOfLines={1}>
-              {[performance.venue.name, performance.setlistName].filter(Boolean).join(" · ")}
+              {[performance.venue.name, setlistSummary(performance.setlists)]
+                .filter(Boolean)
+                .join(" · ")}
             </AppText>
           ) : null}
         </View>

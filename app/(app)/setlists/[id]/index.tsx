@@ -72,7 +72,8 @@ export default function SetlistDetail() {
         : performances
             .filter(
               (performance) =>
-                performance.setlistId === setlistId && performance.status !== "cancelled",
+                performance.setlists.some((entry) => entry.id === setlistId) &&
+                performance.status !== "cancelled",
             )
             .sort((a, b) => b.date.localeCompare(a.date)),
     [performances, setlistId],

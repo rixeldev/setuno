@@ -271,13 +271,14 @@ service cloud.firestore {
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
           && request.resource.data.date is string
+          && request.resource.data.setlists is list
           && request.resource.data.venue is map
           && request.resource.data.status in ['scheduled', 'completed', 'cancelled'];
         allow update: if isAdmin(organizationId)
           && request.resource.data.organizationId == organizationId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'name', 'date', 'endDate', 'startTime', 'endTime', 'venue', 'notes',
-            'setlistId', 'setlistName', 'status', 'updatedAt'
+            'setlists', 'status', 'updatedAt'
           ]);
         allow delete: if isAdmin(organizationId);
       }

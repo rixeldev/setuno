@@ -13,6 +13,7 @@ import { EmptyState, Skeleton } from "@/components/ui/States"
 import { useToast } from "@/components/ui/Toast"
 import {
   CheckCircleIcon,
+  ChevronRightIcon,
   ClockIcon,
   CloseIcon,
   EditIcon,
@@ -62,13 +63,6 @@ export default function PerformanceDetail() {
     () => performances.find((entry) => entry.id === performanceId) ?? null,
     [performances, performanceId],
   )
-  const setlist = useMemo(
-    () =>
-      performance?.setlistId
-        ? (setlists.find((entry) => entry.id === performance.setlistId) ?? null)
-        : null,
-    [performance, setlists],
-  )
   const actor = { id: profile?.uid ?? "", name: profile?.displayName || "An admin" }
 
   const setStatus = async (status: PerformanceStatus): Promise<void> => {
@@ -86,10 +80,9 @@ export default function PerformanceDetail() {
           endTime: performance.endTime,
           venue: performance.venue,
           notes: performance.notes,
-          setlistId: performance.setlistId,
+          setlists: performance.setlists,
           status,
         },
-        performance.setlistName,
         actor,
       )
       toast.showSuccess(t("performances.markedAs", { status: t(`performances.${status}`).toLowerCase() }))
@@ -154,6 +147,7 @@ export default function PerformanceDetail() {
     .join(" – ")
   const hasVenue = Boolean(performance.venue.name || performance.venue.address || performance.venue.notes)
   const hasNotes = performance.notes.trim().length > 0
+  const attachedSetlists = performance.setlists
 
   return (
     <ScreenContainer
@@ -238,59 +232,41 @@ export default function PerformanceDetail() {
       ) : null}
 
       <Card style={styles.setlistCard}>
-        <View style={styles.sectionHeader}>
-          <AppText variant="label" tone="faint">
-            {t("performances.setlist")}
-          </AppText>
-          {setlist ? (
-            <Button
-              label={t("performances.openSetlist")}
-              size="sm"
-              variant="ghost"
-              onPress={() => router.push(`/setlists/${setlist.id}`)}
-            />
-          ) : null}
-        </View>
+        <AppText variant="label" tone="faint">
+          {t("performances.setlist")}
+        </AppText>
 
-        {setlist ? (
-          <>
-            <View style={styles.metaRow}>
-              <MusicIcon size={14} color={Theme.colors.primary} />
-              <AppText variant="subheading" style={styles.flex} numberOfLines={2}>
-                {setlist.name}
-              </AppText>
-            </View>
-            <AppText variant="caption" tone="faint">
-              {t("setlists.songsCount", {
-                count: setlist.songs.length,
-                duration: formatDurationLong(setlist.estimatedDurationSec),
-              })}
-            </AppText>
-            <View style={styles.songs}>
-              {setlist.songs.slice(0, 8).map((entry, index) => (
+        {attachedSetlists.length > 0 ? (
+          <View style={styles.songs}>
+            {attachedSetlists.map((entry) => {
+              const doc = setlists.find((item) => item.id === entry.id)
+              return (
                 <Pressable
-                  key={`${entry.songId}-${index}`}
+                  key={entry.id}
                   accessibilityRole="button"
-                  accessibilityLabel={entry.title}
-                  onPress={() => router.push(`/songs/${entry.songId}`)}
-                  style={({ pressed }) => [styles.songRow, pressed && styles.pressed]}
+                  accessibilityLabel={entry.name || t("performances.openSetlist")}
+                  onPress={() => router.push(`/setlists/${entry.id}`)}
+                  style={({ pressed }) => [styles.setlistRow, pressed && styles.pressed]}
                 >
-                  <AppText variant="caption" tone="faint" style={styles.order}>
-                    {index + 1}
-                  </AppText>
-                  <AppText variant="body" numberOfLines={1} style={styles.flex}>
-                    {entry.title}
-                  </AppText>
-                  {entry.key ? <Badge label={entry.key} tone="accent" /> : null}
+                  <MusicIcon size={15} color={Theme.colors.primary} />
+                  <View style={styles.flex}>
+                    <AppText variant="bodyStrong" numberOfLines={1}>
+                      {entry.name}
+                    </AppText>
+                    {doc ? (
+                      <AppText variant="caption" tone="faint" numberOfLines={1}>
+                        {t("setlists.songsCount", {
+                          count: doc.songs.length,
+                          duration: formatDurationLong(doc.estimatedDurationSec),
+                        })}
+                      </AppText>
+                    ) : null}
+                  </View>
+                  <ChevronRightIcon size={16} color={Theme.colors.textFaint} />
                 </Pressable>
-              ))}
-              {setlist.songs.length > 8 ? (
-                <AppText variant="caption" tone="faint">
-                  {t("performances.moreSongs", { count: setlist.songs.length - 8 })}
-                </AppText>
-              ) : null}
-            </View>
-          </>
+              )
+            })}
+          </View>
         ) : (
           <View style={styles.emptySetlist}>
             <AppText variant="caption" tone="faint">
@@ -298,7 +274,7 @@ export default function PerformanceDetail() {
             </AppText>
             {isAdmin ? (
               <Button
-                label={t("performances.attachSetlist")}
+                label={t("performances.attachSetlists")}
                 variant="secondary"
                 size="sm"
                 onPress={() => router.push(`/performances/${performance.id}/edit`)}
@@ -385,20 +361,13 @@ const createStyles = () =>
       paddingLeft: Theme.spacing.m,
     },
     setlistCard: { gap: Theme.spacing.m },
-    sectionHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: Theme.spacing.s,
-    },
     songs: { gap: 2 },
-    songRow: {
+    setlistRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: Theme.spacing.m,
       paddingVertical: Theme.spacing.s,
     },
-    order: { width: 16, textAlign: "right" },
     pressed: { opacity: 0.7 },
     emptySetlist: { gap: Theme.spacing.m, alignItems: "flex-start" },
     actions: { gap: Theme.spacing.s, width: "100%", maxWidth: 420 },

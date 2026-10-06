@@ -25,6 +25,27 @@ import { ValidationError } from "@/services/errors"
 import { ISO_DATE_PATTERN, TIME_PATTERN, toIsoDate } from "@/libs/validation"
 import { eachDayBetween } from "@/libs/format"
 
+const MAX_SETLISTS = 20
+
+/**
+ * Setlists attached to a performance. Documents written before multi-setlist
+ * support stored a single `setlistId`/`setlistName` pair: read those too.
+ */
+const mapSetlists = (data: Record<string, unknown>): Performance["setlists"] => {
+  const raw = data.setlists
+  if (Array.isArray(raw)) {
+    return raw
+      .filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null)
+      .map((entry) => ({ id: String(entry.id ?? ""), name: String(entry.name ?? "") }))
+      .filter((entry) => entry.id.length > 0)
+      .slice(0, MAX_SETLISTS)
+  }
+  if (typeof data.setlistId === "string" && data.setlistId.length > 0) {
+    return [{ id: data.setlistId, name: typeof data.setlistName === "string" ? data.setlistName : "" }]
+  }
+  return []
+}
+
 const mapPerformance = (data: Record<string, unknown>, id: string): Performance => {
   const venue = (data.venue ?? {}) as Record<string, unknown>
   const status = data.status as PerformanceStatus
@@ -42,8 +63,7 @@ const mapPerformance = (data: Record<string, unknown>, id: string): Performance 
       notes: String(venue.notes ?? ""),
     },
     notes: String(data.notes ?? ""),
-    setlistId: (data.setlistId as string | null) ?? null,
-    setlistName: (data.setlistName as string | null) ?? null,
+    setlists: mapSetlists(data),
     status: status === "completed" ? "completed" : status === "cancelled" ? "cancelled" : "scheduled",
     createdBy: String(data.createdBy ?? ""),
     createdAt: data.createdAt as Performance["createdAt"],
@@ -131,7 +151,11 @@ const normalizeInput = (input: PerformanceInput): PerformanceInput => {
       notes: input.venue.notes.trim(),
     },
     notes: input.notes.trim(),
-    setlistId: input.setlistId,
+    setlists: input.setlists
+      .map((entry) => ({ id: entry.id.trim(), name: entry.name.trim() }))
+      .filter((entry) => entry.id.length > 0)
+      .filter((entry, index, all) => all.findIndex((other) => other.id === entry.id) === index)
+      .slice(0, MAX_SETLISTS),
     status: input.status,
   }
 }
@@ -139,7 +163,6 @@ const normalizeInput = (input: PerformanceInput): PerformanceInput => {
 export const createPerformance = async (
   organizationId: string,
   input: PerformanceInput,
-  setlistName: string | null,
   author: { id: string; name: string },
 ): Promise<string> => {
   const uid = requireUserId()
@@ -150,7 +173,6 @@ export const createPerformance = async (
   await setDoc(reference, {
     ...normalized,
     organizationId,
-    setlistName,
     createdBy: uid,
     createdAt: now,
     updatedAt: now,
@@ -173,7 +195,6 @@ export const updatePerformance = async (
   organizationId: string,
   performanceId: string,
   input: PerformanceInput,
-  setlistName: string | null,
   actor: { id: string; name: string },
 ): Promise<void> => {
   const uid = requireUserId()
@@ -181,7 +202,6 @@ export const updatePerformance = async (
 
   await updateDoc(doc(firestore, paths.performance(organizationId, performanceId)), {
     ...normalized,
-    setlistName,
     updatedAt: serverTimestamp(),
   })
 
