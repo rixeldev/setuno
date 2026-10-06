@@ -1,19 +1,31 @@
 import React, { useEffect, useMemo, useState } from "react"
-import { StyleSheet, View } from "react-native"
+import { Pressable, ScrollView, StyleSheet, View } from "react-native"
 import { useLocalSearchParams, useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
-import { Badge, Card } from "@/components/ui/Card"
+import { Badge } from "@/components/ui/Card"
 import { Button, IconButton } from "@/components/ui/Button"
 import { Dialog } from "@/components/ui/Dialog"
 import { EmptyState, Skeleton } from "@/components/ui/States"
-import { CopyIcon, EditIcon, FullscreenExitIcon, SuggestIcon, TrashIcon } from "@/components/ui/Icons"
+import {
+  BookIcon,
+  ChevronRightIcon,
+  CopyIcon,
+  EditIcon,
+  FullscreenExitIcon,
+  FullscreenIcon,
+  MusicIcon,
+  SuggestIcon,
+  TrashIcon,
+} from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
+import { AppBackground } from "@/components/app/AppBackground"
 import { PageHeader } from "@/components/ui/PageHeader"
 import { SongContent } from "@/components/songs/SongContent"
-import { ImmersiveToggle, SongControls } from "@/components/songs/SongControls"
+import { SongControls } from "@/components/songs/SongControls"
 import { useToast } from "@/components/ui/Toast"
 import { useAuth } from "@/hooks/useAuth"
 import { useResponsive } from "@/hooks/useResponsive"
@@ -23,19 +35,24 @@ import { deleteSong, subscribeSong } from "@/services/songs"
 import { updatePreferences } from "@/services/users"
 import { updateCachedPreferences, usePreferences } from "@/services/prefs"
 import { toFriendlyError } from "@/services/errors"
-import { transposeKey } from "@/libs/chords"
+import { displayKey as spellKey, transposeKey } from "@/libs/chords"
 import { formatRelativeTime, formatDuration } from "@/libs/format"
 import { toDate } from "@/interfaces/timestamp"
 import type { UserPreferences } from "@/interfaces"
-import { songLyricsText } from "@/libs/songUtils"
+import { songLyricsText, sectionLabelFor } from "@/libs/songUtils"
 import * as Clipboard from "expo-clipboard"
 
 /**
- * Song reader / performance view (docs §12): big readable type, display-only
- * transposition, capo, font size and chord visibility.
+ * Song reader / performance view (docs §12).
+ *
+ * The screen is ordered like the job: the title and the artist in the header,
+ * one slim bar for every display control, then the lyrics — the only thing that
+ * matters while playing. Notes, suggestions, sharing and the destructive actions
+ * live below the song, so nothing competes with the chords.
  */
 export default function SongScreen() {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const router = useRouter()
   const toast = useToast()
   const { gutter } = useResponsive()
@@ -60,6 +77,8 @@ export default function SongScreen() {
   // restored instantly on every start-up (docs §32), then mirrored to the
   // profile so the defaults follow the account across devices.
   const preferences = usePreferences()
+  // Solfège ("Do Re Mi") is a display choice stored with the reader settings.
+  const notation = preferences.chordNotation ?? "letters"
   const [fontSize, setFontSize] = useState(preferences.songFontSize)
   const [showChords, setShowChords] = useState(preferences.chordsVisible)
   const [immersive, setImmersive] = useState(false)
@@ -74,8 +93,8 @@ export default function SongScreen() {
 
   const displayKey = useMemo(() => {
     if (!song) return ""
-    return transposeKey(song.key, semitones)
-  }, [song, semitones])
+    return spellKey(transposeKey(song.key, semitones), notation)
+  }, [song, semitones, notation])
 
   // Opening a different song resets the reader controls to their defaults
   // (adjust state while rendering, as documented by React).
@@ -90,8 +109,10 @@ export default function SongScreen() {
 
   const copyLyrics = async (): Promise<void> => {
     if (!song) return
-    await Clipboard.setStringAsync(songLyricsText(song.sections))
-    toast.showSuccess("Lyrics and chords copied to the clipboard.")
+    await Clipboard.setStringAsync(
+      songLyricsText(song.sections, (_section, index) => sectionLabelFor(song.sections, index, t)),
+    )
+    toast.showSuccess(t("songs.lyricsCopied"))
   }
 
   const remove = async (): Promise<void> => {
@@ -106,7 +127,7 @@ export default function SongScreen() {
       toast.showSuccess(`"${song.title}" was deleted.`)
       router.replace("/songs")
     } catch (error) {
-      toast.showError(toFriendlyError(error, "We couldn't delete that song."))
+      toast.showError(toFriendlyError(error, t("songs.couldNotDelete")))
     } finally {
       setDeleting(false)
     }
@@ -114,8 +135,8 @@ export default function SongScreen() {
 
   if (!songId) {
     return (
-      <ScreenContainer back title="Song">
-        <EmptyState title="Song not found" message="This song may have been deleted." />
+      <ScreenContainer back title={t("songs.song")}>
+        <EmptyState title={t("songs.songNotFound")} message={t("songs.songNotFoundDescription")} />
       </ScreenContainer>
     )
   }
@@ -123,7 +144,8 @@ export default function SongScreen() {
   if (!song) {
     return (
       <View style={styles.host}>
-        <PageHeader title="Song" back elevated />
+        <AppBackground />
+        <PageHeader title={t("songs.song")} back elevated />
         <View style={[styles.loading, { paddingHorizontal: gutter }]}>
           {loading ? (
             <View style={{ gap: Theme.spacing.m }}>
@@ -133,9 +155,9 @@ export default function SongScreen() {
             </View>
           ) : (
             <EmptyState
-              title="Song not found"
-              message="It may have been deleted, or you may not have access to this band."
-              actionLabel="Back to songs"
+              title={t("songs.songNotFound")}
+              message={t("songs.songNotFoundDescription")}
+              actionLabel={t("songs.backToSongs")}
               onAction={() => router.replace("/songs")}
             />
           )}
@@ -144,112 +166,102 @@ export default function SongScreen() {
     )
   }
 
-  const body = (
-    <View style={styles.content}>
-      <View style={styles.titleBlock}>
-        <AppText variant={immersive ? "display" : "title"}>{song.title}</AppText>
-        <AppText variant="body" tone="muted">
-          {song.artist || "Unknown artist"}
-        </AppText>
-        <View style={styles.badges}>
-          {song.key ? <Badge label={`Key ${song.key}`} tone="accent" /> : null}
-          {song.capo > 0 ? <Badge label={`Capo ${song.capo}`} /> : null}
-          {song.bpm ? <Badge label={`${song.bpm} BPM`} /> : null}
-          <Badge label={formatDuration(song.durationSec)} />
-          {song.genre ? <Badge label={song.genre} /> : null}
-        </View>
-      </View>
+  const lyrics =
+    song.sections.length === 0 ? (
+      <EmptyState
+        compact
+        title={t("songs.noLyrics")}
+        message={isAdmin ? t("songs.noLyricsAdmin") : t("songs.noLyricsMember")}
+        actionLabel={isAdmin ? t("songs.openEditor") : undefined}
+        onAction={isAdmin ? () => router.push(`/songs/${song.id}/edit`) : undefined}
+      />
+    ) : (
+      <SongContent
+        sections={song.sections}
+        fontSize={fontSize}
+        showChords={showChords}
+        semitones={semitones}
+        notation={notation}
+      />
+    )
 
-      {song.notes.trim().length > 0 ? (
-        <Card style={{ gap: 6 }} onPress={() => setNotesOpen(true)} accessibilityLabel="Open performance notes">
-          <AppText variant="label" tone="faint">
-            Performance notes
-          </AppText>
-          <AppText variant="body" tone="muted" numberOfLines={3}>
-            {song.notes}
-          </AppText>
-        </Card>
-      ) : null}
-
-      <SongContent sections={song.sections} fontSize={fontSize} showChords={showChords} semitones={semitones} />
-
-      {song.tags.length > 0 ? (
-        <View style={styles.badges}>
-          {song.tags.map((tag) => (
-            <Badge key={tag} label={tag} />
-          ))}
-        </View>
-      ) : null}
-
-      <AppText variant="caption" tone="faint">
-        Added by {song.createdByName || "an admin"} · updated {formatRelativeTime(toDate(song.updatedAt))}
-      </AppText>
-
-      {song.sections.length === 0 ? (
-        <EmptyState
-          compact
-          title="No lyrics yet"
-          message={
-            isAdmin
-              ? "Open the editor to type the lyrics and add chords."
-              : "This song has no lyrics yet. Suggest them to an admin."
-          }
-          actionLabel={isAdmin ? "Open the editor" : undefined}
-          onAction={isAdmin ? () => router.push(`/songs/${song.id}/edit`) : undefined}
-        />
-      ) : null}
-    </View>
-  )
-
+  // Stage mode: only the song, the exit control and the current key.
   if (immersive) {
     return (
-      <View style={[styles.host, styles.immersive, { paddingHorizontal: gutter }]}>
+      <View style={[styles.host, { paddingHorizontal: gutter }]}>
+        <AppBackground />
         <View style={styles.immersiveBar}>
-          <ImmersiveToggle immersive onToggle={() => setImmersive(false)} />
-          <AppText variant="caption" tone="faint">
-            {displayKey || song.key}
-          </AppText>
+          <View style={styles.immersiveKey}>
+            <MusicIcon size={14} color={Theme.colors.primary} />
+            <AppText variant="caption" tone="primary">
+              {displayKey || song.key}
+            </AppText>
+          </View>
+          <Button
+            label={t("songs.exitStageMode")}
+            variant="secondary"
+            size="sm"
+            icon={<FullscreenExitIcon size={15} color={Theme.colors.text} />}
+            onPress={() => setImmersive(false)}
+          />
         </View>
-        {body}
+        <ScrollView
+          style={styles.immersiveScroll}
+          contentContainerStyle={styles.immersiveContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.immersiveTitle}>
+            <AppText variant="display">{song.title}</AppText>
+            <AppText variant="body" tone="muted">
+              {song.artist || "Unknown artist"}
+            </AppText>
+          </View>
+          {lyrics}
+        </ScrollView>
       </View>
     )
   }
 
+  const details = [
+    song.bpm ? `${song.bpm} BPM` : null,
+    song.durationSec ? formatDuration(song.durationSec) : null,
+    song.genre || null,
+  ].filter((value): value is string => Boolean(value))
+  const hasNotes = song.notes.trim().length > 0
+
   return (
     <View style={styles.host}>
+      <AppBackground />
       <PageHeader
         title={song.title}
         subtitle={song.artist || undefined}
+        titleLines={2}
         back
+        elevated
         right={
           <>
             <IconButton
-              label="Copy lyrics and chords"
-              onPress={() => void copyLyrics()}
-              icon={<CopyIcon size={18} color={Theme.colors.textMuted} />}
-            />
-            <IconButton
-              label="Stage mode"
+              label={t("songs.stageMode")}
               onPress={() => setImmersive(true)}
-              icon={<FullscreenExitIcon size={18} color={Theme.colors.textMuted} />}
+              icon={<FullscreenIcon size={18} color={Theme.colors.textMuted} />}
             />
             {isAdmin ? (
               <IconButton
-                label="Edit song"
+                label={t("songs.editSong")}
                 onPress={() => router.push(`/songs/${song.id}/edit`)}
                 icon={<EditIcon size={18} color={Theme.colors.textMuted} />}
               />
             ) : null}
           </>
         }
-        elevated
       />
 
       <SongControls
         semitones={semitones}
         onSemitonesChange={setSemitones}
         displayKey={displayKey}
-        originalKey={song.key}
+        originalKey={spellKey(song.key, notation)}
         capo={capo}
         onCapoChange={setCapoOverride}
         fontSize={fontSize}
@@ -263,38 +275,98 @@ export default function SongScreen() {
           setShowChords(next)
           saveDisplayPreference({ chordsVisible: next })
         }}
+        notation={notation}
+        onNotationChange={(next) => saveDisplayPreference({ chordNotation: next })}
       />
 
-      <View style={[styles.actions, { paddingHorizontal: gutter }]}>
-        <Button
-          label="Suggest a change"
-          variant="secondary"
-          size="sm"
-          icon={<SuggestIcon size={15} color={Theme.colors.text} />}
-          onPress={() => router.push(`/songs/${song.id}/suggest`)}
-          style={styles.action}
-        />
-        {isAdmin ? (
-          <Button
-            label="Delete song"
-            variant="danger"
-            size="sm"
-            icon={<TrashIcon size={15} color={Theme.colors.onPrimary} />}
-            onPress={() => setConfirmDelete(true)}
-            style={styles.action}
-          />
-        ) : null}
-      </View>
-
       <ScreenContainer scroll padded={false} style={[styles.scrollBody, { paddingHorizontal: gutter }]}>
-        {body}
+        <View style={styles.content}>
+          {details.length > 0 ? (
+            <AppText variant="caption" tone="faint">
+              {details.join("  ·  ")}
+            </AppText>
+          ) : null}
+
+          {hasNotes ? (
+            <Pressable
+              onPress={() => setNotesOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t("songs.performanceNotes")}
+              style={({ pressed }) => [styles.notes, pressed && styles.pressed]}
+            >
+              <BookIcon size={16} color={Theme.colors.primary} />
+              <View style={styles.flex}>
+                <AppText variant="caption" tone="muted">
+                  {t("songs.performanceNotes")}
+                </AppText>
+                <AppText variant="caption" tone="faint" numberOfLines={1}>
+                  {song.notes}
+                </AppText>
+              </View>
+              <ChevronRightIcon size={16} color={Theme.colors.textFaint} />
+            </Pressable>
+          ) : null}
+
+          {lyrics}
+
+          {isAdmin ? null : (
+            <Button
+              label={t("songs.suggestChange")}
+              variant="secondary"
+              icon={<SuggestIcon size={15} color={Theme.colors.text} />}
+              onPress={() => router.push(`/songs/${song.id}/suggest`)}
+            />
+          )}
+
+          <View style={styles.footer}>
+            {song.tags.length > 0 ? (
+              <View style={styles.badges}>
+                {song.tags.map((tag) => (
+                  <Badge key={tag} label={tag} />
+                ))}
+              </View>
+            ) : null}
+
+            <AppText variant="caption" tone="faint">
+              Added by {song.createdByName || "an admin"} · updated {formatRelativeTime(toDate(song.updatedAt))}
+            </AppText>
+
+            <View style={styles.footerActions}>
+              <Pressable
+                onPress={() => void copyLyrics()}
+                accessibilityRole="button"
+                accessibilityLabel={t("songs.copyA11y")}
+                style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
+              >
+                <CopyIcon size={15} color={Theme.colors.textMuted} />
+                <AppText variant="caption" tone="muted">
+                  {t("songs.copyLyrics")}
+                </AppText>
+              </Pressable>
+
+              {isAdmin ? (
+                <Pressable
+                  onPress={() => setConfirmDelete(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("songs.deleteSong")}
+                  style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
+                >
+                  <TrashIcon size={15} color={Theme.colors.danger} />
+                  <AppText variant="caption" tone="danger">
+                    {t("songs.deleteSong")}
+                  </AppText>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        </View>
       </ScreenContainer>
 
       <Dialog
         visible={notesOpen}
         onClose={() => setNotesOpen(false)}
-        title="Performance notes"
-        confirmLabel="Close"
+        title={t("songs.performanceNotes")}
+        confirmLabel={t("common.close")}
         onConfirm={() => setNotesOpen(false)}
       >
         <AppText variant="body" tone="muted">
@@ -305,9 +377,9 @@ export default function SongScreen() {
       <Dialog
         visible={confirmDelete}
         onClose={() => setConfirmDelete(false)}
-        title={`Delete "${song.title}"?`}
-        description="The lyrics, chords and notes are removed for the whole band. This can't be undone."
-        confirmLabel="Delete song"
+        title={t("songs.deleteSongConfirm", { title: song.title })}
+        description={t("songs.deleteSongDescription")}
+        confirmLabel={t("songs.deleteSong")}
         tone="danger"
         confirmLoading={deleting}
         onConfirm={() => void remove()}
@@ -318,19 +390,61 @@ export default function SongScreen() {
 
 const createStyles = () =>
   StyleSheet.create({
-    host: { flex: 1, backgroundColor: Theme.colors.background },
+    host: { flex: 1 },
+    flex: { flex: 1, minWidth: 0 },
+    pressed: { opacity: 0.7 },
     loading: { flex: 1, padding: Theme.spacing.l },
-    scrollBody: { paddingHorizontal: Theme.spacing.l, paddingTop: Theme.spacing.l },
+    scrollBody: { paddingTop: Theme.spacing.l },
     content: { gap: Theme.spacing.l, paddingBottom: Theme.spacing.huge },
-    titleBlock: { gap: 4 },
-    badges: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 },
-    actions: {
+    notes: {
       flexDirection: "row",
-      gap: Theme.spacing.s,
+      alignItems: "center",
+      gap: Theme.spacing.m,
+      paddingVertical: Theme.spacing.m,
       paddingHorizontal: Theme.spacing.l,
-      paddingBottom: Theme.spacing.s,
+      borderRadius: Theme.radii.lg,
+      borderWidth: 1,
+      borderColor: Theme.colors.borderSoft,
+      backgroundColor: Theme.colors.surface,
     },
-    action: { flexGrow: 1 },
-    immersive: { paddingHorizontal: Theme.spacing.l },
-    immersiveBar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+    badges: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+    footer: {
+      gap: Theme.spacing.m,
+      paddingTop: Theme.spacing.m,
+      borderTopWidth: 1,
+      borderTopColor: Theme.colors.borderSoft,
+    },
+    footerActions: { flexDirection: "row", flexWrap: "wrap", gap: Theme.spacing.xl },
+    footerLink: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingVertical: 4,
+    },
+    immersiveScroll: { flex: 1 },
+    immersiveBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: Theme.spacing.m,
+      paddingTop: Theme.spacing.s,
+      paddingBottom: Theme.spacing.l,
+    },
+    immersiveKey: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: Theme.spacing.m,
+      paddingVertical: 8,
+      borderRadius: Theme.radii.pill,
+      backgroundColor: Theme.colors.surface,
+      borderWidth: 1,
+      borderColor: Theme.colors.borderSoft,
+    },
+    immersiveContent: {
+      gap: Theme.spacing.l,
+      paddingTop: Theme.spacing.l,
+      paddingBottom: Theme.spacing.huge,
+    },
+    immersiveTitle: { gap: 2 },
   })

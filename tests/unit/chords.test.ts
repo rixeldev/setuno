@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  COMMON_CHORDS,
   describeSemitones,
   diatonicChords,
+  displayChord,
+  displayKey,
   looksLikeChord,
   nextWordStart,
   normalizeChordInput,
@@ -110,10 +113,20 @@ describe("keys", () => {
 
   it("transposes keys while preserving major/minor and spelling", () => {
     expect(transposeKey("C", 2)).toBe("D")
-    expect(transposeKey("Am", 2)).toBe("Dm")
     expect(transposeKey("Bb", 2)).toBe("C")
     expect(transposeKey("C", 0)).toBe("C")
     expect(transposeKey("nonsense", 3)).toBe("nonsense")
+  })
+
+  it("moves minor keys semitone by semitone from their own tonic", () => {
+    // Regression: the tonic was taken from the relative major, so Em +1 landed
+    // on Abm and Em -1 on Gbm instead of the neighbouring minor keys.
+    expect(transposeKey("Em", 1)).toBe("Fm")
+    expect(transposeKey("Em", -1)).toBe("Ebm")
+    expect(transposeKey("Am", 2)).toBe("Bm")
+    expect(transposeKey("Am", -1)).toBe("Abm")
+    expect(transposeKey("F#m", 1)).toBe("Gm")
+    expect(transposeKey("F#m", -1)).toBe("Fm")
   })
 
   it("describes the shift in words", () => {
@@ -142,6 +155,67 @@ describe("diatonicChords", () => {
 
   it("returns nothing for an invalid key", () => {
     expect(diatonicChords("H")).toEqual([])
+  })
+})
+
+describe("COMMON_CHORDS", () => {
+  it("only offers chords the parser accepts", () => {
+    for (const chord of COMMON_CHORDS) {
+      expect(looksLikeChord(chord), `"${chord}" should be a valid chord`).toBe(true)
+    }
+  })
+
+  it("covers the roots and shapes players reach for", () => {
+    expect(COMMON_CHORDS).toEqual(
+      expect.arrayContaining([
+        "C#m",
+        "F#m",
+        "Bbm",
+        "Ebm",
+        "G#m",
+        "D5",
+        "Bm7",
+        "Cmaj7",
+        "Asus2",
+        "Csus4",
+        "Cadd9",
+        "Bdim",
+        "Eaug",
+        "Bm7b5",
+        "G/B",
+      ]),
+    )
+  })
+
+  it("has no duplicates", () => {
+    expect(new Set(COMMON_CHORDS).size).toBe(COMMON_CHORDS.length)
+  })
+})
+
+describe("chord notation", () => {
+  it("keeps the american letters when asked", () => {
+    expect(displayChord("F#m7", "letters")).toBe("F#m7")
+    expect(displayKey("Em", "letters")).toBe("Em")
+  })
+
+  it("spells chords in solfège", () => {
+    expect(displayChord("C", "solfege")).toBe("Do")
+    expect(displayChord("F#m7", "solfege")).toBe("Fa#m7")
+    expect(displayChord("Bbmaj7", "solfege")).toBe("Sibmaj7")
+    expect(displayChord("G/B", "solfege")).toBe("Sol/Si")
+    expect(displayChord("Am7", "solfege")).toBe("Lam7")
+  })
+
+  it("spells keys in solfège, dropping the 'm' spelling variant", () => {
+    expect(displayKey("C", "solfege")).toBe("Do")
+    expect(displayKey("Em", "solfege")).toBe("Mim")
+    expect(displayKey("Bb", "solfege")).toBe("Sib")
+    expect(displayKey("nonsense", "solfege")).toBe("nonsense")
+  })
+
+  it("leaves anything that is not a chord untouched", () => {
+    expect(displayChord("N.C.", "solfege")).toBe("N.C.")
+    expect(displayChord("", "solfege")).toBe("")
   })
 })
 

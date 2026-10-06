@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -22,16 +23,16 @@ import {
   isFiltered,
   type SongFilters,
 } from "@/libs/songSearch"
-import { pluralize } from "@/libs/format"
 import type { SongFacets } from "@/interfaces"
 
 type FacetKey = "artist" | "genre" | "key" | "tag"
 
-const FACET_TITLES: Record<FacetKey, string> = {
-  artist: "Artist",
-  genre: "Genre",
-  key: "Key",
-  tag: "Tag",
+/** Facet labels are i18n keys, resolved where they are rendered. */
+const FACET_LABELS: Record<FacetKey, string> = {
+  artist: "songs.artist",
+  genre: "songs.genre",
+  key: "songs.key",
+  tag: "songs.tags",
 }
 
 const FACET_SOURCES: Record<FacetKey, (facets: SongFacets) => string[]> = {
@@ -44,6 +45,7 @@ const FACET_SOURCES: Record<FacetKey, (facets: SongFacets) => string[]> = {
 /** Songbook with instant search and facet filters (docs §33, §34). */
 export default function SongsScreen() {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const router = useRouter()
   const { isAdmin } = useOrganization()
   const { songs, facets, loading, error } = useOrgData()
@@ -61,13 +63,15 @@ export default function SongsScreen() {
 
   return (
     <ScreenContainer
-      title="Songs"
-      subtitle={loading ? "Loading your songbook…" : pluralize(songs.length, "song")}
+      title={t("songs.songs")}
+      subtitle={
+        loading ? t("songs.loadingSongbook") : t("organizations.songsCount", { count: songs.length })
+      }
       large
       headerRight={
         isAdmin ? (
           <IconButton
-            label="Add a song"
+            label={t("songs.newSong")}
             variant="secondary"
             onPress={() => router.push("/songs/new")}
             icon={<PlusIcon size={18} color={Theme.colors.text} />}
@@ -78,8 +82,8 @@ export default function SongsScreen() {
         <View style={styles.toolbar}>
           <View style={styles.searchRow}>
             <SearchInput
-              label="Search songs"
-              placeholder="Title, artist, tag…"
+              label={t("common.search")}
+              placeholder={t("songs.searchPlaceholder")}
               value={filters.search}
               onChangeText={(search) => setFilters((current) => ({ ...current, search }))}
               onClear={() => setFilters((current) => ({ ...current, search: "" }))}
@@ -87,7 +91,9 @@ export default function SongsScreen() {
               containerStyle={styles.search}
             />
             <Button
-              label={activeCount > 0 ? `Filters · ${activeCount}` : "Filters"}
+              label={
+                activeCount > 0 ? t("songs.filtersCount", { count: activeCount }) : t("songs.filters")
+              }
               variant={activeCount > 0 ? "primary" : "secondary"}
               icon={<FilterIcon size={15} color={activeCount > 0 ? Theme.colors.onPrimary : Theme.colors.text} />}
               onPress={() => setFacet(facet ?? "key")}
@@ -101,14 +107,18 @@ export default function SongsScreen() {
                 .map((key) => (
                   <Chip
                     key={key}
-                    label={`${FACET_TITLES[key]}: ${filters[key] ?? ""}`}
+                    label={`${t(FACET_LABELS[key])}: ${filters[key] ?? ""}`}
                     tone="primary"
                     size="sm"
                     onPress={() => setFacetValue(key, null)}
-                    accessibilityLabel={`Remove ${FACetLabel(key)} filter`}
+                    accessibilityLabel={t("songs.removeFilter", { filter: t(FACET_LABELS[key]) })}
                   />
                 ))}
-              <Chip label="Clear filters" size="sm" onPress={() => setFilters(EMPTY_FILTERS)} />
+              <Chip
+                label={t("songs.clearFilters")}
+                size="sm"
+                onPress={() => setFilters(EMPTY_FILTERS)}
+              />
             </View>
           ) : null}
         </View>
@@ -120,27 +130,25 @@ export default function SongsScreen() {
         <SkeletonList count={5} height={82} />
       ) : songs.length === 0 ? (
         <EmptyState
-          title="Your chord book is empty"
-          message={
-            isAdmin
-              ? "Add the songs your band plays. You'll type the lyrics once and transpose them on stage any time."
-              : "No songs yet. An admin has to add the songs your band plays."
-          }
-          actionLabel={isAdmin ? "Add the first song" : undefined}
+          title={t("songs.noSongs")}
+          message={isAdmin ? t("songs.noSongsDescription") : t("songs.noLyricsMember")}
+          actionLabel={isAdmin ? t("songs.addFirstSong") : undefined}
           onAction={isAdmin ? () => router.push("/songs/new") : undefined}
         />
       ) : results.length === 0 ? (
         <EmptyState
-          title="No songs match"
-          message={isFiltered(filters) ? "Try another word, or clear the filters." : "Nothing here yet."}
-          actionLabel={isFiltered(filters) ? "Clear filters" : undefined}
+          title={t("songs.noResults")}
+          message={t("songs.noResultsDescription")}
+          actionLabel={isFiltered(filters) ? t("songs.clearFilters") : undefined}
           onAction={isFiltered(filters) ? () => setFilters(EMPTY_FILTERS) : undefined}
         />
       ) : (
         <View style={styles.list}>
           <AppText variant="caption" tone="faint">
-            {pluralize(results.length, "song")}
-            {results.length !== songs.length ? ` of ${songs.length}` : ""}
+            {t("organizations.songsCount", { count: results.length })}
+            {results.length !== songs.length
+              ? ` · ${t("organizations.songsCount", { count: songs.length })}`
+              : ""}
           </AppText>
           {results.map((song) => (
             <SongRow key={song.id} song={song} onPress={() => router.push(`/songs/${song.id}`)} />
@@ -151,14 +159,14 @@ export default function SongsScreen() {
       <Dialog
         visible={facet !== null}
         onClose={() => setFacet(null)}
-        title="Filter songs"
-        description="Pick a value to filter by. Tap the active value again to clear it."
+        title={t("songs.filterTitle")}
+        description={t("songs.filterDescription")}
       >
         <View style={styles.facetTabs}>
           {(["artist", "genre", "key", "tag"] as FacetKey[]).map((key) => (
             <Chip
               key={key}
-              label={FACET_TITLES[key]}
+              label={t(FACET_LABELS[key])}
               tone="primary"
               selected={facet === key}
               onPress={() => setFacet(key)}
@@ -169,7 +177,7 @@ export default function SongsScreen() {
         <View style={styles.facetOptions}>
           {facetOptions.length === 0 ? (
             <AppText variant="caption" tone="faint">
-              Nothing to filter by yet.
+              {t("songs.noFacetOptions")}
             </AppText>
           ) : (
             facetOptions.map((option) => (
@@ -188,8 +196,6 @@ export default function SongsScreen() {
 }
 
 /** Screen-reader friendly name of a facet key. */
-const FACetLabel = (key: FacetKey): string => FACET_TITLES[key].toLowerCase()
-
 const createStyles = () =>
   StyleSheet.create({
     toolbar: { gap: Theme.spacing.s },

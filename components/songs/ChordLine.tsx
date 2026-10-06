@@ -3,12 +3,16 @@ import { StyleSheet, Text, View } from "react-native"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
-import type { ChordPosition, LyricLine } from "@/interfaces"
+import { displayChord } from "@/libs/chords"
+import { buildChordRow } from "@/libs/songUtils"
+import type { ChordNotation, LyricLine } from "@/interfaces"
 
 interface ChordLineProps {
   line: LyricLine
   fontSize: number
   showChords: boolean
+  /** Chord spelling: letters (C) or solfège (Do). Display-only. */
+  notation?: ChordNotation
   /** Dims lyric lines without chords so structure stays readable. */
   dimEmpty?: boolean
 }
@@ -20,19 +24,48 @@ interface ChordLineProps {
  * Chords are anchored to a character offset (`ChordPosition.position`) which
  * makes the alignment deterministic on both Android and Web.
  */
-export function ChordLine({ line, fontSize, showChords, dimEmpty = true }: ChordLineProps) {
+export function ChordLine({ line, fontSize, showChords, notation = "letters", dimEmpty = true }: ChordLineProps) {
   const styles = useThemedStyles(createStyles)
   const chords = useMemo(
     () =>
       line.chords
         .filter((chord) => chord.chord.trim().length > 0)
-        .sort((a, b) => a.position - b.position),
-    [line.chords],
+        .sort((a, b) => a.position - b.position)
+        .map((chord) => ({ ...chord, chord: displayChord(chord.chord, notation) })),
+    [line.chords, notation],
   )
 
   const chordRow = useMemo(() => buildChordRow(chords, line.text), [chords, line.text])
   const lineHeight = Math.round(fontSize * 1.65)
   const hasContent = line.text.trim().length > 0 || chords.length > 0
+
+  // A line without lyrics (intro, instrumental, riff) is a chord progression:
+  // the chords are the content, so they get the full row as modern pills
+  // instead of a monospace grid followed by an empty lyric line.
+  if (line.text.trim().length === 0) {
+    if (!showChords || chords.length === 0) {
+      // Blank lyric lines are paragraph spacing: keep a small gap.
+      return <View style={{ height: Math.round(fontSize * 0.6) }} />
+    }
+    return (
+      <View
+        style={styles.progression}
+        accessible
+        accessibilityLabel={`Chords: ${chords.map((chord) => chord.chord).join(", ")}`}
+      >
+        {chords.map((chord, index) => (
+          <View key={`${chord.chord}-${index}`} style={styles.progressionChord}>
+            <Text
+              selectable={false}
+              style={[styles.progressionText, { fontSize: Math.max(12, fontSize - 2) }]}
+            >
+              {chord.chord}
+            </Text>
+          </View>
+        ))}
+      </View>
+    )
+  }
 
   return (
     <View style={styles.line}>
@@ -60,27 +93,6 @@ export function ChordLine({ line, fontSize, showChords, dimEmpty = true }: Chord
   )
 }
 
-/**
- * Pads a monospace string so each chord starts exactly `position` characters
- * into the row. Overlapping chords are shifted one column to stay readable.
- */
-export const buildChordRow = (chords: ChordPosition[], text: string): string => {
-  if (chords.length === 0) return ""
-  const limit = text.length
-  let row = ""
-
-  for (const chord of chords) {
-    const target = Math.max(0, Math.min(Math.round(chord.position), limit))
-    // Never place a chord before the end of the previous one.
-    const start = Math.max(target, row.length)
-    if (start > row.length) row += " ".repeat(start - row.length)
-    row += chord.chord.trim()
-    row += " "
-  }
-
-  return row
-}
-
 const createStyles = () =>
   StyleSheet.create({
     line: {
@@ -100,5 +112,23 @@ const createStyles = () =>
     },
     emptyLyric: {
       color: Theme.colors.textFaint,
+    },
+    progression: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: Theme.spacing.s,
+      paddingVertical: Theme.spacing.xs,
+    },
+    progressionChord: {
+      paddingHorizontal: Theme.spacing.m,
+      paddingVertical: 6,
+      borderRadius: Theme.radii.m,
+      backgroundColor: Theme.colors.accentSoft,
+    },
+    progressionText: {
+      color: Theme.colors.accent,
+      fontFamily: Theme.fonts.mono,
+      fontWeight: "700",
     },
   })

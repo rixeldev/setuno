@@ -1,3 +1,5 @@
+import type { ChordNotation } from "@/interfaces/user"
+
 /**
  * Chord + key utilities: parsing, transposition and helpers used by the
  * chord/lyric editor and the song reader.
@@ -169,8 +171,13 @@ export const semitonesBetweenKeys = (fromKey: string, toKey: string): number => 
 export const transposeKey = (key: string, semitones: number): string => {
   const parsed = parseKey(key)
   if (!parsed.valid || semitones === 0) return key.trim()
+  // `parseKey` stores minor roots three semitones up (their relative major) so
+  // the diatonic helpers can share the major table. Naming the transposed note
+  // needs the actual tonic, otherwise a minor key would jump a third every step
+  // (Em +1 landing on Abm instead of Fm).
+  const tonic = parsed.minor ? parsed.rootIndex - 3 : parsed.rootIndex
   const prefersFlats = parsed.minor || parsed.label.includes("b")
-  const name = noteName(parsed.rootIndex + semitones, prefersFlats)
+  const name = noteName(tonic + semitones, prefersFlats)
   return parsed.minor ? `${name}m` : name
 }
 
@@ -182,36 +189,75 @@ export const describeSemitones = (semitones: number): string => {
   return `${amount} semitone${amount === 1 ? "" : "s"} ${direction}`
 }
 
-/** Quick-pick chord palette used by the editor chord pad. */
-export const COMMON_CHORDS = [
-  "C",
-  "Cm",
-  "C7",
-  "Csus4",
-  "D",
-  "Dm",
-  "D7",
-  "Dsus4",
-  "E",
-  "Em",
-  "E7",
-  "F",
-  "Fm",
-  "F7",
-  "Fsus4",
-  "G",
-  "Gm",
-  "G7",
-  "Gsus4",
-  "A",
-  "Am",
-  "A7",
-  "Asus4",
-  "B",
-  "Bm",
-  "B7",
-  "Bsus4",
-] as const
+/** Solfège names for the natural notes, used by the latin notation. */
+const SOLFEGE_NAMES: Record<string, string> = {
+  C: "Do",
+  D: "Re",
+  E: "Mi",
+  F: "Fa",
+  G: "Sol",
+  A: "La",
+  B: "Si",
+}
+
+/** Spells a single note ("C#", "Bb") in the chosen notation. */
+export const displayNote = (note: string, notation: ChordNotation): string => {
+  if (notation === "letters") return note
+  const name = SOLFEGE_NAMES[note.charAt(0).toUpperCase()]
+  return name ? `${name}${note.slice(1)}` : note
+}
+
+/**
+ * Spells a chord in the chosen notation. Stored chords always use letters, so
+ * this is a display-only conversion ("F#m7/C#" -> "Fa#m7/Do#").
+ */
+export const displayChord = (chord: string, notation: ChordNotation = "letters"): string => {
+  if (notation === "letters") return chord
+  const parsed = parseChord(chord)
+  if (!parsed.valid) return chord
+  const bass = parsed.bass ? `/${displayNote(parsed.bass, notation)}` : ""
+  return `${displayNote(parsed.root, notation)}${parsed.quality}${bass}`
+}
+
+/** Spells a key label in the chosen notation ("Em" -> "Mim", "Bb" -> "Sib"). */
+export const displayKey = (key: string, notation: ChordNotation = "letters"): string => {
+  if (notation === "letters") return key
+  const match = /^([A-G][#♯b♭]{0,2})(m|min)?$/.exec(key.trim())
+  if (!match) return key
+  return `${displayNote(match[1] ?? "", notation)}${match[2] ? "m" : ""}`
+}
+
+/**
+ * Quick-pick chord palette used by the editor chord pad. Grouped from the most
+ * common shapes (triads) to the specialised ones, and spelled the way bands
+ * write them (both F#/Gb and C#/Db, flats for the rest).
+ */
+export const COMMON_CHORDS: string[] = [
+  // Major triads.
+  "C", "C#", "Db", "D", "Eb", "E", "F", "F#", "Gb", "G", "Ab", "A", "Bb", "B",
+  // Minor triads.
+  "Cm", "C#m", "Dm", "Ebm", "Em", "Fm", "F#m", "Gm", "G#m", "Am", "Bbm", "Bm",
+  // Power chords.
+  "C5", "D5", "E5", "F5", "F#5", "G5", "A5", "B5",
+  // Dominant sevenths.
+  "C7", "D7", "E7", "F7", "F#7", "G7", "A7", "Bb7", "B7",
+  // Minor sevenths.
+  "Am7", "Bm7", "Cm7", "C#m7", "Dm7", "Em7", "Fm7", "F#m7", "Gm7", "Bbm7",
+  // Major sevenths.
+  "Cmaj7", "Dmaj7", "Ebmaj7", "Emaj7", "Fmaj7", "F#maj7", "Gmaj7", "Amaj7", "Bbmaj7", "Bmaj7",
+  // Suspended second / fourth.
+  "Asus2", "Asus4", "Bsus4", "Csus2", "Csus4", "Dsus2", "Dsus4", "Esus4",
+  "Fsus2", "Fsus4", "Gsus2", "Gsus4",
+  // Added ninths and sixths.
+  "Cadd9", "Dadd9", "Eadd9", "Fadd9", "Gadd9", "Aadd9", "Badd9",
+  "C6", "D6", "E6", "G6", "A6",
+  // Diminished, augmented and half diminished.
+  "Bdim", "Cdim", "Ddim", "Edim", "Fdim", "Gdim", "Adim",
+  "Caug", "Eaug", "Gaug", "Aaug",
+  "Am7b5", "Bm7b5", "Cm7b5", "Dm7b5", "Em7b5", "F#m7b5", "Gm7b5",
+  // Slash chords (bass note under the chord).
+  "C/E", "C/G", "D/F#", "D/A", "E/G#", "F/A", "G/B", "A/C#", "Am/G", "G/D",
+]
 
 const MAJOR_DEGREES = [
   { degree: "I", semitone: 0, quality: "" },

@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest"
 
 import type { SongSection } from "@/interfaces/song"
 import {
+  buildChordRow,
+  chordAnchors,
+  chordPositionLimit,
   cloneSections,
   countSongChords,
   countSongLines,
@@ -10,12 +13,19 @@ import {
   emptyLine,
   estimateDurationSec,
   insertLineAfter,
+  isNumberedSection,
   moveChord,
   normalizeChords,
   normalizeSectionLabels,
   parseLyricBlock,
+  reanchorChords,
+  resolveSectionLabel,
   sectionLabel,
+  sectionLabelFor,
+  sectionOrdinal,
   setChordAt,
+  shiftChordByCharacter,
+  shiftChordToAnchor,
   songLyricsText,
   transposeSections,
 } from "@/libs/songUtils"
@@ -169,6 +179,210 @@ describe("chord editing", () => {
   it("clamps a chord dragged past the end of the line", () => {
     const chords = setChordAt([], 99, "C", 11)
     expect(chords).toEqual([{ chord: "C", position: 11 }])
+  })
+})
+
+describe("chord-only lines", () => {
+  it("only clamps chords to the lyric text when there are words", () => {
+    expect(chordPositionLimit("Hello world")).toBe(11)
+    expect(chordPositionLimit("")).toBe(Number.MAX_SAFE_INTEGER)
+    expect(chordPositionLimit("   ")).toBe(Number.MAX_SAFE_INTEGER)
+  })
+
+  it("grows a progression without typing lyrics", () => {
+    const limit = chordPositionLimit("")
+    let chords = setChordAt([], 0, "C", limit)
+    chords = setChordAt(chords, 1, "G", limit)
+    chords = setChordAt(chords, 2, "Am", limit)
+    chords = setChordAt(chords, 3, "F", limit)
+    expect(chords).toEqual([
+      { chord: "C", position: 0 },
+      { chord: "G", position: 1 },
+      { chord: "Am", position: 2 },
+      { chord: "F", position: 3 },
+    ])
+
+    // Removing the middle chord keeps the rest of the progression.
+    const trimmed = setChordAt(chords, 2, "", limit)
+    expect(trimmed).toEqual([
+      { chord: "C", position: 0 },
+      { chord: "G", position: 1 },
+      { chord: "F", position: 3 },
+    ])
+  })
+})
+
+describe("moving chords between anchors (progressions)", () => {
+  const slots = [0, 1, 2]
+
+  it("swaps with the chord already sitting on the target", () => {
+    const chords = [
+      { chord: "C", position: 0 },
+      { chord: "G", position: 1 },
+      { chord: "Am", position: 2 },
+    ]
+    expect(shiftChordToAnchor(chords, 0, slots, 1, Number.MAX_SAFE_INTEGER)).toEqual([
+      { chord: "G", position: 0 },
+      { chord: "C", position: 1 },
+      { chord: "Am", position: 2 },
+    ])
+  })
+
+  it("returns the very same array at the boundaries", () => {
+    const atStart = [{ chord: "C", position: 0 }]
+    expect(shiftChordToAnchor(atStart, 0, slots, -1, Number.MAX_SAFE_INTEGER)).toBe(atStart)
+    const atEnd = [{ chord: "C", position: 2 }]
+    expect(shiftChordToAnchor(atEnd, 2, slots, 1, Number.MAX_SAFE_INTEGER)).toBe(atEnd)
+  })
+})
+
+describe("precise chord placement", () => {
+  it("lists word starts and the end of the line as anchors", () => {
+    expect(chordAnchors("Hello world")).toEqual([0, 6, 11])
+    expect(chordAnchors("")).toEqual([0])
+  })
+
+  it("nudges a chord one character at a time, even inside a word", () => {
+    const chords = [{ chord: "C", position: 3 }]
+    expect(shiftChordByCharacter(chords, 3, 1, 11)).toEqual([{ chord: "C", position: 4 }])
+    expect(shiftChordByCharacter(chords, 3, -1, 11)).toEqual([{ chord: "C", position: 2 }])
+  })
+
+  it("skips the position taken by another chord", () => {
+    const chords = [
+      { chord: "Am", position: 2 },
+      { chord: "C", position: 3 },
+    ]
+    expect(shiftChordByCharacter(chords, 2, 1, 11)).toEqual([
+      { chord: "C", position: 3 },
+      { chord: "Am", position: 4 },
+    ])
+  })
+
+  it("stops at the line boundaries", () => {
+    const atStart = [{ chord: "C", position: 0 }]
+    expect(shiftChordByCharacter(atStart, 0, -1, 11)).toBe(atStart)
+    const atEnd = [{ chord: "C", position: 11 }]
+    expect(shiftChordByCharacter(atEnd, 11, 1, 11)).toBe(atEnd)
+  })
+})
+
+describe("buildChordRow", () => {
+  it("pads every chord to its exact character column", () => {
+    const row = buildChordRow(
+      [
+        { chord: "C", position: 0 },
+        { chord: "G", position: 6 },
+      ],
+      "Hello world",
+    )
+    expect(row.indexOf("C")).toBe(0)
+    expect(row.indexOf("G")).toBe(6)
+  })
+
+  it("aligns a chord placed in the middle of a word", () => {
+    const row = buildChordRow([{ chord: "Am", position: 3 }], "Hello world")
+    expect(row.indexOf("Am")).toBe(3)
+  })
+
+  it("shifts a chord that would overwrite the previous one", () => {
+    const row = buildChordRow(
+      [
+        { chord: "Am", position: 0 },
+        { chord: "G", position: 1 },
+      ],
+      "Hi",
+    )
+    expect(row.indexOf("Am")).toBe(0)
+    expect(row.indexOf("G")).toBe(3)
+  })
+
+  it("clamps positions to the end of the line", () => {
+    expect(buildChordRow([{ chord: "C", position: 99 }], "Hi").indexOf("C")).toBe(2)
+  })
+
+  it("returns an empty row without chords", () => {
+    expect(buildChordRow([], "Hi")).toBe("")
+  })
+})
+
+describe("reanchorChords", () => {
+  it("keeps the chord on its character when text is inserted before it", () => {
+    expect(reanchorChords([{ chord: "C", position: 6 }], "Hello world", "Hello big world")).toEqual([
+      { chord: "C", position: 10 },
+    ])
+  })
+
+  it("follows the character when text before it is deleted", () => {
+    expect(reanchorChords([{ chord: "C", position: 6 }], "Hello world", "world")).toEqual([
+      { chord: "C", position: 0 },
+    ])
+  })
+
+  it("keeps mid-word positions instead of snapping to the word", () => {
+    expect(reanchorChords([{ chord: "C", position: 3 }], "Hello", "Hello!")).toEqual([
+      { chord: "C", position: 3 },
+    ])
+  })
+
+  it("collapses a chord inside the replaced range to the edit point", () => {
+    expect(reanchorChords([{ chord: "C", position: 3 }], "abXYZc", "abc")).toEqual([
+      { chord: "C", position: 2 },
+    ])
+  })
+
+  it("returns the same array when nothing changed", () => {
+    const chords = [{ chord: "C", position: 3 }]
+    expect(reanchorChords(chords, "Hello", "Hello")).toBe(chords)
+  })
+})
+
+describe("section labels", () => {
+  const sections = [
+    { id: "a", type: "intro" as const, label: "Intro", lines: [] },
+    { id: "b", type: "verse" as const, label: "Verse 1", lines: [] },
+    { id: "c", type: "chorus" as const, label: "Chorus 1", lines: [] },
+    { id: "d", type: "verse" as const, label: "Verse 2", lines: [] },
+    { id: "e", type: "instrumental" as const, label: "Instrumental", lines: [] },
+    { id: "f", type: "custom" as const, label: "Sax solo", lines: [] },
+  ]
+  // A minimal stand-in for i18next so the helper stays pure.
+  const t = (key: string): string =>
+    ({
+      "songs.intro": "Intro",
+      "songs.verse": "Verse",
+      "songs.chorus": "Chorus",
+      "songs.instrumental": "Instrumental",
+      "songs.custom": "Custom",
+      "songs.sectionFallback": "Section",
+    })[key] ?? key
+
+  it("counts sections per type", () => {
+    expect(sectionOrdinal(sections, 1)).toBe(1)
+    expect(sectionOrdinal(sections, 3)).toBe(2)
+    expect(sectionOrdinal(sections, 0)).toBe(1)
+  })
+
+  it("numbers only the types that repeat", () => {
+    expect(isNumberedSection("verse")).toBe(true)
+    expect(isNumberedSection("chorus")).toBe(true)
+    expect(isNumberedSection("intro")).toBe(false)
+    expect(isNumberedSection("instrumental")).toBe(false)
+    expect(isNumberedSection("outro")).toBe(false)
+  })
+
+  it("renders known types from their type + ordinal, ignoring the stored text", () => {
+    expect(sectionLabelFor(sections, 0, t)).toBe("Intro")
+    expect(sectionLabelFor(sections, 1, t)).toBe("Verse 1")
+    expect(sectionLabelFor(sections, 3, t)).toBe("Verse 2")
+    expect(sectionLabelFor(sections, 4, t)).toBe("Instrumental")
+  })
+
+  it("keeps the stored text for custom sections", () => {
+    expect(sectionLabelFor(sections, 5, t)).toBe("Sax solo")
+    expect(resolveSectionLabel({ id: "x", type: "custom", label: "  ", lines: [] }, 1, t)).toBe(
+      "Section",
+    )
   })
 })
 

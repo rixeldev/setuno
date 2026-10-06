@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react"
 import { Pressable, ScrollView, StyleSheet, View } from "react-native"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -9,6 +10,7 @@ import { Dialog } from "@/components/ui/Dialog"
 import { Input } from "@/components/ui/Input"
 import { AddIcon, CloseIcon, SearchIcon } from "@/components/ui/Icons"
 import { COMMON_CHORDS, diatonicChords, looksLikeChord, normalizeChordInput } from "@/libs/chords"
+import { rememberChord, useRecentChords } from "@/services/recentChords"
 
 interface ChordPadContentProps {
   /** Chord highlighted as the current selection. */
@@ -34,25 +36,33 @@ export function ChordPadContent({
   header,
 }: ChordPadContentProps) {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const [search, setSearch] = useState(initialChord)
   const [custom, setCustom] = useState("")
   const [customError, setCustomError] = useState<string | null>(null)
+  const recent = useRecentChords()
 
   const diatonic = useMemo(() => diatonicChords(songKey ?? ""), [songKey])
   const matches = useMemo(() => {
     const term = search.trim().toLowerCase()
-    const palette = Array.from(new Set([...diatonic, ...COMMON_CHORDS]))
+    const palette = Array.from(new Set([...diatonic, ...recent, ...COMMON_CHORDS]))
     if (term.length === 0) return palette
     return palette.filter((chord) => chord.toLowerCase().includes(term))
-  }, [diatonic, search])
+  }, [diatonic, recent, search])
+
+  /** Every pick feeds the "recent" shortcut, wherever it comes from. */
+  const pick = (chord: string): void => {
+    rememberChord(chord)
+    onPick(chord)
+  }
 
   const pickCustom = (): void => {
     const normalized = normalizeChordInput(custom)
     if (!looksLikeChord(normalized)) {
-      setCustomError("Type a chord such as C, F#m7 or G/B.")
+      setCustomError(t("songs.invalidChord"))
       return
     }
-    onPick(normalized)
+    pick(normalized)
   }
 
   return (
@@ -60,10 +70,10 @@ export function ChordPadContent({
       {header}
 
       <Input
-        label="Search chords"
+        label={t("songs.searchChords")}
         value={search}
         onChangeText={setSearch}
-        placeholder="Filter the palette, or type a chord"
+        placeholder={t("songs.searchChordsPlaceholder")}
         autoCapitalize="none"
         autoCorrect={false}
         icon={<SearchIcon size={16} color={Theme.colors.textFaint} />}
@@ -73,7 +83,7 @@ export function ChordPadContent({
               onPress={() => setSearch("")}
               hitSlop={Theme.hitSlop}
               accessibilityRole="button"
-              accessibilityLabel="Clear chord search"
+              accessibilityLabel={t("common.clearSearch")}
             >
               <CloseIcon size={14} color={Theme.colors.textFaint} />
             </Pressable>
@@ -81,10 +91,28 @@ export function ChordPadContent({
         }
       />
 
+      {search.trim().length === 0 && recent.length > 0 ? (
+        <View style={styles.block}>
+          <AppText variant="label" tone="faint">
+            {t("songs.recentChords")}
+          </AppText>
+          <View style={styles.wrap}>
+            {recent.map((chord) => (
+              <ChordKey
+                key={`recent-${chord}`}
+                chord={chord}
+                onPress={pick}
+                label={t("songs.useChordRecent", { chord })}
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
+
       {diatonic.length > 0 && search.trim().length === 0 ? (
         <View style={styles.block}>
           <AppText variant="label" tone="faint">
-            In {songKey}
+            {songKey ? t("songs.inKey", { key: songKey }) : t("songs.diatonicChords")}
           </AppText>
           <View style={styles.wrap}>
             {diatonic.map((chord) => (
@@ -92,8 +120,8 @@ export function ChordPadContent({
                 key={`dia-${chord}`}
                 chord={chord}
                 highlighted
-                onPress={onPick}
-                label={`Use chord ${chord}, in key ${songKey}`}
+                onPress={pick}
+                label={t("songs.useChordInKey", { chord, key: songKey })}
               />
             ))}
           </View>
@@ -102,7 +130,7 @@ export function ChordPadContent({
 
       <View style={styles.block}>
         <AppText variant="label" tone="faint">
-          Common chords
+          {t("songs.commonChords")}
         </AppText>
         <ScrollView style={styles.scroll} nestedScrollEnabled>
           <View style={styles.wrap}>
@@ -111,13 +139,13 @@ export function ChordPadContent({
                 key={chord}
                 chord={chord}
                 selected={chord === initialChord}
-                onPress={onPick}
-                label={`Use chord ${chord}`}
+                onPress={pick}
+                label={t("songs.useChord", { chord })}
               />
             ))}
             {matches.length === 0 ? (
               <AppText variant="caption" tone="faint">
-                No chords match “{search}”. Add it as a custom chord below.
+                {t("songs.noChordMatches", { search })}
               </AppText>
             ) : null}
           </View>
@@ -125,7 +153,7 @@ export function ChordPadContent({
       </View>
 
       <Input
-        label="Custom chord"
+        label={t("songs.customChord")}
         value={custom}
         onChangeText={(value) => {
           setCustom(value)
@@ -140,14 +168,19 @@ export function ChordPadContent({
       />
       <View style={styles.footer}>
         <Button
-          label="Use custom chord"
+          label={t("songs.useCustomChord")}
           variant="secondary"
           icon={<AddIcon size={16} color={Theme.colors.text} />}
           onPress={pickCustom}
           disabled={custom.trim().length === 0}
           style={styles.footerButton}
         />
-        <Button label="Cancel" variant="ghost" onPress={onCancel} style={styles.footerButton} />
+        <Button
+          label={t("common.cancel")}
+          variant="ghost"
+          onPress={onCancel}
+          style={styles.footerButton}
+        />
       </View>
     </View>
   )
@@ -164,15 +197,22 @@ interface ChordPadProps extends Omit<ChordPadContentProps, "header"> {
 export function ChordPad({
   visible,
   onDismiss,
-  title = "Choose a chord",
+  title,
   description,
   initialChord,
   songKey,
   onPick,
 }: ChordPadProps) {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   return (
-    <Dialog visible={visible} onClose={onDismiss} title={title} description={description} hideActions>
+    <Dialog
+      visible={visible}
+      onClose={onDismiss}
+      title={title ?? t("songs.chooseChord")}
+      description={description}
+      hideActions
+    >
       <View style={styles.dialogBody}>
         <ChordPadContent
           initialChord={initialChord}

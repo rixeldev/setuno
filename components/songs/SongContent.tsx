@@ -1,12 +1,13 @@
 import React, { useMemo } from "react"
 import { StyleSheet, View } from "react-native"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { ChordLine } from "@/components/songs/ChordLine"
-import { transposeSections } from "@/libs/songUtils"
-import type { SongSection } from "@/interfaces"
+import { transposeSections, sectionLabelFor } from "@/libs/songUtils"
+import type { ChordNotation, SongSection } from "@/interfaces"
 
 interface SongContentProps {
   sections: SongSection[]
@@ -14,6 +15,8 @@ interface SongContentProps {
   showChords: boolean
   /** Semitone shift applied to a copy of the data (never mutates the song). */
   semitones?: number
+  /** Chord spelling: letters (C) or solfège (Do). Display-only. */
+  notation?: ChordNotation
   /** Highlights a section while scrolling from a suggestion. */
   highlightSectionId?: string | null
 }
@@ -27,15 +30,17 @@ export function SongContent({
   fontSize,
   showChords,
   semitones = 0,
+  notation = "letters",
   highlightSectionId = null,
 }: SongContentProps) {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const view = useMemo(() => transposeSections(sections, semitones), [sections, semitones])
 
   if (view.length === 0) {
     return (
       <View style={styles.empty}>
-        <AppText tone="muted">This song has no lyrics yet.</AppText>
+        <AppText tone="muted">{t("songs.noLyricsYet")}</AppText>
       </View>
     )
   }
@@ -53,7 +58,7 @@ export function SongContent({
         >
           {section.lines.length > 0 || section.label.length > 0 ? (
             <AppText variant="label" tone="primary" style={styles.sectionLabel}>
-              {section.label}
+              {sectionLabelFor(view, index, t)}
             </AppText>
           ) : null}
           <View style={styles.lines}>
@@ -63,6 +68,7 @@ export function SongContent({
                 line={line}
                 fontSize={fontSize}
                 showChords={showChords}
+                notation={notation}
               />
             ))}
           </View>

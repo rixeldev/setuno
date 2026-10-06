@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react"
 import { Pressable, ScrollView, StyleSheet, View } from "react-native"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -24,9 +25,10 @@ import {
   normalizeSectionLabels,
   parseLyricBlock,
   sectionLabel,
+  sectionLabelFor,
   transposeSections,
 } from "@/libs/songUtils"
-import { describeSemitones, transposeChord, transposeKey } from "@/libs/chords"
+import { transposeChord, transposeKey } from "@/libs/chords"
 import type { SongSection, SongSectionType } from "@/interfaces"
 
 interface SongEditorProps {
@@ -50,6 +52,7 @@ export function SongEditor({
   fontSize,
 }: SongEditorProps) {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const [sectionToDelete, setSectionToDelete] = useState<SongSection | null>(
     null,
   )
@@ -59,6 +62,8 @@ export function SongEditor({
   const [semitones, setSemitones] = useState(2)
   const [pasteText, setPasteText] = useState("")
   const [pasteMode, setPasteMode] = useState<"replace" | "append">("replace")
+  // Line that must take the focus after pressing Enter on the line above.
+  const [focusTarget, setFocusTarget] = useState<{ sectionId: string; lineIndex: number } | null>(null)
 
   const lineCount = useMemo(() => countSongLines(sections), [sections])
   const chordCount = useMemo(() => countSongChords(sections), [sections])
@@ -92,6 +97,20 @@ export function SongEditor({
     ])
   }
 
+  /** Enter on a line: a fresh editable line appears right below it. */
+  const addLineAfter = (sectionIndex: number, lineIndex: number): void => {
+    const section = sections[sectionIndex]
+    if (!section) return
+    const lines = [...section.lines]
+    lines.splice(lineIndex + 1, 0, emptyLine())
+    onChange(
+      sections.map((entry, index) =>
+        index === sectionIndex ? { ...section, lines } : entry,
+      ),
+    )
+    setFocusTarget({ sectionId: section.id, lineIndex: lineIndex + 1 })
+  }
+
   const applyPaste = (): void => {
     const parsed = parseLyricBlock(pasteText)
     if (parsed.length === 0) return
@@ -114,9 +133,15 @@ export function SongEditor({
       <View style={styles.summary}>
         <MusicIcon size={14} color={Theme.colors.textFaint} />
         <AppText variant="caption" tone="faint">
-          {sections.length} sections · {lineCount} lines · {chordCount} chords
+          {t("songs.summary", { sections: sections.length, lines: lineCount, chords: chordCount })}
         </AppText>
       </View>
+
+      {chordCount === 0 ? (
+        <AppText variant="caption" tone="muted">
+          {t("songs.placeCursorHint")}
+        </AppText>
+      ) : null}
 
       {sections.map((section, index) => (
         <View key={section.id} style={styles.section}>
@@ -124,20 +149,22 @@ export function SongEditor({
             <Pressable
               onPress={() => setTypePicker({ index })}
               accessibilityRole="button"
-              accessibilityLabel={`Change section type, currently ${section.label}`}
+              accessibilityLabel={t("songs.changeSection", {
+                section: sectionLabelFor(sections, index, t),
+              })}
               style={({ pressed }) => [
                 styles.typeButton,
                 pressed && styles.pressed,
               ]}
             >
               <AppText variant="label" tone="primary">
-                {section.label}
+                {sectionLabelFor(sections, index, t)}
               </AppText>
             </Pressable>
 
             <View style={styles.sectionActions}>
               <IconButton
-                label={`Move ${section.label} up`}
+                label={t("songs.moveSectionUp", { section: sectionLabelFor(sections, index, t) })}
                 size={32}
                 onPress={() => moveSection(index, -1)}
                 disabled={index === 0}
@@ -146,7 +173,7 @@ export function SongEditor({
                 }
               />
               <IconButton
-                label={`Move ${section.label} down`}
+                label={t("songs.moveSectionDown", { section: sectionLabelFor(sections, index, t) })}
                 size={32}
                 onPress={() => moveSection(index, 1)}
                 disabled={index === sections.length - 1}
@@ -155,7 +182,7 @@ export function SongEditor({
                 }
               />
               <IconButton
-                label={`Delete ${section.label}`}
+                label={t("songs.deleteSectionA11y", { section: sectionLabelFor(sections, index, t) })}
                 size={32}
                 variant="danger"
                 onPress={() => setSectionToDelete(section)}
@@ -170,9 +197,15 @@ export function SongEditor({
                 key={`${section.id}-${lineIndex}`}
                 line={line}
                 lineIndex={lineIndex}
-                sectionLabel={section.label}
+                sectionLabel={sectionLabelFor(sections, index, t)}
                 songKey={songKey}
                 fontSize={fontSize}
+                onSubmit={() => addLineAfter(index, lineIndex)}
+                autoFocus={
+                  focusTarget?.sectionId === section.id &&
+                  focusTarget.lineIndex === lineIndex
+                }
+                onFocused={() => setFocusTarget(null)}
                 onChange={(next) => {
                   const lines = section.lines.map((entry, position) =>
                     position === lineIndex ? next : entry,
@@ -197,7 +230,7 @@ export function SongEditor({
           </View>
 
           <Button
-            label="Add line"
+            label={t("songs.addLine")}
             variant="subtle"
             size="sm"
             icon={<AddIcon size={14} color={Theme.colors.primary} />}
@@ -212,9 +245,11 @@ export function SongEditor({
         </View>
       ))}
 
+      {/* Song-wide actions live at the end: adding the next section happens
+          right where the user finished writing, without scrolling back up. */}
       <View style={styles.toolbar}>
         <Button
-          label="Add section"
+          label={t("songs.addSection")}
           variant="secondary"
           size="sm"
           icon={<AddIcon size={15} color={Theme.colors.text} />}
@@ -222,14 +257,14 @@ export function SongEditor({
           style={styles.tool}
         />
         <Button
-          label="Paste lyrics"
+          label={t("songs.pasteLyrics")}
           variant="secondary"
           size="sm"
           onPress={() => setPasteOpen(true)}
           style={styles.tool}
         />
         <Button
-          label="Transpose chords"
+          label={t("songs.transpose")}
           variant="secondary"
           size="sm"
           onPress={() => {
@@ -244,7 +279,7 @@ export function SongEditor({
         visible={typePicker !== null}
         onClose={() => setTypePicker(null)}
         title={
-          typePicker?.index === -1 ? "Add a section" : "Change section type"
+          typePicker?.index === -1 ? t("songs.addSection") : t("songs.changeSectionType")
         }
         hideActions
       >
@@ -254,7 +289,7 @@ export function SongEditor({
               <Pressable
                 key={entry.type}
                 accessibilityRole="button"
-                accessibilityLabel={`${entry.label} section`}
+                accessibilityLabel={t(entry.i18n)}
                 onPress={() => {
                   const picker = typePicker
                   if (picker?.index === -1) {
@@ -280,7 +315,7 @@ export function SongEditor({
                   pressed && styles.pressed,
                 ]}
               >
-                <AppText variant="bodyStrong">{entry.label}</AppText>
+                <AppText variant="bodyStrong">{t(entry.i18n)}</AppText>
               </Pressable>
             ))}
           </View>
@@ -290,20 +325,18 @@ export function SongEditor({
       <Dialog
         visible={pasteOpen}
         onClose={() => setPasteOpen(false)}
-        title="Paste lyrics"
-        description="Section headers such as “Chorus” or “[Verse 2]” are detected automatically."
-        confirmLabel="Insert"
+        title={t("songs.pasteLyrics")}
+        description={t("songs.pasteDescription")}
+        confirmLabel={t("songs.insert")}
         onConfirm={applyPaste}
         confirmDisabled={pasteText.trim().length === 0}
       >
         <Input
-          label="Lyrics"
+          label={t("songs.lyrics")}
           value={pasteText}
           onChangeText={setPasteText}
           multiline
-          placeholder={
-            "Verse 1\nHello darkness my friend\n\nChorus\nI've come to talk with you again"
-          }
+          placeholder={t("songs.pastePlaceholder")}
           autoCapitalize="sentences"
         />
         <View style={styles.modeRow}>
@@ -323,7 +356,7 @@ export function SongEditor({
                 variant="caption"
                 tone={pasteMode === mode ? "primary" : "muted"}
               >
-                {mode === "replace" ? "Replace lyrics" : "Append to existing"}
+                {mode === "replace" ? t("songs.replaceLyrics") : t("songs.appendToExisting")}
               </AppText>
             </Pressable>
           ))}
@@ -333,9 +366,9 @@ export function SongEditor({
       <Dialog
         visible={transposeOpen}
         onClose={() => setTransposeOpen(false)}
-        title="Transpose every chord"
-        description="This edits the stored chords, unlike the reader's display transposition."
-        confirmLabel="Transpose"
+        title={t("songs.transposeTitle")}
+        description={t("songs.transposeDescription")}
+        confirmLabel={t("songs.transpose")}
         onConfirm={applyTranspose}
         confirmDisabled={semitones === 0}
       >
@@ -344,18 +377,20 @@ export function SongEditor({
             {semitones > 0 ? `+${semitones}` : semitones}
           </AppText>
           <AppText variant="caption" tone="muted">
-            semitones · {describeSemitones(semitones)}
+            {t(semitones >= 0 ? "songs.transposeUp" : "songs.transposeDown", {
+              semitones: Math.abs(semitones),
+            })}
           </AppText>
         </View>
         <View style={styles.transposeButtons}>
           <Button
-            label="Down"
+            label={t("songs.down")}
             variant="secondary"
             onPress={() => setSemitones((value) => Math.max(-11, value - 1))}
             style={styles.tool}
           />
           <Button
-            label="Up"
+            label={t("songs.up")}
             variant="secondary"
             onPress={() => setSemitones((value) => Math.min(11, value + 1))}
             style={styles.tool}
@@ -363,7 +398,7 @@ export function SongEditor({
         </View>
         <View style={styles.transposePreview}>
           <AppText variant="caption" tone="faint">
-            Key {songKey || "—"} → {transposeKey(songKey, semitones) || "—"} · G
+            {t("songs.key")} {songKey || "—"} → {transposeKey(songKey, semitones) || "—"} · G
             → {transposeChord("G", semitones)} · Em7 →{" "}
             {transposeChord("Em7", semitones)}
           </AppText>
@@ -373,9 +408,19 @@ export function SongEditor({
       <Dialog
         visible={sectionToDelete !== null}
         onClose={() => setSectionToDelete(null)}
-        title={`Delete ${sectionToDelete?.label ?? "section"}?`}
-        description="The lyrics and chords in this section will be removed from the song."
-        confirmLabel="Delete section"
+        title={t("songs.deleteSectionConfirm", {
+          section:
+            sectionToDelete &&
+            sections.findIndex((entry) => entry.id === sectionToDelete.id) >= 0
+              ? sectionLabelFor(
+                  sections,
+                  sections.findIndex((entry) => entry.id === sectionToDelete.id),
+                  t,
+                )
+              : t("songs.sectionFallback"),
+        })}
+        description={t("songs.deleteSectionDescription")}
+        confirmLabel={t("songs.deleteSectionLabel")}
         tone="danger"
         onConfirm={() => {
           if (sectionToDelete) {

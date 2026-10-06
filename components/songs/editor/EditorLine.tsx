@@ -1,5 +1,6 @@
-import React, { useRef, useState } from "react"
-import { Pressable, StyleSheet, TextInput, View } from "react-native"
+import React, { useEffect, useRef, useState } from "react"
+import { Platform, Pressable, StyleSheet, TextInput, View } from "react-native"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -8,15 +9,17 @@ import { Button, IconButton } from "@/components/ui/Button"
 import { Dialog } from "@/components/ui/Dialog"
 import { AddIcon, TrashIcon } from "@/components/ui/Icons"
 import {
-  nextWordStart,
-  previousWordStart,
-  snapToWordStart,
-  wordStarts,
-} from "@/libs/chords"
-import { moveChord, normalizeChords, setChordAt } from "@/libs/songUtils"
+  buildChordRow,
+  chordAnchors,
+  chordPositionLimit,
+  normalizeChords,
+  reanchorChords,
+  setChordAt,
+  shiftChordByCharacter,
+  shiftChordToAnchor,
+} from "@/libs/songUtils"
 import type { ChordPosition, LyricLine } from "@/interfaces"
 import { ChordPadContent } from "@/components/songs/editor/ChordPad"
-import { buildChordRow } from "@/components/songs/ChordLine"
 
 interface EditorLineProps {
   line: LyricLine
@@ -26,6 +29,11 @@ interface EditorLineProps {
   fontSize: number
   onChange: (next: LyricLine) => void
   onDelete: () => void
+  /** Enter pressed: the editor adds a fresh line below this one. */
+  onSubmit?: () => void
+  /** Takes the focus as soon as the line mounts (used by the new line). */
+  autoFocus?: boolean
+  onFocused?: () => void
 }
 
 interface PadState {
@@ -36,11 +44,14 @@ interface PadState {
 }
 
 /**
- * One lyric line of the chord editor.
+ * One line of the chord editor.
  *
- * The caret position decides where a new chord lands, snapped to the closest
- * word start: that is what makes "add a chord at this exact position" feel
- * natural with a finger (docs §10).
+ * Chords land **exactly where the cursor is** — including inside a word — and
+ * stay glued to that character while the lyrics are edited (docs §10). If the
+ * cursor already sits on a chord, tapping “Add chord” opens it for editing.
+ * Lines without lyrics — intros, instrumentals, riffs — are treated as a
+ * **chord progression**: chords are appended in order and reordered by
+ * swapping, so no placeholder words are needed.
  */
 export function EditorLine({
   line,
@@ -50,12 +61,31 @@ export function EditorLine({
   fontSize,
   onChange,
   onDelete,
+  onSubmit,
+  autoFocus = false,
+  onFocused,
 }: EditorLineProps) {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
+  const inputRef = useRef<TextInput>(null)
   const caret = useRef(line.text.length)
   const [pad, setPad] = useState<PadState | null>(null)
 
-  const chords = normalizeChords(line.chords, line.text.length)
+  // A line created by pressing Enter takes the focus straight away, so the
+  // lyric keeps flowing without touching anything else.
+  useEffect(() => {
+    if (!autoFocus) return
+    inputRef.current?.focus()
+    onFocused?.()
+  }, [autoFocus, onFocused])
+
+  const chordOnly = line.text.trim().length === 0
+  const limit = chordPositionLimit(line.text)
+  const chords = normalizeChords(line.chords, limit)
+  // The chord preview and the lyric field must share font family, size and
+  // padding: the preview is a monospace row padded to each character column, so
+  // any difference in metrics shows up as misaligned chords.
+  const lyricFontSize = Math.max(14, fontSize - 3)
 
   const readWebCaret = (fallback: number): number => {
     if (typeof document === "undefined") return fallback
@@ -67,122 +97,151 @@ export function EditorLine({
   }
 
   const resolveInsertPosition = (requested: number): number => {
-    const base = Math.max(0, Math.min(requested, line.text.length))
-    const anchors = Array.from(new Set([...wordStarts(line.text), line.text.length]))
-      .filter((value) => value >= 0 && value <= line.text.length)
-      .sort((a, b) => a - b)
-    const taken = new Set(chords.map((entry) => entry.position))
-    const forward = anchors.find((anchor) => anchor >= base && !taken.has(anchor))
-    if (forward !== undefined) return forward
-    const firstFree = anchors.find((anchor) => !taken.has(anchor))
-    if (firstFree !== undefined) return firstFree
-    if (!taken.has(base)) return base
-    if (!taken.has(line.text.length)) return line.text.length
-    return base
+    // A progression only grows: the next chord goes after the last one.
+    if (chordOnly) {
+      return chords.reduce((max, entry) => Math.max(max, entry.position), -1) + 1
+    }
+    // Exact cursor position: a chord can sit in the middle of a word.
+    return Math.max(0, Math.min(requested, line.text.length))
   }
 
-  /** Keeps chords glued to their word while the lyrics are edited. */
+  /**
+   * Keeps chords glued to the character they sit on while the lyrics are
+   * edited, so free placement never drifts. The two transitions are handled
+   * explicitly: clearing the lyrics turns the chords into a numbered
+   * progression, and typing them back spreads the progression over the new
+   * line in order.
+   */
   const handleText = (text: string): void => {
     caret.current = text.length
-    onChange({
-      text,
-      chords: normalizeChords(
-        chords.map((chord) => ({
+    const becomesChordOnly = text.trim().length === 0
+    const next = becomesChordOnly
+      ? chords.map((chord, index) => ({
           ...chord,
-          position: Math.min(chord.position, text.length),
-        })),
-        text.length,
-      ),
-    })
+          position: chordOnly ? chord.position : index,
+        }))
+      : chordOnly
+        ? (() => {
+            const anchors = chordAnchors(text)
+            return chords.map((chord, index) => ({
+              ...chord,
+              position: anchors[Math.min(index, anchors.length - 1)] ?? 0,
+            }))
+          })()
+        : reanchorChords(chords, line.text, text)
+
+    onChange({ text, chords: normalizeChords(next, chordPositionLimit(text)) })
   }
 
   const applyChord = (chord: string): void => {
     if (!pad) return
-    const position = pad.position
     onChange({
       ...line,
-      chords: setChordAt(chords, position, chord, line.text.length),
+      chords: setChordAt(chords, pad.position, chord, limit),
     })
-    caret.current = nextWordStart(line.text, position)
     setPad(null)
   }
 
   const shiftChord = (position: number, direction: 1 | -1): void => {
-    const chord = chords.find((entry) => entry.position === position)
-    if (!chord) return
-    const target =
-      direction === 1
-        ? snapToWordStart(line.text, nextWordStart(line.text, position))
-        : snapToWordStart(line.text, previousWordStart(line.text, position))
-    onChange({
-      ...line,
-      chords: moveChord(chords, position, target, line.text.length),
-    })
+    // A progression has no characters: "left/right" swaps it with the previous
+    // or next chord. With lyrics the move is character-exact, so a chord placed
+    // in the middle of a word can be nudged without snapping to the word.
+    const next = chordOnly
+      ? shiftChordToAnchor(
+          chords,
+          position,
+          chords.map((entry) => entry.position),
+          direction,
+          limit,
+        )
+      : shiftChordByCharacter(chords, position, direction, limit)
+    if (next === chords) return
+    onChange({ ...line, chords: next })
   }
 
   const removeChord = (position: number): void => {
     onChange({
       ...line,
-      chords: setChordAt(chords, position, "", line.text.length),
+      chords: setChordAt(chords, position, "", limit),
     })
     setPad(null)
   }
 
+  const addChip = (
+    <Pressable
+      onPressIn={() => {
+        caret.current = readWebCaret(caret.current)
+      }}
+      onPress={() => {
+        const position = resolveInsertPosition(readWebCaret(caret.current))
+        // The cursor is on an existing chord: edit that one instead.
+        const existing = chords.find((entry) => entry.position === position)
+        setPad(
+          existing
+            ? { position, chord: existing.chord, existing: true }
+            : { position, chord: "", existing: false },
+        )
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={
+        chordOnly
+          ? t("songs.addNextChord", { section: sectionLabel, line: lineIndex + 1 })
+          : t("songs.addChordToLine", { line: lineIndex + 1, section: sectionLabel })
+      }
+      style={({ pressed }) => [styles.addChip, pressed && styles.pressed]}
+    >
+      <AddIcon size={13} color={Theme.colors.primary} />
+      <AppText variant="caption" tone="primary">
+        {t("songs.addChord")}
+      </AppText>
+    </Pressable>
+  )
+
   return (
     <View style={styles.row}>
       <View style={styles.chipRow}>
-        <Pressable
-          onPressIn={() => {
-            caret.current = readWebCaret(caret.current)
-          }}
-          onPress={() =>
-            setPad({
-              position: resolveInsertPosition(readWebCaret(caret.current)),
-              chord: "",
-              existing: false,
-            })
-          }
-          accessibilityRole="button"
-          accessibilityLabel={`Add a chord to line ${lineIndex + 1} of ${sectionLabel}`}
-          style={({ pressed }) => [styles.addChip, pressed && styles.pressed]}
-        >
-          <AddIcon size={13} color={Theme.colors.primary} />
-          <AppText variant="caption" tone="primary">
-            Add chord
-          </AppText>
-        </Pressable>
+        {chordOnly ? null : addChip}
 
-        {chords.map((chord) => (
-          <Pressable
-            key={`${chord.position}-${chord.chord}`}
-            onPress={() =>
-              setPad({
-                position: chord.position,
-                chord: chord.chord,
-                existing: true,
-              })
-            }
-            accessibilityRole="button"
-            accessibilityLabel={`Edit chord ${chord.chord} above ${describeAnchor(line.text, chord.position)}`}
-            style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
-          >
-            <AppText
-              style={[
-                styles.chipText,
-                { fontSize: Math.max(11, fontSize - 6) },
-              ]}
-              tone="accent"
+        {chords.map((chord) => {
+          const word = wordAt(line.text, chord.position)
+          return (
+            <Pressable
+              key={`${chord.position}-${chord.chord}`}
+              onPress={() =>
+                setPad({
+                  position: chord.position,
+                  chord: chord.chord,
+                  existing: true,
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={
+                word
+                  ? t("songs.changeToWord", { chord: chord.chord, word })
+                  : t("songs.changeAtEnd", { chord: chord.chord })
+              }
+              style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
             >
-              {chord.chord}
-            </AppText>
-          </Pressable>
-        ))}
+              <AppText
+                style={[
+                  styles.chipText,
+                  { fontSize: Math.max(11, fontSize - 6) },
+                ]}
+                tone="accent"
+              >
+                {chord.chord}
+              </AppText>
+            </Pressable>
+          )
+        })}
+
+        {chordOnly ? addChip : null}
       </View>
 
-      {chords.length > 0 ? (
+      {chords.length > 0 && !chordOnly ? (
         <View style={styles.preview}>
           <AppText
-            style={[styles.previewText, { fontSize: Math.max(12, fontSize - 4) }]}
+            style={[styles.previewText, { fontSize: lyricFontSize, lineHeight: Math.round(lyricFontSize * 1.4) }]}
             tone="muted"
           >
             {buildChordRow(chords, line.text)}
@@ -192,19 +251,29 @@ export function EditorLine({
 
       <View style={styles.inputRow}>
         <TextInput
+          ref={inputRef}
           value={line.text}
           onChangeText={handleText}
           onSelectionChange={(event) => {
             caret.current = event.nativeEvent.selection.start
           }}
-          placeholder="Type or paste a lyric line…"
+          onSubmitEditing={() => onSubmit?.()}
+          // Enter adds the next line; keep the keyboard up and let the editor
+          // move the focus (react-native-web still uses `blurOnSubmit`).
+          blurOnSubmit={Platform.OS === "web" ? false : undefined}
+          submitBehavior={Platform.OS === "web" ? undefined : "submit"}
+          placeholder={chordOnly ? t("songs.optionalLyric") : t("songs.lyricPlaceholder")}
           placeholderTextColor={Theme.colors.textFaint}
           selectionColor={Theme.colors.primary}
-          accessibilityLabel={`Lyrics for line ${lineIndex + 1} of ${sectionLabel}`}
-          style={[styles.input, { fontSize: Math.max(14, fontSize - 3) }]}
+          accessibilityLabel={t("songs.lineLabel", {
+            section: sectionLabel,
+            line: lineIndex + 1,
+          })}
+          accessibilityHint={t("songs.pressEnterHint")}
+          style={[styles.input, { fontSize: lyricFontSize }]}
         />
         <IconButton
-          label={`Delete line ${lineIndex + 1} of ${sectionLabel}`}
+          label={t("songs.deleteLine", { line: lineIndex + 1, section: sectionLabel })}
           size={34}
           variant="danger"
           onPress={onDelete}
@@ -215,10 +284,16 @@ export function EditorLine({
       <Dialog
         visible={pad !== null}
         onClose={() => setPad(null)}
-        title={pad?.existing ? "Edit chord" : "Add chord"}
-        description={`${sectionLabel} · line ${lineIndex + 1}${
-          pad ? ` · above “${describeAnchor(line.text, pad.position)}”` : ""
-        }`}
+        title={pad?.existing ? t("songs.editChord") : t("songs.addChord")}
+        description={
+          pad && !chordOnly
+            ? t("songs.lineAbove", {
+                section: sectionLabel,
+                line: lineIndex + 1,
+                anchor: wordAt(line.text, pad.position) || t("songs.endOfLine"),
+              })
+            : t("songs.lineLabel", { section: sectionLabel, line: lineIndex + 1 })
+        }
         hideActions
       >
         {pad ? (
@@ -231,7 +306,7 @@ export function EditorLine({
               pad.existing ? (
                 <View style={styles.padActions}>
                   <Button
-                    label="Move left"
+                    label={t("songs.moveLeft")}
                     variant="secondary"
                     size="sm"
                     onPress={() => {
@@ -240,7 +315,7 @@ export function EditorLine({
                     }}
                   />
                   <Button
-                    label="Move right"
+                    label={t("songs.moveRight")}
                     variant="secondary"
                     size="sm"
                     onPress={() => {
@@ -249,7 +324,7 @@ export function EditorLine({
                     }}
                   />
                   <Button
-                    label="Remove"
+                    label={t("common.remove")}
                     variant="danger"
                     size="sm"
                     onPress={() => removeChord(pad.position)}
@@ -264,10 +339,14 @@ export function EditorLine({
   )
 }
 
-/** Short description of what a chord is anchored to, for screen readers. */
-const describeAnchor = (text: string, position: number): string => {
-  const word = text.slice(position).split(/\s/)[0] ?? ""
-  return word.length > 0 ? word : "the end of the line"
+/** Word the chord sits on, for screen readers and pad descriptions. */
+const wordAt = (text: string, position: number): string => {
+  if (text.length === 0 || position >= text.length) return ""
+  let start = position
+  while (start > 0 && !/\s/.test(text[start - 1] ?? " ")) start -= 1
+  let end = position
+  while (end < text.length && !/\s/.test(text[end] ?? " ")) end += 1
+  return text.slice(start, end)
 }
 
 export type { ChordPosition }

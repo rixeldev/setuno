@@ -1,19 +1,19 @@
 import type { ChordPosition, LyricLine, SongSection, SongSectionType } from "@/interfaces/song"
-import { transposeChord } from "@/libs/chords"
+import { transposeChord, wordStarts } from "@/libs/chords"
 
 /** Short, collision-resistant id for locally created sections. */
 export const createId = (prefix = "id"): string =>
   `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 
-export const SECTION_TYPES: { type: SongSectionType; label: string; short: string }[] = [
-  { type: "intro", label: "Intro", short: "Intro" },
-  { type: "verse", label: "Verse", short: "V" },
-  { type: "pre-chorus", label: "Pre-Chorus", short: "PC" },
-  { type: "chorus", label: "Chorus", short: "Ch" },
-  { type: "bridge", label: "Bridge", short: "Br" },
-  { type: "outro", label: "Outro", short: "Out" },
-  { type: "instrumental", label: "Instrumental", short: "Inst" },
-  { type: "custom", label: "Custom", short: "Cus" },
+export const SECTION_TYPES: { type: SongSectionType; label: string; short: string; i18n: string }[] = [
+  { type: "intro", label: "Intro", short: "Intro", i18n: "songs.intro" },
+  { type: "verse", label: "Verse", short: "V", i18n: "songs.verse" },
+  { type: "pre-chorus", label: "Pre-Chorus", short: "PC", i18n: "songs.preChorus" },
+  { type: "chorus", label: "Chorus", short: "Ch", i18n: "songs.chorus" },
+  { type: "bridge", label: "Bridge", short: "Br", i18n: "songs.bridge" },
+  { type: "outro", label: "Outro", short: "Out", i18n: "songs.outro" },
+  { type: "instrumental", label: "Instrumental", short: "Inst", i18n: "songs.instrumental" },
+  { type: "custom", label: "Custom", short: "Cus", i18n: "songs.custom" },
 ]
 
 const SECTION_LABEL_BY_TYPE: Record<SongSectionType, string> = {
@@ -32,6 +32,54 @@ export const sectionLabel = (type: SongSectionType, index: number): string => {
   const base = SECTION_LABEL_BY_TYPE[type]
   if (type === "intro" || type === "instrumental" || type === "outro") return base
   return `${base} ${index}`
+}
+
+/** Types that are never numbered: "Intro" stays "Intro", not "Intro 2". */
+export const isNumberedSection = (type: SongSectionType): boolean =>
+  type !== "intro" && type !== "instrumental" && type !== "outro"
+
+/** 1-based position of a section among the ones sharing its type. */
+export const sectionOrdinal = (sections: SongSection[], index: number): number => {
+  const type = sections[index]?.type
+  if (!type) return 1
+  let count = 0
+  for (let position = 0; position <= index; position += 1) {
+    if (sections[position]?.type === type) count += 1
+  }
+  return count
+}
+
+/** i18n key of a section type (custom sections use their own text). */
+export const sectionLabelKey = (type: SongSectionType): string =>
+  SECTION_TYPES.find((entry) => entry.type === type)?.i18n ?? "songs.custom"
+
+/**
+ * Label to render for a section.
+ *
+ * The stored `label` is only used for **custom** sections: every known type is
+ * rendered from its type + ordinal through the translation, so the same song
+ * shows "Estrofa 1" for Spanish readers and "Verse 1" for everyone else without
+ * touching the stored data.
+ */
+export const resolveSectionLabel = (
+  section: SongSection,
+  ordinal: number,
+  t: (key: string) => string,
+): string => {
+  if (section.type === "custom") return section.label.trim() || t("songs.sectionFallback")
+  const base = t(sectionLabelKey(section.type))
+  return isNumberedSection(section.type) ? `${base} ${ordinal}` : base
+}
+
+/** Same as {@link resolveSectionLabel} for a section inside its list. */
+export const sectionLabelFor = (
+  sections: SongSection[],
+  index: number,
+  t: (key: string) => string,
+): string => {
+  const section = sections[index]
+  if (!section) return ""
+  return resolveSectionLabel(section, sectionOrdinal(sections, index), t)
 }
 
 export const emptyLine = (text = ""): LyricLine => ({ text, chords: [] })
@@ -140,6 +188,142 @@ export const normalizeChords = (chords: ChordPosition[], lineLength: number): Ch
     })
 }
 
+/**
+ * Position limit for the chords of a line.
+ *
+ * Lines with lyrics clamp every chord to the text length so it stays above a
+ * character. Wordless lines (intros, instrumentals, riffs) are a chord
+ * progression instead: there is nothing to clamp against, so a new chord can
+ * always be appended without typing lyrics first.
+ */
+export const chordPositionLimit = (text: string): number =>
+  text.trim().length > 0 ? text.length : Number.MAX_SAFE_INTEGER
+
+/**
+ * The spots a chord can occupy on a line with lyrics: every word start plus the
+ * end of the line, so a chord on the last word can still move right.
+ */
+export const chordAnchors = (text: string): number[] =>
+  Array.from(new Set([...wordStarts(text), text.length])).sort((a, b) => a - b)
+
+/**
+ * Moves a chord to the previous/next anchor of the line.
+ *
+ * The chord already sitting on the target **swaps** places instead of being
+ * dropped, so moving always works (even between two chords on adjacent words)
+ * and never loses data.
+ *
+ * @returns the same array when the chord cannot move (line boundary).
+ */
+export const shiftChordToAnchor = (
+  chords: ChordPosition[],
+  position: number,
+  anchors: number[],
+  direction: 1 | -1,
+  lineLength: number,
+): ChordPosition[] => {
+  const index = anchors.indexOf(position)
+  const target = index === -1 ? undefined : anchors[index + direction]
+  if (target === undefined) return chords
+  return normalizeChords(
+    chords.map((chord) => {
+      if (chord.position === position) return { ...chord, position: target }
+      if (chord.position === target) return { ...chord, position }
+      return chord
+    }),
+    lineLength,
+  )
+}
+
+/**
+ * Nudges a chord one character left/right, so a chord can sit exactly where the
+ * cursor is — even in the middle of a word. Positions already taken by another
+ * chord are skipped instead of overwritten.
+ *
+ * @returns the same array when the chord cannot move (line boundary).
+ */
+export const shiftChordByCharacter = (
+  chords: ChordPosition[],
+  position: number,
+  direction: 1 | -1,
+  lineLength: number,
+): ChordPosition[] => {
+  const taken = new Set(chords.map((chord) => chord.position))
+  let target = position + direction
+  while (target >= 0 && target <= lineLength && taken.has(target)) target += direction
+  if (target < 0 || target > lineLength) return chords
+  return normalizeChords(
+    chords.map((chord) => (chord.position === position ? { ...chord, position: target } : chord)),
+    lineLength,
+  )
+}
+
+/**
+ * Pads a monospace string so each chord starts exactly `position` characters
+ * into the row. Overlapping chords are shifted one column so nothing is drawn
+ * on top of anything else.
+ *
+ * Shared by the reader and the editor preview, and always rendered with the
+ * same font size as the lyric line underneath so the columns line up.
+ */
+export const buildChordRow = (chords: ChordPosition[], text: string): string => {
+  if (chords.length === 0) return ""
+  const limit = text.length
+  let row = ""
+
+  for (const chord of chords) {
+    const target = Math.max(0, Math.min(Math.round(chord.position), limit))
+    // Never place a chord before the end of the previous one.
+    const start = Math.max(target, row.length)
+    if (start > row.length) row += " ".repeat(start - row.length)
+    row += chord.chord.trim()
+    row += " "
+  }
+
+  return row
+}
+
+const commonPrefixLength = (a: string, b: string): number => {
+  const max = Math.min(a.length, b.length)
+  let index = 0
+  while (index < max && a[index] === b[index]) index += 1
+  return index
+}
+
+const commonSuffixLength = (a: string, b: string, prefix: number): number => {
+  const max = Math.min(a.length - prefix, b.length - prefix)
+  let index = 0
+  while (index < max && a[a.length - 1 - index] === b[b.length - 1 - index]) index += 1
+  return index
+}
+
+/**
+ * Keeps every chord glued to the character it sits on while the lyrics change:
+ * whatever was typed or deleted before a chord shifts it by the same amount.
+ * Chords inside the replaced range collapse to the edit point.
+ *
+ * Without this, free chord placement would drift as soon as the user types.
+ */
+export const reanchorChords = (
+  chords: ChordPosition[],
+  previousText: string,
+  nextText: string,
+): ChordPosition[] => {
+  if (previousText === nextText || chords.length === 0) return chords
+  const prefix = commonPrefixLength(previousText, nextText)
+  const suffix = commonSuffixLength(previousText, nextText, prefix)
+  const removed = previousText.length - prefix - suffix
+  const delta = nextText.length - previousText.length
+
+  return chords.map((chord) => {
+    // Strict `<`: a chord sitting exactly on the edit point belongs to the text
+    // that follows it, so typing there carries the chord along.
+    if (chord.position < prefix) return chord
+    if (chord.position >= prefix + removed) return { ...chord, position: chord.position + delta }
+    return { ...chord, position: prefix }
+  })
+}
+
 /** Applies a semitone shift to every chord in every section (display only). */
 export const transposeSections = (
   sections: SongSection[],
@@ -168,10 +352,16 @@ export const countSongChords = (sections: SongSection[]): number =>
     0,
   )
 
-export const songLyricsText = (sections: SongSection[]): string =>
+export const songLyricsText = (
+  sections: SongSection[],
+  labelFor?: (section: SongSection, index: number) => string,
+): string =>
   sections
-    .map((section) =>
-      [`[${section.label}]`, ...section.lines.map((line) => line.text)].join("\n"),
+    .map((section, index) =>
+      [
+        `[${labelFor ? labelFor(section, index) : section.label}]`,
+        ...section.lines.map((line) => line.text),
+      ].join("\n"),
     )
     .join("\n\n")
 

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { useLocalSearchParams, useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -11,15 +12,18 @@ import { Input } from "@/components/ui/Input"
 import { EmptyState, Skeleton } from "@/components/ui/States"
 import { useToast } from "@/components/ui/Toast"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
+import { AppBackground } from "@/components/app/AppBackground"
+import { DiscardChangesDialog } from "@/components/app/DiscardChangesDialog"
 import { PageHeader } from "@/components/ui/PageHeader"
 import { ChordPadContent } from "@/components/songs/editor/ChordPad"
 import { Dialog } from "@/components/ui/Dialog"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges"
 import { subscribeSong } from "@/services/songs"
 import { createSuggestion } from "@/services/suggestions"
 import { toFriendlyError } from "@/services/errors"
-import { setChordAt } from "@/libs/songUtils"
+import { sectionLabelFor, setChordAt } from "@/libs/songUtils"
 import { wordStarts } from "@/libs/chords"
 import { validateRequired } from "@/libs/validation"
 import type { Song, SuggestionChange, SuggestionType } from "@/interfaces"
@@ -28,14 +32,39 @@ import type { Song, SuggestionChange, SuggestionType } from "@/interfaces"
 const CHORD_TYPES: SuggestionType[] = ["chord_change", "add_chord", "remove_chord"]
 
 const TYPE_LABELS: Record<SuggestionType, string> = {
-  chord_change: "Change a chord",
-  add_chord: "Add a chord",
-  remove_chord: "Remove a chord",
-  key_change: "Change the key",
-  lyrics_change: "Fix a lyric",
-  new_song: "New song",
-  other: "Something else",
+  chord_change: "suggestions.fixChords",
+  add_chord: "suggestions.addChords",
+  remove_chord: "suggestions.removeChord",
+  key_change: "suggestions.changeKey",
+  lyrics_change: "suggestions.editLyrics",
+  new_song: "songs.newSong",
+  other: "suggestions.other",
 }
+
+interface SuggestFormState {
+  type: SuggestionType
+  sectionId: string | null
+  lineIndex: number | null
+  position: number | null
+  chord: string
+  newKey: string
+  lyrics: string
+  comment: string
+}
+
+const EMPTY_SUGGESTION: SuggestFormState = {
+  type: "chord_change",
+  sectionId: null,
+  lineIndex: null,
+  position: null,
+  chord: "",
+  newKey: "",
+  lyrics: "",
+  comment: "",
+}
+
+/** Stable snapshot used to detect unsaved changes. */
+const serializeForm = (state: SuggestFormState): string => JSON.stringify(state)
 
 /**
  * Suggestion composer for a song (docs §13). Members describe the change; an
@@ -43,6 +72,7 @@ const TYPE_LABELS: Record<SuggestionType, string> = {
  */
 export default function SuggestForSong() {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const router = useRouter()
   const toast = useToast()
   const params = useLocalSearchParams<{ id?: string }>()
@@ -63,6 +93,20 @@ export default function SuggestForSong() {
   const [padOpen, setPadOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [baseline, setBaseline] = useState(() => serializeForm(EMPTY_SUGGESTION))
+
+  const currentState: SuggestFormState = {
+    type,
+    sectionId,
+    lineIndex,
+    position,
+    chord,
+    newKey,
+    lyrics,
+    comment,
+  }
+  const hasUnsavedChanges = serializeForm(currentState) !== baseline && !saving
+  const leaveGuard = useUnsavedChanges(hasUnsavedChanges)
 
   const subscribe = React.useCallback(
     (onChange: (value: Song | null) => void) => subscribeSong(organizationId, songId, onChange),
@@ -77,6 +121,17 @@ export default function SuggestForSong() {
   )
   const line = section && lineIndex !== null ? (section.lines[lineIndex] ?? null) : null
   const isChordType = CHORD_TYPES.includes(type)
+  // Lines without lyrics (intros, instrumentals) hold a chord progression
+  // instead of chords above words, so the picker offers steps, not words.
+  const chordOnly = line !== null && line.text.trim().length === 0
+  const nextSlot = line ? line.chords.reduce((max, entry) => Math.max(max, entry.position), -1) + 1 : 0
+  const progressionStep = line
+    ? Math.max(
+        1,
+        line.chords.findIndex((entry) => entry.position === position) + 1 ||
+          line.chords.length + 1,
+      )
+    : 1
   const existingChord = useMemo(() => {
     if (!line || position === null) return ""
     return line.chords.find((entry) => entry.position === position)?.chord ?? ""
@@ -112,7 +167,7 @@ export default function SuggestForSong() {
       setFormError("Pick the new key.")
       return
     }
-    const commentError = validateRequired(comment, "Add a short note so the admin understands the change.")
+    const commentError = validateRequired(comment, t("suggestions.commentRequired"))
     if (commentError) {
       setFormError(commentError)
       return
@@ -120,6 +175,11 @@ export default function SuggestForSong() {
 
     let change: SuggestionChange
     let summary: string
+    const sectionIndex = section
+      ? song.sections.findIndex((entry) => entry.id === section.id)
+      : -1
+    const sectionName =
+      sectionIndex >= 0 ? sectionLabelFor(song.sections, sectionIndex, t) : t("songs.sectionFallback")
 
     if (isChordType && section && lineIndex !== null && position !== null) {
       change = {
@@ -130,15 +190,22 @@ export default function SuggestForSong() {
         from: existingChord,
         to: type === "remove_chord" ? "" : chord,
       }
-      summary = `${section.label} · line ${lineIndex + 1} · ${
-        existingChord.length > 0 ? `${existingChord} → ` : ""
-      }${type === "remove_chord" ? "remove chord" : chord}`
+      summary = t("suggestions.summarySectionChord", {
+        section: sectionName,
+        line: lineIndex + 1,
+        change:
+          type === "remove_chord"
+            ? t("suggestions.removeChord")
+            : existingChord.length > 0
+              ? `${existingChord} → ${chord}`
+              : chord,
+      })
     } else if (type === "key_change") {
       change = { kind: "key_change", from: song.key, to: newKey }
-      summary = `Key ${song.key || "—"} → ${newKey}`
+      summary = t("suggestions.summaryKey", { from: song.key || "—", to: newKey })
     } else if (type === "lyrics_change" && section && lineIndex !== null) {
       change = { kind: "lyrics_change", sectionId: section.id, lineIndex, from: line?.text ?? "", to: lyrics }
-      summary = `${section.label} · line ${lineIndex + 1} lyric fix`
+      summary = t("suggestions.summarySectionLyric", { section: sectionName, line: lineIndex + 1 })
     } else {
       change = { kind: "other" }
       summary = "General note"
@@ -158,10 +225,11 @@ export default function SuggestForSong() {
         },
         { id: profile?.uid ?? "", name: profile?.displayName || "A member" },
       )
-      toast.showSuccess("Thanks! An admin will review your suggestion.")
+      toast.showSuccess(t("suggestions.suggestionCreated"))
+      setBaseline(serializeForm(currentState))
       router.replace(`/songs/${song.id}`)
     } catch (error) {
-      const message = toFriendlyError(error, "We couldn't send that suggestion.")
+      const message = toFriendlyError(error, t("suggestions.couldNotSend"))
       setFormError(message)
       toast.showError(message)
     } finally {
@@ -172,7 +240,8 @@ export default function SuggestForSong() {
   if (!song) {
     return (
       <View style={styles.host}>
-        <PageHeader title="Suggest a change" back elevated />
+        <AppBackground />
+        <PageHeader title={t("songs.suggestChange")} back elevated />
         <View style={styles.loading}>
           <Skeleton height={120} />
         </View>
@@ -182,19 +251,20 @@ export default function SuggestForSong() {
 
   return (
     <View style={styles.host}>
-      <PageHeader title="Suggest a change" subtitle={song.title} back elevated />
+      <AppBackground />
+      <PageHeader title={t("songs.suggestChange")} subtitle={song.title} back elevated />
 
       <ScreenContainer scroll style={styles.body}>
         <Card style={{ gap: Theme.spacing.m }}>
           <AppText variant="label" tone="faint">
-            What needs changing?
+            {t("suggestions.changeType")}
           </AppText>
           <View style={styles.wrap}>
             {(["chord_change", "add_chord", "remove_chord", "key_change", "lyrics_change", "other"] as SuggestionType[]).map(
               (entry) => (
                 <Chip
                   key={entry}
-                  label={TYPE_LABELS[entry]}
+                  label={t(TYPE_LABELS[entry])}
                   tone="primary"
                   selected={type === entry}
                   onPress={() => pickType(entry)}
@@ -207,14 +277,14 @@ export default function SuggestForSong() {
         {isChordType || type === "lyrics_change" ? (
           <Card style={{ gap: Theme.spacing.m }}>
             <AppText variant="label" tone="faint">
-              Where?
+              {t("suggestions.where")}
             </AppText>
 
             <View style={styles.wrap}>
-              {song.sections.map((entry) => (
+              {song.sections.map((entry, index) => (
                 <Chip
                   key={entry.id}
-                  label={entry.label}
+                  label={sectionLabelFor(song.sections, index, t)}
                   tone="primary"
                   selected={sectionId === entry.id}
                   onPress={() => {
@@ -248,25 +318,53 @@ export default function SuggestForSong() {
         {isChordType && line ? (
           <Card style={{ gap: Theme.spacing.m }}>
             <AppText variant="label" tone="faint">
-              Which word does the chord sit on?
+              {chordOnly ? t("songs.progressionStep") : t("songs.whichWord")}
             </AppText>
             <View style={styles.wrap}>
-              {wordStarts(line.text).map((start) => {
-                const word = line.text.slice(start).split(/\s/)[0] ?? ""
-                const current = line.chords.find((entry) => entry.position === start)?.chord ?? ""
-                return (
+              {chordOnly ? (
+                <>
+                  {line.chords.map((entry, index) => (
+                    <Chip
+                      key={`step-${entry.position}`}
+                      label={`${index + 1} · ${entry.chord}`}
+                      tone="accent"
+                      selected={position === entry.position}
+                      onPress={() => setPosition(entry.position)}
+                    />
+                  ))}
                   <Chip
-                    key={`word-${start}`}
-                    label={current ? `${word} (${current})` : word}
-                    tone="accent"
-                    selected={position === start}
-                    onPress={() => setPosition(start)}
+                    label={`${line.chords.length + 1} · add chord`}
+                    tone="primary"
+                    selected={
+                      position !== null && !line.chords.some((entry) => entry.position === position)
+                    }
+                    onPress={() => setPosition(nextSlot)}
                   />
-                )
-              })}
-              {wordStarts(line.text).length === 0 ? (
-                <Chip label="Start of the line" selected={position === 0} onPress={() => setPosition(0)} />
-              ) : null}
+                </>
+              ) : (
+                <>
+                  {wordStarts(line.text).map((start) => {
+                    const word = line.text.slice(start).split(/\s/)[0] ?? ""
+                    const current = line.chords.find((entry) => entry.position === start)?.chord ?? ""
+                    return (
+                      <Chip
+                        key={`word-${start}`}
+                        label={current ? `${word} (${current})` : word}
+                        tone="accent"
+                        selected={position === start}
+                        onPress={() => setPosition(start)}
+                      />
+                    )
+                  })}
+                  {wordStarts(line.text).length === 0 ? (
+                    <Chip
+                      label={t("songs.startOfLine")}
+                      selected={position === 0}
+                      onPress={() => setPosition(0)}
+                    />
+                  ) : null}
+                </>
+              )}
             </View>
           </Card>
         ) : null}
@@ -274,14 +372,16 @@ export default function SuggestForSong() {
         {isChordType && line && position !== null ? (
           <Card style={{ gap: Theme.spacing.m }}>
             <AppText variant="label" tone="faint">
-              Chord at “{line.text.slice(position).split(/\s/)[0] || "end of line"}”
+              {chordOnly
+                ? t("songs.chordAtStep", { step: progressionStep })
+                : `Chord at “${line.text.slice(position).split(/\s/)[0] || t("songs.endOfLine")}”`}
             </AppText>
             {line.chords.length > 0 ? (
               <View style={styles.wrap}>
-                {line.chords.map((entry) => (
+                {line.chords.map((entry, index) => (
                   <Chip
                     key={`${entry.position}-${entry.chord}`}
-                    label={`${entry.chord} @ ${entry.position}`}
+                    label={chordOnly ? `${index + 1} · ${entry.chord}` : `${entry.chord} @ ${entry.position}`}
                     tone="accent"
                     selected={position === entry.position}
                     onPress={() => setPosition(entry.position)}
@@ -292,7 +392,7 @@ export default function SuggestForSong() {
 
             {type !== "remove_chord" ? (
               <Button
-                label={chord ? `Chord: ${chord}` : "Choose a chord"}
+                label={chord ? t("songs.chordValue", { chord }) : t("songs.chooseChord")}
                 variant="secondary"
                 onPress={() => setPadOpen(true)}
               />
@@ -303,14 +403,14 @@ export default function SuggestForSong() {
         {type === "key_change" ? (
           <Card style={{ gap: Theme.spacing.m }}>
             <AppText variant="label" tone="faint">
-              New key
+              {t("songs.newKey")}
             </AppText>
             <Input
               value={newKey}
               onChangeText={setNewKey}
               placeholder={song.key || "C"}
               autoCapitalize="characters"
-              hint={`Current key: ${song.key || "not set"}`}
+              hint={t("songs.currentKey", { key: song.key || t("songs.notSet") })}
             />
           </Card>
         ) : null}
@@ -318,7 +418,7 @@ export default function SuggestForSong() {
         {type === "lyrics_change" && line ? (
           <Card style={{ gap: Theme.spacing.m }}>
             <AppText variant="label" tone="faint">
-              Corrected lyric
+              {t("songs.correctedLyric")}
             </AppText>
             <Input value={lyrics} onChangeText={setLyrics} multiline />
           </Card>
@@ -326,12 +426,12 @@ export default function SuggestForSong() {
 
         <Card style={{ gap: Theme.spacing.m }}>
           <Input
-            label="Note for the admin"
+            label={t("songs.noteForAdmin")}
             required
             value={comment}
             onChangeText={setComment}
             multiline
-            placeholder="We always sing it like this on stage…"
+            placeholder={t("songs.noteForAdminPlaceholder")}
           />
         </Card>
 
@@ -341,18 +441,29 @@ export default function SuggestForSong() {
           </AppText>
         ) : null}
 
-        <Button label="Send suggestion" loading={saving} onPress={() => void submit()} />
+        <Button label={t("songs.sendSuggestion")} loading={saving} onPress={() => void submit()} />
 
         {song.sections.length === 0 ? (
-          <EmptyState compact title="Nothing to suggest yet" message="This song has no lyrics yet." />
+          <EmptyState
+            compact
+            title={t("songs.nothingToSuggest")}
+            message={t("songs.noLyricsYet")}
+          />
         ) : null}
       </ScreenContainer>
+
+      <DiscardChangesDialog
+        visible={leaveGuard.confirmVisible}
+        what={t("songs.suggestionChanges")}
+        onKeepEditing={leaveGuard.keepEditing}
+        onDiscard={leaveGuard.discardAndLeave}
+      />
 
       <Dialog
         visible={padOpen}
         onClose={() => setPadOpen(false)}
-        title="Which chord?"
-        description="Pick the chord that should sit above the word."
+        title={t("songs.whichChord")}
+        description={t("songs.whichChordDescription")}
         hideActions
       >
         <ChordPadContent
@@ -385,7 +496,7 @@ const truncate = (value: string, max: number): string =>
 
 const createStyles = () =>
   StyleSheet.create({
-    host: { flex: 1, backgroundColor: Theme.colors.background },
+    host: { flex: 1 },
     body: { paddingTop: Theme.spacing.l, gap: Theme.spacing.l },
     loading: { padding: Theme.spacing.l },
     wrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },

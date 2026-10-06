@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { useLocalSearchParams, useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { SongForm } from "@/components/songs/SongForm"
+import { AppBackground } from "@/components/app/AppBackground"
 import { EmptyState, Skeleton } from "@/components/ui/States"
 import { useOrganization } from "@/hooks/useOrganization"
 import { subscribeSong } from "@/services/songs"
@@ -13,6 +15,7 @@ import type { Song } from "@/interfaces"
 /** Edit an existing song: metadata plus the full chord/lyric editor. */
 export default function EditSong() {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const router = useRouter()
   const params = useLocalSearchParams<{ id?: string }>()
   const songId = params.id ?? null
@@ -32,6 +35,7 @@ export default function EditSong() {
   if (!ready) {
     return (
       <View style={styles.host}>
+        <AppBackground />
         <Skeleton height={30} width="50%" />
         <Skeleton height={220} />
       </View>
@@ -41,10 +45,11 @@ export default function EditSong() {
   if (!song) {
     return (
       <View style={styles.host}>
+        <AppBackground />
         <EmptyState
-          title="Song not found"
-          message="It may have been deleted while you were editing."
-          actionLabel="Back to songs"
+          title={t("songs.songNotFound")}
+          message={t("songs.songNotFoundEditing")}
+          actionLabel={t("songs.backToSongs")}
           onAction={() => router.replace("/songs")}
         />
       </View>
@@ -56,5 +61,5 @@ export default function EditSong() {
 
 const createStyles = () =>
   StyleSheet.create({
-    host: { flex: 1, backgroundColor: Theme.colors.background, padding: Theme.spacing.l, gap: Theme.spacing.l },
+    host: { flex: 1, padding: Theme.spacing.l, gap: Theme.spacing.l },
   })
