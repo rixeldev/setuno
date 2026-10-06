@@ -149,7 +149,9 @@ const createStyles = () =>
       gap: 6,
       alignSelf: "flex-start",
       padding: 4,
-      borderRadius: Theme.radii.pill,
+      // Matches the chips' own radius instead of going full pill: with wrapped
+      // rows the container is tall, and pill corners look exaggerated.
+      borderRadius: Theme.radii.lg,
       backgroundColor: Theme.colors.surfaceHigh,
       borderWidth: 1,
       borderColor: Theme.colors.borderSoft,
