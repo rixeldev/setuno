@@ -37,7 +37,7 @@ interface PageHeaderProps {
    * `title` elsewhere; dynamic titles (band names) step it down so they fit.
    */
   titleVariant?: TextVariant
-  /** Lines before the title truncates. `0` means no limit. Defaults to 1. */
+  /** Lines before the title truncates. `0` means no limit. Defaults to 2. */
   titleLines?: number
 }
 
@@ -57,7 +57,7 @@ export function PageHeader({
   large = false,
   dense = false,
   titleVariant,
-  titleLines = 1,
+  titleLines = 2,
 }: PageHeaderProps) {
   const styles = useThemedStyles(createStyles)
   const { gutter, isMobile } = useResponsive()

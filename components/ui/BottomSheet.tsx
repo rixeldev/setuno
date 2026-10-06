@@ -70,7 +70,7 @@ export function SheetOptionRow({
       ]}
     >
       <View style={styles.optionBody}>
-        <AppText variant="bodyStrong" tone={selected ? "primary" : "default"} numberOfLines={1}>
+        <AppText variant="bodyStrong" tone={selected ? "primary" : "default"} numberOfLines={2}>
           {label}
         </AppText>
         {hint ? (

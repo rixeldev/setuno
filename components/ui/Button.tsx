@@ -62,7 +62,7 @@ export function Button({
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
-        { height: HEIGHTS[size] },
+        { minHeight: HEIGHTS[size] },
         styles[variant],
         full && styles.full,
         pressed && !isDisabled && styles.pressed,
@@ -81,7 +81,8 @@ export function Button({
           <AppText
             variant={size === "sm" ? "caption" : "bodyStrong"}
             tone={TONE_BY_VARIANT[variant]}
-            numberOfLines={1}
+            numberOfLines={2}
+            style={styles.label}
           >
             {label}
           </AppText>
@@ -150,9 +151,12 @@ const createStyles = () =>
       justifyContent: "center",
       gap: Theme.spacing.s,
       paddingHorizontal: Theme.spacing.xl,
+      paddingVertical: Theme.spacing.xs,
       borderRadius: Theme.radii.m,
       borderWidth: 1,
     },
+    // Labels never ellipsize: they wrap up to two lines and the button grows.
+    label: { flexShrink: 1, textAlign: "center" },
     full: { alignSelf: "stretch", width: "100%" },
     primary: {
       backgroundColor: Theme.colors.primary,

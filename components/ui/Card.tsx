@@ -106,7 +106,7 @@ export function Chip({
       <AppText
         variant="caption"
         tone={selected ? TONE_BY_VARIANT[tone] : "muted"}
-        numberOfLines={1}
+        numberOfLines={2}
       >
         {label}
       </AppText>

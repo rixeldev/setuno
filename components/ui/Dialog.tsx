@@ -187,6 +187,8 @@ const createStyles = () =>
     close: { padding: 4 },
     body: { maxHeight: 460 },
     bodyContent: { paddingBottom: Theme.spacing.s, gap: Theme.spacing.m },
-    actions: { flexDirection: "row", gap: Theme.spacing.m },
-    action: { flex: 1 },
+    actions: { flexDirection: "row", flexWrap: "wrap", gap: Theme.spacing.m },
+    // Buttons share the row when they fit (~two per line) and take the full
+    // width when they do not, so labels are never squeezed into an ellipsis.
+    action: { flexGrow: 1, flexShrink: 1, flexBasis: 120 },
   })
