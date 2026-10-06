@@ -22,7 +22,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { usesSidebar } = useResponsive()
   const pathname = usePathname()
   const focused = isFocusRoute(pathname)
-  // One banner, on the dashboard, sitting right above the navigation. It hides
+  // One banner, on the dashboard, sitting under the navigation. It hides
   // itself when there is nothing to show (no fill, offline, web).
   const showDashboardBanner = pathname === "/" && !focused
 
@@ -45,8 +45,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SyncBanner />
         {children}
       </SafeAreaView>
-      {showDashboardBanner ? <BannerAdSlot /> : null}
       {focused ? null : <BottomBar />}
+      {/* The dashboard banner lives under the tab bar, full width. */}
+      {showDashboardBanner ? <BannerAdSlot fullWidth /> : null}
     </View>
   )
 }
