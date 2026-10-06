@@ -13,6 +13,8 @@ import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { useResponsive } from "@/hooks/useResponsive"
 import { PageHeader } from "@/components/ui/PageHeader"
+import { AppBackground } from "@/components/app/AppBackground"
+import type { TextVariant } from "@/components/ui/AppText"
 
 interface ScreenContainerProps {
   children: React.ReactNode
@@ -22,6 +24,10 @@ interface ScreenContainerProps {
   subtitle?: string
   back?: boolean
   large?: boolean
+  /** Typography for a dynamic title (band names). See `PageHeader`. */
+  titleVariant?: TextVariant
+  /** Lines before the title truncates. `0` means no limit. */
+  titleLines?: number
   headerRight?: React.ReactNode
   /** Bar rendered above the header title (brand mark, page actions). */
   headerTop?: React.ReactNode
@@ -48,6 +54,8 @@ export function ScreenContainer({
   subtitle,
   back = false,
   large = false,
+  titleVariant,
+  titleLines,
   headerRight,
   headerTop,
   toolbar,
@@ -70,6 +78,8 @@ export function ScreenContainer({
           subtitle={subtitle}
           back={back}
           large={large}
+          titleVariant={titleVariant}
+          titleLines={titleLines}
           right={headerRight}
           top={headerTop}
         />
@@ -94,6 +104,7 @@ export function ScreenContainer({
   if (!scroll) {
     return (
       <View style={styles.host}>
+        <AppBackground />
         {header}
         {body}
       </View>
@@ -101,45 +112,49 @@ export function ScreenContainer({
   }
 
   return (
-    <ScrollView
-      style={styles.host}
-      contentContainerStyle={[
-        styles.scrollContent,
-        Platform.OS === "web" ? styles.webScroll : null,
-      ]}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        onRefresh ? (
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={Theme.colors.primary}
-            colors={[Theme.colors.primary]}
-          />
-        ) : undefined
-      }
-    >
-      {header}
-      <View
-        style={[
-          styles.body,
-          padded && { paddingHorizontal: gutter },
-          { gap },
-          { maxWidth: columnMaxWidth },
-          style,
+    <View style={styles.host}>
+      <AppBackground />
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={[
+          styles.scrollContent,
+          Platform.OS === "web" ? styles.webScroll : null,
         ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={Theme.colors.primary}
+              colors={[Theme.colors.primary]}
+            />
+          ) : undefined
+        }
       >
-        {toolbar}
-        {children}
-      </View>
-    </ScrollView>
+        {header}
+        <View
+          style={[
+            styles.body,
+            padded && { paddingHorizontal: gutter },
+            { gap },
+            { maxWidth: columnMaxWidth },
+            style,
+          ]}
+        >
+          {toolbar}
+          {children}
+        </View>
+      </ScrollView>
+    </View>
   )
 }
 
 const createStyles = () =>
   StyleSheet.create({
-    host: { flex: 1, backgroundColor: Theme.colors.background },
+    host: { flex: 1 },
+    flex: { flex: 1 },
     scrollContent: {
       flexGrow: 1,
       paddingBottom: Theme.spacing.huge,

@@ -1,21 +1,21 @@
 import React from "react"
-import { ScrollView, StyleSheet, View } from "react-native"
+import { Pressable, ScrollView, StyleSheet, View } from "react-native"
+import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
 
-import { Theme } from "@/constants/Theme"
+import { Theme, colorWithOpacity } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
+import { useResponsive } from "@/hooks/useResponsive"
 import { AppText } from "@/components/ui/AppText"
 import { Avatar } from "@/components/ui/Avatar"
-import { Badge, Card, Divider } from "@/components/ui/Card"
-import { ChevronRightIcon } from "@/components/ui/Icons"
-import { PageHeader } from "@/components/ui/PageHeader"
-import { useResponsive } from "@/hooks/useResponsive"
+import { Badge, Card } from "@/components/ui/Card"
+import { ChevronRightIcon, ShieldCheckIcon } from "@/components/ui/Icons"
+import { AppBackground } from "@/components/app/AppBackground"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrgData } from "@/hooks/useOrgData"
 import { MORE_NAV } from "@/libs/navigation"
-import { pluralize } from "@/libs/format"
-import { ROLE_LABELS } from "@/interfaces"
 
 /**
  * Mobile hub for everything that doesn't fit the bottom bar (docs §21). On
@@ -24,83 +24,144 @@ import { ROLE_LABELS } from "@/interfaces"
  */
 export default function MoreScreen() {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const router = useRouter()
-  const { gutter } = useResponsive()
+  const { gutter, contentMaxWidth } = useResponsive()
   const { profile, user } = useAuth()
   const { organization, role, organizations } = useOrganization()
   const { songs, pendingSuggestions } = useOrgData()
 
-  const displayName = profile?.displayName || user?.displayName || "Musician"
+  const displayName = profile?.displayName || user?.displayName || t("auth.musician")
+  const photoURL = profile?.photoURL ?? user?.photoURL ?? null
+  const isAdmin = role === "admin"
+
+  const stats: { label: string; value: number }[] = [
+    { label: t("nav.songs"), value: songs.length },
+    { label: t("organizations.bands"), value: organizations.length },
+    { label: t("dashboard.stats.pending"), value: pendingSuggestions.length },
+  ]
 
   return (
     <View style={styles.host}>
-      <PageHeader title="More" large />
-
+      <AppBackground />
       <ScrollView
+        style={styles.flex}
         contentContainerStyle={[styles.scroll, { paddingHorizontal: gutter }]}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
       >
-        <Card style={styles.identity}>
-          <Avatar
-            name={displayName}
-            photoURL={profile?.photoURL ?? user?.photoURL ?? null}
-            size={48}
-            accessibilityLabel={`${displayName}${profile?.email ? `, ${profile.email}` : ""}`}
-          />
-          <View style={styles.flex}>
-            <AppText variant="subheading" numberOfLines={1}>
-              {displayName}
-            </AppText>
-            <AppText variant="caption" tone="muted" numberOfLines={1}>
-              {organization
-                ? `${organization.name} · ${ROLE_LABELS[role ?? "member"]}`
-                : "No band selected"}
-            </AppText>
+      <LinearGradient
+        colors={[...Theme.gradients.primary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.hero, { marginHorizontal: -gutter, paddingHorizontal: gutter }]}
+      >
+        <View style={[styles.heroInner, { maxWidth: contentMaxWidth }]}>
+          <View style={styles.heroTop}>
+            <View style={styles.flex}>
+              <AppText variant="label" style={styles.heroKicker}>
+                Stage Book
+              </AppText>
+              <AppText variant="display" tone="inverse">
+                {t("nav.more")}
+              </AppText>
+            </View>
+            {organization ? (
+              <View style={styles.heroPill}>
+                <AppText variant="caption" tone="inverse" numberOfLines={1}>
+                  {role === "admin" ? t("organizations.admin") : t("organizations.member")}
+                </AppText>
+              </View>
+            ) : null}
           </View>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("settings.profile")}
+            onPress={() => router.push("/settings/profile")}
+            style={({ pressed }) => [styles.identity, pressed && styles.pressed]}
+          >
+            <View style={styles.avatarRing}>
+              <Avatar
+                name={displayName}
+                photoURL={photoURL}
+                size={52}
+                accessibilityLabel={`${displayName}${profile?.email ? `, ${profile.email}` : ""}`}
+              />
+            </View>
+            <View style={styles.flex}>
+              <AppText variant="subheading" tone="inverse" numberOfLines={1}>
+                {displayName}
+              </AppText>
+              <AppText variant="caption" style={styles.heroSubtle} numberOfLines={2}>
+                {organization?.name ?? t("organizations.noBand")}
+              </AppText>
+            </View>
+            <ChevronRightIcon size={18} color={Theme.colors.onPrimary} />
+          </Pressable>
+        </View>
+      </LinearGradient>
+
+      <View style={[styles.body, { maxWidth: contentMaxWidth }]}>
+        <Card elevated padded={false} style={styles.stats}>
+          {stats.map((stat, index) => (
+            <View key={stat.label} style={[styles.stat, index > 0 && styles.statDivider]}>
+              <AppText variant="heading">{stat.value}</AppText>
+              <AppText variant="caption" tone="muted">
+                {stat.label}
+              </AppText>
+            </View>
+          ))}
         </Card>
 
-        <View style={styles.group}>
-          {MORE_NAV.map((item, index) => {
-            const Icon = item.icon
-            const hint = item.badge === "suggestions" && pendingSuggestions.length > 0
-              ? `${pendingSuggestions.length} new`
-              : undefined
-            return (
-              <View key={item.href}>
-                {index > 0 ? <Divider /> : null}
-                <Card
-                  padded={false}
+        <View style={styles.section}>
+          <AppText variant="label" tone="faint" style={styles.sectionLabel}>
+            {t("nav.shortcuts")}
+          </AppText>
+
+          <View style={styles.grid}>
+            {MORE_NAV.map((item) => {
+              const Icon = item.icon
+              const hint =
+                item.badge === "suggestions" && pendingSuggestions.length > 0
+                  ? t("common.newCount", { count: pendingSuggestions.length })
+                  : null
+              return (
+                <Pressable
+                  key={item.href}
+                  accessibilityRole="button"
+                  accessibilityLabel={hint ? `${t(item.label)}. ${hint}` : t(item.label)}
                   onPress={() => router.push(item.href as never)}
-                  accessibilityLabel={hint ? `${item.label}. ${hint}` : item.label}
+                  style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
                 >
-                  <View style={styles.row}>
-                    <Icon size={18} color={Theme.colors.textMuted} />
-                    <AppText variant="bodyStrong" style={styles.flex}>
-                      {item.label}
-                    </AppText>
+                  <View style={styles.tileHeader}>
+                    <View style={styles.tileIcon}>
+                      <Icon size={20} color={Theme.colors.primary} />
+                    </View>
                     {hint ? <Badge label={hint} tone="accent" /> : null}
-                    <ChevronRightIcon size={16} color={Theme.colors.textFaint} />
                   </View>
-                </Card>
-              </View>
-            )
-          })}
+                  <View style={styles.tileText}>
+                    <AppText variant="bodyStrong" numberOfLines={1}>
+                      {t(item.label)}
+                    </AppText>
+                    {item.description ? (
+                      <AppText variant="caption" tone="faint" numberOfLines={2}>
+                        {t(item.description)}
+                      </AppText>
+                    ) : null}
+                  </View>
+                </Pressable>
+              )
+            })}
+          </View>
         </View>
 
-        <Card style={styles.summary}>
-          <AppText variant="caption" tone="muted">
-            {pluralize(songs.length, "song")} · {pluralize(organizations.length, "band")} ·{" "}
-            {pluralize(pendingSuggestions.length, "pending suggestion")}
+        <View style={styles.notice}>
+          <ShieldCheckIcon size={16} color={isAdmin ? Theme.colors.primary : Theme.colors.textFaint} />
+          <AppText variant="caption" tone="muted" style={styles.flex}>
+            {isAdmin ? t("dashboard.adminNote") : t("dashboard.memberNote")}
           </AppText>
-          {role === "admin" ? (
-            <Badge label="You're an admin in this band" tone="primary" />
-          ) : (
-            <AppText variant="caption" tone="faint">
-              Members can suggest changes; admins approve them.
-            </AppText>
-          )}
-        </Card>
+        </View>
+      </View>
       </ScrollView>
     </View>
   )
@@ -108,22 +169,98 @@ export default function MoreScreen() {
 
 const createStyles = () =>
   StyleSheet.create({
-    host: { flex: 1, backgroundColor: Theme.colors.background },
-    scroll: { paddingTop: Theme.spacing.s, gap: Theme.spacing.xl, paddingBottom: Theme.spacing.huge },
-    identity: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.m },
-    flex: { flex: 1, minWidth: 0 },
-    group: {
-      borderRadius: Theme.radii.xl,
-      borderWidth: 1,
-      borderColor: Theme.colors.borderSoft,
-      overflow: "hidden",
-      backgroundColor: Theme.colors.surface,
+    host: { flex: 1 },
+    scroll: { paddingBottom: Theme.spacing.huge },
+    hero: {
+      paddingTop: Theme.spacing.xxl,
+      paddingBottom: Theme.spacing.xxxl,
+      borderBottomLeftRadius: Theme.radii.xxl,
+      borderBottomRightRadius: Theme.radii.xxl,
     },
-    row: {
+    heroInner: { width: "100%", alignSelf: "center", gap: Theme.spacing.xl },
+    heroTop: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: Theme.spacing.m,
+    },
+    heroKicker: { color: colorWithOpacity(Theme.colors.onPrimary, 0.72) },
+    heroPill: {
+      paddingHorizontal: Theme.spacing.m,
+      paddingVertical: 5,
+      borderRadius: Theme.radii.pill,
+      backgroundColor: colorWithOpacity("#FFFFFF", 0.18),
+      borderWidth: 1,
+      borderColor: colorWithOpacity("#FFFFFF", 0.24),
+    },
+    identity: {
       flexDirection: "row",
       alignItems: "center",
       gap: Theme.spacing.m,
-      padding: Theme.spacing.l,
+      padding: Theme.spacing.m,
+      borderRadius: Theme.radii.xl,
+      backgroundColor: colorWithOpacity("#FFFFFF", 0.14),
+      borderWidth: 1,
+      borderColor: colorWithOpacity("#FFFFFF", 0.22),
     },
-    summary: { gap: Theme.spacing.s },
+    avatarRing: {
+      padding: 2,
+      borderRadius: Theme.radii.pill,
+      borderWidth: 2,
+      borderColor: colorWithOpacity("#FFFFFF", 0.45),
+    },
+    heroSubtle: { color: colorWithOpacity(Theme.colors.onPrimary, 0.72) },
+    body: {
+      width: "100%",
+      alignSelf: "center",
+      marginTop: -Theme.spacing.xxl,
+      gap: Theme.spacing.xl,
+    },
+    stats: { flexDirection: "row", overflow: "hidden" },
+    stat: { flex: 1, alignItems: "center", gap: 2, paddingVertical: Theme.spacing.l },
+    statDivider: { borderLeftWidth: 1, borderLeftColor: Theme.colors.borderSoft },
+    section: { gap: Theme.spacing.m },
+    sectionLabel: { paddingLeft: Theme.spacing.xs },
+    grid: { flexDirection: "row", flexWrap: "wrap", gap: Theme.spacing.m },
+    tile: {
+      flexGrow: 1,
+      flexBasis: "45%",
+      minHeight: 112,
+      justifyContent: "space-between",
+      gap: Theme.spacing.m,
+      padding: Theme.spacing.l,
+      borderRadius: Theme.radii.xl,
+      borderWidth: 1,
+      borderColor: Theme.colors.borderSoft,
+      backgroundColor: Theme.colors.surface,
+      ...Theme.shadows.sm,
+    },
+    tilePressed: { opacity: 0.75 },
+    tileHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: Theme.spacing.s,
+    },
+    tileIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: Theme.radii.m,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: Theme.colors.primarySoft,
+    },
+    tileText: { gap: 2, minWidth: 0 },
+    notice: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.s,
+      padding: Theme.spacing.m,
+      borderRadius: Theme.radii.lg,
+      borderWidth: 1,
+      borderColor: Theme.colors.borderSoft,
+      backgroundColor: Theme.colors.background2,
+    },
+    flex: { flex: 1, minWidth: 0 },
+    pressed: { opacity: 0.8 },
   })
