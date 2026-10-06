@@ -20,8 +20,6 @@ import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { addMemberByEmail, removeMember, revokeInvitation, updateMemberRole } from "@/services/organizations"
 import { toFriendlyError } from "@/services/errors"
-import { formatRelativeTime } from "@/libs/format"
-import { toDate } from "@/interfaces/timestamp"
 import { validateEmail } from "@/libs/validation"
 import type { OrganizationMember, OrganizationRole } from "@/interfaces"
 
@@ -186,16 +184,9 @@ export default function MembersScreen() {
                         ? t("organizations.admin")
                         : t("organizations.member")}
                   </AppText>
-                  {member.email || member.joinedAt ? (
-                    <AppText variant="caption" tone="faint" numberOfLines={1}>
-                      {[
-                        member.email,
-                        member.joinedAt
-                          ? t("members.joined", { time: formatRelativeTime(toDate(member.joinedAt)) })
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
+                  {member.email ? (
+                    <AppText variant="caption" tone="muted" numberOfLines={1}>
+                      {member.email}
                     </AppText>
                   ) : null}
                 </View>
