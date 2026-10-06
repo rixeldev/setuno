@@ -1,7 +1,8 @@
 {
   "name": "Stage Book",
-  "accent": "#E2592B",
-  "accentLight": "#F2823F",
-  "ink": "#14100E",
-  "cream": "#FDF8F3"
+  "accent": "#EA580C",
+  "accentLight": "#F98B33",
+  "accentStrong": "#C2410C",
+  "ink": "#0B0B14",
+  "cream": "#FFF7EE"
 }

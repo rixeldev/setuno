@@ -26,7 +26,7 @@ export default {
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#0B0B14",
-        backgroundImage: "./assets/adaptive-icon.png",
+        backgroundImage: "./assets/icon-background.png",
       },
       icon: "./assets/icon.png",
       predictiveBackGestureEnabled: true,
@@ -53,10 +53,12 @@ export default {
       [
         "expo-splash-screen",
         {
-          image: "./assets/icons/mipmap-xxxhdpi/ic_launcher.png",
+          image: "./assets/splash-icon.png",
+          imageWidth: 200,
+          resizeMode: "contain",
           backgroundColor: "#0B0B14",
           dark: {
-            image: "./assets/icons/mipmap-xxxhdpi/ic_launcher.png",
+            image: "./assets/splash-icon.png",
             backgroundColor: "#0B0B14",
           },
         },
