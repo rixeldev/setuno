@@ -1,16 +1,15 @@
 import React, { useMemo } from "react"
-import { StyleSheet, View } from "react-native"
 import { useLocalSearchParams, useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
 
-import { Theme } from "@/constants/Theme"
-import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { SetlistForm } from "@/components/setlists/SetlistForm"
+import { ModalScreen } from "@/components/app/ModalScreen"
 import { EmptyState, Skeleton } from "@/components/ui/States"
 import { useOrgData } from "@/hooks/useOrgData"
 
-/** Edit a setlist's details without leaving the running order behind. */
+/** Edit a setlist's details without leaving the running order behind, as a modal. */
 export default function EditSetlist() {
-  const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const router = useRouter()
   const params = useLocalSearchParams<{ id?: string }>()
   const setlistId = params.id ?? null
@@ -23,30 +22,25 @@ export default function EditSetlist() {
 
   if (loading && !setlist) {
     return (
-      <View style={styles.host}>
+      <ModalScreen title={t("setlists.editSetlist")}>
         <Skeleton height={30} width="50%" />
         <Skeleton height={220} />
-      </View>
+      </ModalScreen>
     )
   }
 
   if (!setlist) {
     return (
-      <View style={styles.host}>
+      <ModalScreen title={t("setlists.editSetlist")}>
         <EmptyState
-          title="Setlist not found"
-          message="It may have been deleted while you were editing."
-          actionLabel="Back to setlists"
+          title={t("setlists.setlistNotFound")}
+          message={t("setlists.notFoundEditing")}
+          actionLabel={t("setlists.backToSetlists")}
           onAction={() => router.replace("/setlists")}
         />
-      </View>
+      </ModalScreen>
     )
   }
 
   return <SetlistForm setlist={setlist} onSaved={() => router.replace(`/setlists/${setlist.id}`)} />
 }
-
-const createStyles = () =>
-  StyleSheet.create({
-    host: { flex: 1, backgroundColor: Theme.colors.background, padding: Theme.spacing.l, gap: Theme.spacing.l },
-  })
