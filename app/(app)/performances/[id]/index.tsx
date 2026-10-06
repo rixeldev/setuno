@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from "react"
-import { StyleSheet, View } from "react-native"
+import { Pressable, StyleSheet, View } from "react-native"
 import { useLocalSearchParams, useRouter } from "expo-router"
 import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
-import { Badge, Card, Chip } from "@/components/ui/Card"
+import { Badge, Card } from "@/components/ui/Card"
 import { Button, IconButton } from "@/components/ui/Button"
 import { Dialog } from "@/components/ui/Dialog"
 import { EmptyState, Skeleton } from "@/components/ui/States"
@@ -27,14 +27,15 @@ import { useOrgData } from "@/hooks/useOrgData"
 import { deletePerformance, updatePerformance } from "@/services/performances"
 import { toFriendlyError } from "@/services/errors"
 import type { RelativeDayLabels } from "@/libs/format"
-import {
-  formatDateRange,
-  formatDurationLong,
-  formatRelativeDay,
-  formatTime,
-} from "@/libs/format"
+import { formatDateRange, formatDurationLong, formatRelativeDay, formatTime } from "@/libs/format"
 import { parseIsoDate } from "@/libs/validation"
 import type { PerformanceStatus } from "@/interfaces"
+
+const STATUS_TONES = {
+  completed: "success",
+  cancelled: "danger",
+  scheduled: "primary",
+} as const
 
 /** Show detail (docs §22): details, attached setlist and admin actions. */
 export default function PerformanceDetail() {
@@ -166,13 +167,11 @@ export default function PerformanceDetail() {
           <View style={styles.headerActions}>
             <IconButton
               label={t("performances.editPerformance")}
-              variant="secondary"
               onPress={() => router.push(`/performances/${performance.id}/edit`)}
-              icon={<EditIcon size={18} color={Theme.colors.text} />}
+              icon={<EditIcon size={18} color={Theme.colors.textMuted} />}
             />
             <IconButton
               label={t("performances.deletePerformance")}
-              variant="secondary"
               onPress={() => setConfirmDelete(true)}
               icon={<TrashIcon size={18} color={Theme.colors.danger} />}
             />
@@ -180,7 +179,7 @@ export default function PerformanceDetail() {
         ) : null
       }
     >
-      {/* Key facts: date, status, time and place in one tidy block. */}
+      {/* Key facts: an editorial date block next to the status, time and place. */}
       <Card style={styles.infoCard}>
         <View style={styles.infoTop}>
           <View style={styles.stamp}>
@@ -192,74 +191,53 @@ export default function PerformanceDetail() {
             </AppText>
           </View>
 
-          <View style={styles.flex}>
-            <View style={styles.badges}>
-              <Badge
-                label={t(`performances.${performance.status}`)}
-                tone={
-                  performance.status === "completed"
-                    ? "success"
-                    : performance.status === "cancelled"
-                      ? "danger"
-                      : "primary"
-                }
-              />
-              {timeRange ? <Badge label={timeRange} tone="default" /> : null}
-            </View>
-            <AppText variant="bodyStrong" numberOfLines={2}>
-              {dateLabel}
-            </AppText>
+          <View style={styles.infoBody}>
+            <Badge
+              label={t(`performances.${performance.status}`)}
+              tone={STATUS_TONES[performance.status]}
+            />
             {relativeDay ? (
-              <AppText variant="caption" tone="muted" numberOfLines={1}>
+              <AppText variant="bodyStrong" numberOfLines={2}>
                 {relativeDay}
               </AppText>
             ) : null}
+            {timeRange ? (
+              <View style={styles.metaRow}>
+                <ClockIcon size={13} color={Theme.colors.textFaint} />
+                <AppText variant="caption" tone="muted" numberOfLines={1}>
+                  {timeRange}
+                </AppText>
+              </View>
+            ) : null}
+            {hasVenue ? (
+              <View style={styles.metaRow}>
+                <MapPinIcon size={13} color={Theme.colors.textFaint} />
+                <View style={styles.flex}>
+                  <AppText variant="caption" tone="muted" numberOfLines={2}>
+                    {[performance.venue.name, performance.venue.address].filter(Boolean).join(" · ") ||
+                      t("performances.venueNotSet")}
+                  </AppText>
+                  {performance.venue.notes ? (
+                    <AppText variant="caption" tone="faint" numberOfLines={2}>
+                      {performance.venue.notes}
+                    </AppText>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
           </View>
         </View>
-
-        {timeRange ? (
-          <View style={styles.detailRow}>
-            <ClockIcon size={15} color={Theme.colors.textFaint} />
-            <AppText variant="body" tone="muted" style={styles.flex}>
-              {timeRange}
-            </AppText>
-          </View>
-        ) : null}
-
-        {hasVenue ? (
-          <View style={styles.detailRow}>
-            <MapPinIcon size={15} color={Theme.colors.textFaint} />
-            <View style={styles.flex}>
-              <AppText variant="bodyStrong" numberOfLines={2}>
-                {performance.venue.name || t("performances.venueNotSet")}
-              </AppText>
-              {performance.venue.address ? (
-                <AppText variant="caption" tone="muted" numberOfLines={2}>
-                  {performance.venue.address}
-                </AppText>
-              ) : null}
-              {performance.venue.notes ? (
-                <AppText variant="caption" tone="faint" numberOfLines={2}>
-                  {performance.venue.notes}
-                </AppText>
-              ) : null}
-            </View>
-          </View>
-        ) : null}
       </Card>
 
       {hasNotes ? (
-        <Card style={{ gap: 6 }}>
-          <AppText variant="label" tone="faint">
-            {t("performances.notes")}
-          </AppText>
+        <View style={styles.notes}>
           <AppText variant="body" tone="muted">
             {performance.notes}
           </AppText>
-        </Card>
+        </View>
       ) : null}
 
-      <Card style={{ gap: Theme.spacing.m }}>
+      <Card style={styles.setlistCard}>
         <View style={styles.sectionHeader}>
           <AppText variant="label" tone="faint">
             {t("performances.setlist")}
@@ -276,8 +254,8 @@ export default function PerformanceDetail() {
 
         {setlist ? (
           <>
-            <View style={styles.detailRow}>
-              <MusicIcon size={15} color={Theme.colors.primary} />
+            <View style={styles.metaRow}>
+              <MusicIcon size={14} color={Theme.colors.primary} />
               <AppText variant="subheading" style={styles.flex} numberOfLines={2}>
                 {setlist.name}
               </AppText>
@@ -290,15 +268,21 @@ export default function PerformanceDetail() {
             </AppText>
             <View style={styles.songs}>
               {setlist.songs.slice(0, 8).map((entry, index) => (
-                <View key={`${entry.songId}-${index}`} style={styles.songRow}>
+                <Pressable
+                  key={`${entry.songId}-${index}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={entry.title}
+                  onPress={() => router.push(`/songs/${entry.songId}`)}
+                  style={({ pressed }) => [styles.songRow, pressed && styles.pressed]}
+                >
                   <AppText variant="caption" tone="faint" style={styles.order}>
                     {index + 1}
                   </AppText>
-                  <AppText variant="body" numberOfLines={1} style={styles.flex} onPress={() => router.push(`/songs/${entry.songId}`)}>
+                  <AppText variant="body" numberOfLines={1} style={styles.flex}>
                     {entry.title}
                   </AppText>
                   {entry.key ? <Badge label={entry.key} tone="accent" /> : null}
-                </View>
+                </Pressable>
               ))}
               {setlist.songs.length > 8 ? (
                 <AppText variant="caption" tone="faint">
@@ -308,7 +292,7 @@ export default function PerformanceDetail() {
             </View>
           </>
         ) : (
-          <View style={{ gap: Theme.spacing.m }}>
+          <View style={styles.emptySetlist}>
             <AppText variant="caption" tone="faint">
               {t("performances.noSetlistAttached")}
             </AppText>
@@ -316,6 +300,7 @@ export default function PerformanceDetail() {
               <Button
                 label={t("performances.attachSetlist")}
                 variant="secondary"
+                size="sm"
                 onPress={() => router.push(`/performances/${performance.id}/edit`)}
               />
             ) : null}
@@ -323,38 +308,43 @@ export default function PerformanceDetail() {
         )}
       </Card>
 
-      {isAdmin && performance.status !== "completed" ? (
-        <View style={styles.statusActions}>
-          <Button
-            label={t("performances.markCompleted")}
-            variant="secondary"
-            disabled={busy}
-            icon={<CheckCircleIcon size={16} color={Theme.colors.text} />}
-            onPress={() => void setStatus("completed")}
-            style={styles.action}
-          />
-          {performance.status !== "cancelled" ? (
-            <Button
-              label={t("performances.cancelShow")}
-              variant="danger"
-              disabled={busy}
-              icon={<CloseIcon size={16} color={Theme.colors.onPrimary} />}
-              onPress={() => void setStatus("cancelled")}
-              style={styles.action}
-            />
-          ) : null}
-        </View>
+      {performance.status === "cancelled" ? (
+        <AppText variant="caption" tone="danger">
+          {t("performances.cancelledChip")}
+        </AppText>
       ) : null}
 
-      {isAdmin && performance.status === "cancelled" ? (
-        <View style={styles.cancelledRow}>
-          <Chip label={t("performances.cancelledChip")} tone="danger" />
-          <Button
-            label={t("performances.markScheduled")}
-            variant="ghost"
-            disabled={busy}
-            onPress={() => void setStatus("scheduled")}
-          />
+      {isAdmin && performance.status !== "completed" ? (
+        // Stacked full-width actions: they can never overflow the viewport.
+        <View style={styles.actions}>
+          {performance.status === "scheduled" ? (
+            <Button
+              label={t("performances.markCompleted")}
+              full
+              disabled={busy}
+              icon={<CheckCircleIcon size={16} color={Theme.colors.onPrimary} />}
+              onPress={() => void setStatus("completed")}
+            />
+          ) : null}
+          {performance.status === "scheduled" ? (
+            <Button
+              label={t("performances.cancelShow")}
+              variant="secondary"
+              full
+              disabled={busy}
+              icon={<CloseIcon size={16} color={Theme.colors.danger} />}
+              onPress={() => void setStatus("cancelled")}
+            />
+          ) : null}
+          {performance.status === "cancelled" ? (
+            <Button
+              label={t("performances.markScheduled")}
+              variant="secondary"
+              full
+              disabled={busy}
+              onPress={() => void setStatus("scheduled")}
+            />
+          ) : null}
         </View>
       ) : null}
 
@@ -374,38 +364,42 @@ export default function PerformanceDetail() {
 
 const createStyles = () =>
   StyleSheet.create({
-    headerActions: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.s },
+    headerActions: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.xs },
     infoCard: { gap: Theme.spacing.m },
-    infoTop: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.m },
+    infoTop: { flexDirection: "row", alignItems: "stretch", gap: Theme.spacing.l },
     stamp: {
-      minWidth: 56,
-      paddingVertical: Theme.spacing.s,
-      paddingHorizontal: Theme.spacing.s,
-      borderRadius: Theme.radii.lg,
-      backgroundColor: Theme.colors.primarySoft,
+      minWidth: 48,
       alignItems: "center",
+      justifyContent: "center",
       gap: 1,
+      paddingRight: Theme.spacing.l,
+      borderRightWidth: 1,
+      borderRightColor: Theme.colors.borderSoft,
     },
-    badges: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 2 },
-    detailRow: { flexDirection: "row", alignItems: "flex-start", gap: Theme.spacing.s },
+    infoBody: { flex: 1, minWidth: 0, gap: 6, justifyContent: "center" },
+    metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
     flex: { flex: 1, minWidth: 0 },
+    notes: {
+      borderLeftWidth: 2,
+      borderLeftColor: Theme.colors.primary,
+      paddingLeft: Theme.spacing.m,
+    },
+    setlistCard: { gap: Theme.spacing.m },
     sectionHeader: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
       gap: Theme.spacing.s,
     },
-    songs: { gap: 6 },
-    songRow: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.s, paddingVertical: 4 },
-    order: {
-      width: 22,
-      textAlign: "center",
-      paddingVertical: 2,
-      borderRadius: Theme.radii.pill,
-      backgroundColor: Theme.colors.surfaceHigh,
-      overflow: "hidden",
+    songs: { gap: 2 },
+    songRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.m,
+      paddingVertical: Theme.spacing.s,
     },
-    statusActions: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.s },
-    cancelledRow: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.s },
-    action: { flexGrow: 1 },
+    order: { width: 16, textAlign: "right" },
+    pressed: { opacity: 0.7 },
+    emptySetlist: { gap: Theme.spacing.m, alignItems: "flex-start" },
+    actions: { gap: Theme.spacing.s, width: "100%", maxWidth: 420 },
   })
