@@ -49,6 +49,25 @@ const STORAGE_MESSAGES: Record<string, string> = {
   "storage/unknown": "The upload failed. Please try again.",
 }
 
+/**
+ * Native Google Sign-In failures. Android reports numeric status codes
+ * (GoogleSignInStatusCodes) while the JS SDK adds named ones, and unmapped
+ * codes would otherwise collapse into the generic fallback message.
+ */
+const GOOGLE_MESSAGES: Record<string, string> = {
+  "4": "Choose a Google account to continue.",
+  "7": "No connection right now. Check your internet and try again.",
+  "8": "Google Play Services had a hiccup. Please try again.",
+  "10": "Google sign-in isn't configured for this build. Check the app's signing key in Firebase.",
+  "16": "Google sign-in was cancelled.",
+  "12500": "Google couldn't complete the sign-in. Please try again.",
+  "12502": "Google sign-in is already in progress.",
+  IN_PROGRESS: "Google sign-in is already in progress.",
+  PLAY_SERVICES_NOT_AVAILABLE: "Google Play Services is missing or needs an update on this device.",
+  SIGN_IN_REQUIRED: "Choose a Google account to continue.",
+  NULL_PRESENTER: "Google sign-in isn't ready yet. Try again in a moment.",
+}
+
 /** Extracts the `code` of a Firebase error (`auth/...`, `permission-denied`...). */
 export const errorCode = (error: unknown): string | null => {
   if (!error || typeof error !== "object") return null
@@ -71,7 +90,11 @@ export const toFriendlyError = (error: unknown, fallback?: string): string => {
   const code = errorCode(error)
   if (code) {
     const known =
-      AUTH_MESSAGES[code] ?? FIRESTORE_MESSAGES[code] ?? STORAGE_MESSAGES[code] ?? undefined
+      AUTH_MESSAGES[code] ??
+      GOOGLE_MESSAGES[code] ??
+      FIRESTORE_MESSAGES[code] ??
+      STORAGE_MESSAGES[code] ??
+      undefined
     if (known) return known
   }
 
