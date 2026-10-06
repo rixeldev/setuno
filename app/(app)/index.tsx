@@ -54,7 +54,8 @@ export default function Dashboard() {
   const { t, i18n } = useTranslation()
   const toast = useToast()
   const { profile } = useAuth()
-  const { organization, organizationId, isAdmin, state } = useOrganization()
+  const { organization, organizationId, isAdmin, state, organizationsError, retryOrganizations } =
+    useOrganization()
   const {
     songs,
     setlists,
@@ -124,6 +125,16 @@ export default function Dashboard() {
     )
   }
 
+  // The band list is still resolving: keep the dashboard's shape instead of
+  // flashing the onboarding (“no band”) screen while we wait.
+  if (state === "loading") {
+    return (
+      <ScreenContainer title={t("dashboard.dashboard")} large>
+        <SkeletonList count={3} height={88} />
+      </ScreenContainer>
+    )
+  }
+
   // The signed-in musician: photo when there is one, first letter otherwise,
   // with the name beside it. Opens the profile settings.
   const accountName = profile?.displayName || profile?.email || ""
@@ -156,6 +167,21 @@ export default function Dashboard() {
   // Accounts are not tied to a band: a new user lands here and decides later
   // whether to lead a band or wait for an invitation (docs §7).
   if (state === "needs-organization") {
+    // A band list that could not be read is not "no band": offer a retry
+    // instead of inviting the user to create a duplicate organization.
+    if (organizationsError) {
+      return (
+        <ScreenContainer
+          title={t("dashboard.setupTitle")}
+          subtitle={t("dashboard.setupSubtitle")}
+          large
+          headerTop={account}
+        >
+          <ErrorState message={organizationsError} onRetry={retryOrganizations} />
+        </ScreenContainer>
+      )
+    }
+
     const features = [
       {
         icon: MusicIcon,

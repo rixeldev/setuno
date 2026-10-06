@@ -1,8 +1,17 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 
 import {
   fetchMember,
   fetchOrganization,
+  subscribeMember,
   subscribeMyInvitations,
   subscribeMyOrganizations,
   subscribeOrganization,
@@ -31,8 +40,11 @@ interface OrganizationContextValue {
   invitations: Invitation[]
   /** Set when the invitations query failed (e.g. rules not deployed yet). */
   invitationsError: string | null
+  /** Set when the band list could not be read (the UI offers a retry). */
+  organizationsError: string | null
   switchOrganization: (organizationId: string) => Promise<void>
   refresh: () => Promise<void>
+  retryOrganizations: () => void
 }
 
 const OrganizationContext = createContext<OrganizationContextValue | null>(null)
@@ -47,6 +59,8 @@ interface OrganizationDetail {
 const EMPTY_DETAIL: OrganizationDetail = { id: null, organization: null, member: null }
 const NO_ORGANIZATIONS: OrganizationRef[] = []
 const NO_INVITATIONS: Invitation[] = []
+/** Backoff attempts before a dropped listener surfaces an error to the UI. */
+const BANDS_RETRIES = 4
 
 /**
  * Resolves which organization the user is currently working in, exposes their
@@ -68,6 +82,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [detail, setDetail] = useState<OrganizationDetail>(EMPTY_DETAIL)
   const [invites, setInvites] = useState<Invitation[]>(NO_INVITATIONS)
   const [invitesError, setInvitesError] = useState<string | null>(null)
+  const [bandsError, setBandsError] = useState<string | null>(null)
+  const bandsRetryRef = useRef<(() => void) | null>(null)
 
   const loaded = uid !== null && loadedFor === uid
   const organizations = loaded ? bandRefs : NO_ORGANIZATIONS
@@ -92,60 +108,115 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   // switcher even when they already belong to a band (multi-band membership).
   const invitations = uid !== null ? invites : NO_INVITATIONS
 
-  // 4. Live list of the bands the user belongs to.
+  // 4. Live list of the bands the user belongs to. A dropped listener is
+  // retried with backoff, and a cache-only empty snapshot never counts as an
+  // answer: only a load that truly finished may surface the onboarding screen.
   useEffect(() => {
     if (!uid) return
-    return subscribeMyOrganizations(uid, (items) => {
-      setBandRefs(items)
-      setLoadedFor(uid)
-    })
-  }, [uid])
-
-  // 5. Load the active band document + the caller's membership.
-  //
-  // Offline-first race: right after accepting an invitation the local cache
-  // already shows the new membership, but the server may not have committed
-  // (and rules-approved) the batch yet, so the first read can be denied. Retry
-  // briefly instead of throwing an unhandled permission error.
-  useEffect(() => {
-    if (!activeIdResolved || !uid) return
     let cancelled = false
-    let retry: ReturnType<typeof setTimeout> | null = null
+    let attempts = 0
+    let unsubscribe: () => void = () => undefined
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
 
-    const load = async (attempt: number): Promise<void> => {
-      try {
-        const [nextOrganization, nextMember] = await Promise.all([
-          fetchOrganization(activeIdResolved),
-          fetchMember(activeIdResolved, uid),
-        ])
-        if (!cancelled) {
-          setDetail({ id: activeIdResolved, organization: nextOrganization, member: nextMember })
-        }
-      } catch {
-        if (cancelled || attempt >= 2) return
-        retry = setTimeout(() => void load(attempt + 1), 1500)
-      }
+    const listen = (): void => {
+      unsubscribe()
+      unsubscribe = subscribeMyOrganizations(
+        uid,
+        (items, fromCache) => {
+          if (cancelled) return
+          attempts = 0
+          setBandsError(null)
+          setBandRefs(items)
+          // Wait for the server snapshot when the cache has nothing: the user
+          // may belong to bands this device has never seen.
+          if (!fromCache || items.length > 0) setLoadedFor(uid)
+        },
+        (error) => {
+          if (cancelled) return
+          attempts += 1
+          if (attempts <= BANDS_RETRIES) {
+            retryTimer = setTimeout(listen, Math.min(800 * 2 ** (attempts - 1), 8000))
+            return
+          }
+          setBandsError(toFriendlyError(error, "We couldn't load your bands."))
+          // Keep the app usable with whatever we have; the dashboard offers a
+          // retry instead of pretending the user has no band.
+          setLoadedFor(uid)
+        },
+      )
     }
 
-    void load(0)
+    bandsRetryRef.current = () => {
+      attempts = 0
+      if (retryTimer) clearTimeout(retryTimer)
+      setBandsError(null)
+      listen()
+    }
+
+    listen()
     return () => {
       cancelled = true
-      if (retry) clearTimeout(retry)
+      bandsRetryRef.current = null
+      if (retryTimer) clearTimeout(retryTimer)
+      unsubscribe()
+    }
+  }, [uid])
+
+  // 5. Live band document + the caller's membership. Subscriptions are
+  // cache-first, so on a warm start the name and role are instant; the member
+  // listener is re-created on failure to cover the offline-first race right
+  // after accepting an invitation (the cache shows the new membership before
+  // the server has committed and rules-approved the batch).
+  useEffect(() => {
+    if (!activeIdResolved || !uid) return
+    const organizationId = activeIdResolved
+    let cancelled = false
+    let attempts = 0
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+    let unsubscribeOrganization: () => void = () => undefined
+    let unsubscribeMember: () => void = () => undefined
+
+    const listen = (): void => {
+      unsubscribeOrganization()
+      unsubscribeMember()
+      unsubscribeOrganization = subscribeOrganization(organizationId, (nextOrganization) => {
+        if (cancelled) return
+        setDetail((current) => ({
+          id: organizationId,
+          organization: nextOrganization,
+          member: current.id === organizationId ? current.member : null,
+        }))
+      })
+      unsubscribeMember = subscribeMember(
+        organizationId,
+        uid,
+        (nextMember) => {
+          if (cancelled) return
+          attempts = 0
+          setDetail((current) => ({
+            id: organizationId,
+            organization: current.id === organizationId ? current.organization : null,
+            member: nextMember,
+          }))
+        },
+        () => {
+          if (cancelled) return
+          attempts += 1
+          if (attempts <= BANDS_RETRIES) {
+            retryTimer = setTimeout(listen, Math.min(1200 * 2 ** (attempts - 1), 6000))
+          }
+        },
+      )
+    }
+
+    listen()
+    return () => {
+      cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
+      unsubscribeOrganization()
+      unsubscribeMember()
     }
   }, [activeIdResolved, uid])
-
-  // 6. Live updates for the band document (name/logo/description).
-  useEffect(() => {
-    if (!activeIdResolved) return
-    return subscribeOrganization(activeIdResolved, (next) => {
-      setDetail((current) => ({
-        ...current,
-        id: activeIdResolved,
-        organization: next,
-        member: current.id === activeIdResolved ? current.member : null,
-      }))
-    })
-  }, [activeIdResolved])
 
   // 7. Pending invitations addressed to this user (join flow), always live so
   // an invite can be accepted whether or not the user already has a band.
@@ -181,6 +252,12 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     setDetail({ id: activeIdResolved, organization: nextOrganization, member: nextMember })
   }, [activeIdResolved, uid])
 
+  const retryOrganizations = useCallback(() => {
+    setBandsError(null)
+    setLoadedFor(null)
+    bandsRetryRef.current?.()
+  }, [])
+
   const state: SessionState = !loaded
     ? "loading"
     : organizations.length === 0
@@ -198,8 +275,10 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       organizationId: activeIdResolved,
       invitations,
       invitationsError: invitesError,
+      organizationsError: bandsError,
       switchOrganization,
       refresh,
+      retryOrganizations,
     }),
     [
       state,
@@ -208,9 +287,11 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       member,
       invitations,
       invitesError,
+      bandsError,
       activeIdResolved,
       switchOrganization,
       refresh,
+      retryOrganizations,
     ],
   )
 

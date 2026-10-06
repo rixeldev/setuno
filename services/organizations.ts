@@ -241,6 +241,24 @@ export const fetchMember = async (
   return mapDoc(snapshot, mapMember)
 }
 
+/** Live membership of one user inside a band (role changes included). */
+export const subscribeMember = (
+  organizationId: string | null,
+  uid: string | null,
+  onChange: (member: OrganizationMember | null) => void,
+  onError?: SubscribeErrorHandler,
+): Unsubscribe => {
+  if (!organizationId || !uid) {
+    onChange(null)
+    return () => undefined
+  }
+  return onSnapshot(
+    doc(firestore, paths.member(organizationId, uid)),
+    (snapshot) => onChange(mapDoc(snapshot, mapMember)),
+    (error) => onError?.(error),
+  )
+}
+
 /** Lightweight role lookup used by admin-only UI and guards. */
 export const fetchMemberRole = async (
   organizationId: string,
@@ -326,16 +344,25 @@ export const removeMember = async (
 /** Live list of the organizations a user belongs to (drives the org switcher). */
 export const subscribeMyOrganizations = (
   uid: string | null,
-  onChange: (organizations: OrganizationRef[]) => void,
+  /**
+   * `fromCache` says whether the snapshot came from the local cache only: a
+   * cache-only empty list means "not known yet", which lets the caller hold
+   * the loading state instead of flashing the onboarding screen.
+   */
+  onChange: (organizations: OrganizationRef[], fromCache: boolean) => void,
+  onError?: SubscribeErrorHandler,
 ): Unsubscribe => {
   if (!uid) {
-    onChange([])
+    onChange([], false)
     return () => undefined
   }
   return onSnapshot(
     collection(firestore, paths.userOrganizations(uid)),
-    (snapshot) => onChange(mapDocs(snapshot, mapOrganizationRef)),
-    () => onChange([]),
+    (snapshot) => onChange(mapDocs(snapshot, mapOrganizationRef), snapshot.metadata.fromCache),
+    (error) => {
+      if (onError) onError(error)
+      else onChange([], false)
+    },
   )
 }
 
