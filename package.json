@@ -17,6 +17,7 @@
     "test:integration": "vitest run --project integration",
     "test:all": "vitest run",
     "deploy:rules": "npx firebase-tools@latest deploy --only firestore:rules",
+    "deploy:indexes": "npx firebase-tools@latest deploy --only firestore:indexes",
     "export:web": "expo export --platform web"
   },
   "dependencies": {

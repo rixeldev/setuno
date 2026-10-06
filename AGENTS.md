@@ -80,7 +80,9 @@ npx expo-doctor         # diagnose dependency and config issues
 
 ## Firebase rules deploy
 
-- The Firestore project is pinned in `.firebaserc` (`stage-book-477a6`) and `firebase.json` points at `firestore.rules`; publish with `npx firebase-tools login` (once) then `pnpm deploy:rules`. Collection-group queries (invitations) only work with the recursive-wildcard rule in that file, so deploy rules together with app changes that rely on them.
+- The Firestore project is pinned in `.firebaserc` (`stage-book-477a6`); `firebase.json` maps `firestore.rules` and `firestore.indexes.json`. Publish with `npx firebase-tools login` (once) then `pnpm deploy:rules` and/or `pnpm deploy:indexes`.
+- Collection-group queries (invitations) need BOTH the recursive-wildcard rule in `firestore.rules` and the collection-group index in `firestore.indexes.json`; deploy both together with app changes that rely on them.
+- `firebase deploy --only firestore:indexes` replaces the remote index set with the file, so keep `firestore.indexes.json` up to date before deploying (otherwise unlisted composite indexes are removed).
 
 ## Internationalization
 
