@@ -28,6 +28,11 @@ interface PageHeaderProps {
   /** Large title used on the main tab screens. */
   large?: boolean
   /**
+   * Dense header for reading screens (song reader): single-line 16pt title so
+   * the header stays out of the way of the content.
+   */
+  dense?: boolean
+  /**
    * Typography for the title. Defaults to `display` on large headers and
    * `title` elsewhere; dynamic titles (band names) step it down so they fit.
    */
@@ -50,6 +55,7 @@ export function PageHeader({
   elevated = false,
   style,
   large = false,
+  dense = false,
   titleVariant,
   titleLines = 1,
 }: PageHeaderProps) {
@@ -100,8 +106,8 @@ export function PageHeader({
         <View style={styles.titles}>
           <AppText
             variant={titleStyle}
-            style={compactDisplay ? styles.titleCompact : undefined}
-            numberOfLines={titleLines > 0 ? titleLines : undefined}
+            style={dense ? styles.titleDense : compactDisplay ? styles.titleCompact : undefined}
+            numberOfLines={dense ? 1 : titleLines > 0 ? titleLines : undefined}
           >
             {title}
           </AppText>
@@ -152,6 +158,8 @@ const createStyles = () =>
     },
     // Compact large title for phones (see `compactDisplay` above).
     titleCompact: { fontSize: 25, lineHeight: 29 },
+    // Single-line reading header (see `dense` above).
+    titleDense: { fontSize: Theme.sizes.h3, lineHeight: Theme.sizes.h3 * 1.3 },
     back: {
       width: 40,
       height: 40,

@@ -236,8 +236,7 @@ export default function SongScreen() {
       <PageHeader
         title={song.title}
         subtitle={song.artist || undefined}
-        titleLines={2}
-        titleVariant="heading"
+        dense
         back
         elevated
         right={
