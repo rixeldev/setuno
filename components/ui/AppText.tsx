@@ -36,6 +36,16 @@ const TONE_KEYS: Record<TextTone, ThemeColorKey> = {
   inverse: "onPrimary",
 }
 
+/**
+ * System font size (Android "Font size" / iOS Dynamic Type) scales RN text on
+ * native but not on web — without a cap, big page titles grow until they break
+ * the layout on phones. Regular body text keeps scaling for accessibility.
+ */
+const MAX_FONT_SCALE: Partial<Record<TextVariant, number>> = {
+  display: 1.2,
+  title: 1.3,
+}
+
 /** Typography primitive: one place that owns the type scale. */
 export function AppText({
   variant = "body",
@@ -47,6 +57,7 @@ export function AppText({
   const styles = useThemedStyles(createStyles)
   return (
     <Text
+      maxFontSizeMultiplier={MAX_FONT_SCALE[variant]}
       {...rest}
       style={[styles[variant], { color: Theme.colors[TONE_KEYS[tone]] }, style]}
       // Web: disable the tap highlight so links/rows feel native to both platforms.
