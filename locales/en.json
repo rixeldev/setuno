@@ -293,7 +293,11 @@
     "adminFooter": "You are an admin: you can edit songs, setlists, events and members.",
     "thatEmail": "That email",
     "thisMember": "this member",
-    "thisBand": "this band"
+    "thisBand": "this band",
+    "actions": "Options for {{name}}",
+    "makeAdmin": "Make admin",
+    "makeMember": "Remove admin",
+    "revoke": "Revoke"
   },
   "songs": {
     "songs": "Songs",

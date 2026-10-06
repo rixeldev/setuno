@@ -6,13 +6,14 @@ import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { Avatar } from "@/components/ui/Avatar"
-import { Badge, Card, Chip, Section } from "@/components/ui/Card"
-import { IconButton } from "@/components/ui/Button"
+import { Badge, Card, Chip } from "@/components/ui/Card"
+import { Button, IconButton } from "@/components/ui/Button"
+import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
 import { Dialog } from "@/components/ui/Dialog"
 import { Input } from "@/components/ui/Input"
 import { EmptyState, ErrorState, SkeletonList } from "@/components/ui/States"
 import { useToast } from "@/components/ui/Toast"
-import { CloseIcon, EmailIcon, GroupIcon, PlusIcon, ShieldCheckIcon, TrashIcon } from "@/components/ui/Icons"
+import { DotsIcon, EmailIcon, GroupIcon, PlusIcon } from "@/components/ui/Icons"
 import { ModalScreen } from "@/components/app/ModalScreen"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
@@ -25,8 +26,9 @@ import { validateEmail } from "@/libs/validation"
 import type { OrganizationMember, OrganizationRole } from "@/interfaces"
 
 /**
- * Members and invitations (docs §7, §18): admins invite by email, change roles
- * and remove people; everyone can see who is in the band.
+ * Members and invitations (docs §7, §18): one tidy surface per group. Role and
+ * removal actions live behind a per-member options sheet, so nothing dangerous
+ * happens from a stray tap and the rows stay readable on every platform.
  */
 export default function MembersScreen() {
   const { t } = useTranslation()
@@ -41,6 +43,7 @@ export default function MembersScreen() {
   const [emailError, setEmailError] = useState<string | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [menuMember, setMenuMember] = useState<OrganizationMember | null>(null)
   const [pendingRemoval, setPendingRemoval] = useState<OrganizationMember | null>(null)
 
   const actor = { id: profile?.uid ?? "", name: profile?.displayName || "An admin" }
@@ -48,6 +51,10 @@ export default function MembersScreen() {
     () => invitations.filter((entry) => entry.status === "pending"),
     [invitations],
   )
+
+  /** Only admins manage people, and never themselves nor the band owner. */
+  const canManage = (member: OrganizationMember): boolean =>
+    isAdmin && member.uid !== profile?.uid && member.uid !== organization?.ownerId
 
   const invite = async (): Promise<void> => {
     const problem = validateEmail(email, t("members.thatEmail"))
@@ -130,107 +137,138 @@ export default function MembersScreen() {
 
       {loading ? (
         <SkeletonList count={3} height={72} />
+      ) : members.length === 0 ? (
+        <EmptyState
+          icon={<GroupIcon size={24} color={Theme.colors.primary} />}
+          title={t("organizations.noMembers")}
+          message={isAdmin ? t("members.noMembersAdmin") : t("members.noMembersViewer")}
+          actionLabel={isAdmin ? t("members.inviteSomeone") : undefined}
+          onAction={isAdmin ? () => setInviteOpen(true) : undefined}
+        />
       ) : (
-        <View style={styles.list}>
-          {members.map((member) => (
-            <Card key={member.uid} style={styles.memberRow}>
-              <Avatar
-                photoURL={member.photoURL}
-                name={member.displayName}
-                size={40}
-                accessibilityLabel={`${member.displayName}${member.email ? `, ${member.email}` : ""}`}
-              />
+        <View style={styles.block}>
+          <AppText variant="label" tone="faint">
+            {t("organizations.membersCount", { count: members.length })}
+          </AppText>
+          <Card padded={false} style={styles.surface}>
+            {members.map((member, index) => (
+              <View key={member.uid} style={[styles.row, index > 0 && styles.divider]}>
+                <Avatar
+                  photoURL={member.photoURL}
+                  name={member.displayName}
+                  size={40}
+                  accessibilityLabel={`${member.displayName}${member.email ? `, ${member.email}` : ""}`}
+                />
 
-              <View style={styles.flex}>
-                <View style={styles.nameRow}>
-                  <AppText variant="bodyStrong" numberOfLines={1}>
-                    {member.displayName}
-                  </AppText>
-                  {member.uid === profile?.uid ? <Badge label={t("members.you")} tone="primary" /> : null}
-                  {member.uid === organization?.ownerId ? (
-                    <Badge label={t("organizations.owner")} tone="accent" />
+                <View style={styles.flex}>
+                  <View style={styles.nameRow}>
+                    <AppText variant="bodyStrong" numberOfLines={1}>
+                      {member.displayName}
+                    </AppText>
+                    {member.uid === profile?.uid ? (
+                      <Badge label={t("members.you")} tone="primary" />
+                    ) : null}
+                    {member.uid === organization?.ownerId ? (
+                      <Badge label={t("organizations.owner")} tone="accent" />
+                    ) : null}
+                  </View>
+                  {member.email ? (
+                    <AppText variant="caption" tone="muted" numberOfLines={1}>
+                      {member.email}
+                    </AppText>
+                  ) : null}
+                  {member.joinedAt ? (
+                    <AppText variant="caption" tone="faint" numberOfLines={1}>
+                      {t("members.joined", { time: formatRelativeTime(toDate(member.joinedAt)) })}
+                    </AppText>
                   ) : null}
                 </View>
-                {member.email ? (
-                  <AppText variant="caption" tone="muted" numberOfLines={1}>
-                    {member.email}
-                  </AppText>
-                ) : null}
-                {member.joinedAt ? (
-                  <AppText variant="caption" tone="faint">
-                    {t("members.joined", { time: formatRelativeTime(toDate(member.joinedAt)) })}
-                  </AppText>
-                ) : null}
-              </View>
 
-              {isAdmin ? (
-                <View style={styles.actions}>
-                  <Chip
-                    label={t(`organizations.${member.role}`)}
-                    tone={member.role === "admin" ? "primary" : "default"}
-                    onPress={() => void changeRole(member, member.role === "admin" ? "member" : "admin")}
-                    accessibilityLabel={t("members.roleA11y", {
-                      name: member.displayName,
-                      role: t(`organizations.${member.role}`),
-                    })}
-                  />
-                  {member.uid !== profile?.uid ? (
-                    <IconButton
-                      label={t("members.removeA11y", { name: member.displayName })}
-                      size={32}
-                      onPress={() => setPendingRemoval(member)}
-                      icon={<TrashIcon size={16} color={Theme.colors.danger} />}
-                    />
-                  ) : null}
-                </View>
-              ) : (
                 <Badge
                   label={t(`organizations.${member.role}`)}
                   tone={member.role === "admin" ? "primary" : "default"}
                 />
-              )}
-            </Card>
-          ))}
+                {canManage(member) ? (
+                  <IconButton
+                    label={t("members.actions", { name: member.displayName })}
+                    size={32}
+                    onPress={() => setMenuMember(member)}
+                    icon={<DotsIcon size={16} color={Theme.colors.textMuted} />}
+                  />
+                ) : null}
+              </View>
+            ))}
+          </Card>
         </View>
       )}
 
-      {isAdmin ? (
-        <Section
-          title={t("members.pendingInvitations")}
-          subtitle={
-            pendingInvitations.length > 0
-              ? t("members.openInvites", { count: pendingInvitations.length })
-              : undefined
-          }
-        >
-          {pendingInvitations.length === 0 ? (
-            <AppText variant="caption" tone="faint">
-              {t("organizations.noInvites")}
-            </AppText>
-          ) : (
-            pendingInvitations.map((invitation) => (
-              <Card key={invitation.id} style={styles.inviteRow}>
+      {isAdmin && pendingInvitations.length > 0 ? (
+        <View style={styles.block}>
+          <AppText variant="label" tone="faint">
+            {t("members.pendingInvitations")}
+          </AppText>
+          <Card padded={false} style={styles.surface}>
+            {pendingInvitations.map((invitation, index) => (
+              <View key={invitation.id} style={[styles.row, index > 0 && styles.divider]}>
                 <EmailIcon size={16} color={Theme.colors.accent} />
                 <View style={styles.flex}>
                   <AppText variant="body" numberOfLines={1}>
                     {invitation.email}
                   </AppText>
-                  <AppText variant="caption" tone="muted">
-                    {t("auth.invitedBy", { name: invitation.invitedByName || t("common.unknownAdmin") })} ·{" "}
-                    {t(`organizations.${invitation.role}`)}
+                  <AppText variant="caption" tone="muted" numberOfLines={1}>
+                    {t("auth.invitedBy", {
+                      name: invitation.invitedByName || t("common.unknownAdmin"),
+                    })}{" "}
+                    · {t(`organizations.${invitation.role}`)}
                   </AppText>
                 </View>
-                <IconButton
-                  label={t("members.revokeA11y", { email: invitation.email })}
-                  size={32}
+                <Button
+                  label={t("members.revoke")}
+                  size="sm"
+                  variant="ghost"
+                  accessibilityHint={t("members.revokeA11y", { email: invitation.email })}
                   onPress={() => void revoke(invitation.id, invitation.email)}
-                  icon={<CloseIcon size={16} color={Theme.colors.danger} />}
                 />
-              </Card>
-            ))
-          )}
-        </Section>
+              </View>
+            ))}
+          </Card>
+        </View>
       ) : null}
+
+      <AppText variant="caption" tone="faint">
+        {isAdmin
+          ? t("members.adminFooter")
+          : t("members.yourRole", { role: t(`organizations.${role ?? "member"}`).toLowerCase() })}
+      </AppText>
+
+      <BottomSheet
+        visible={menuMember !== null}
+        onClose={() => setMenuMember(null)}
+        title={menuMember?.displayName ?? ""}
+        subtitle={menuMember ? t(`organizations.${menuMember.role}`) : undefined}
+      >
+        {menuMember ? (
+          <>
+            <SheetOptionRow
+              label={
+                menuMember.role === "admin" ? t("members.makeMember") : t("members.makeAdmin")
+              }
+              onPress={() => {
+                const member = menuMember
+                setMenuMember(null)
+                void changeRole(member, member.role === "admin" ? "member" : "admin")
+              }}
+            />
+            <SheetOptionRow
+              label={t("organizations.removeMember")}
+              onPress={() => {
+                setPendingRemoval(menuMember)
+                setMenuMember(null)
+              }}
+            />
+          </>
+        ) : null}
+      </BottomSheet>
 
       <Dialog
         visible={inviteOpen}
@@ -277,38 +315,23 @@ export default function MembersScreen() {
         confirmLoading={busy}
         onConfirm={() => void remove()}
       />
-
-      {!loading && members.length === 0 ? (
-        <EmptyState
-          icon={<GroupIcon size={24} color={Theme.colors.primary} />}
-          title={t("organizations.noMembers")}
-          message={isAdmin ? t("members.noMembersAdmin") : t("members.noMembersViewer")}
-          actionLabel={isAdmin ? t("members.inviteSomeone") : undefined}
-          onAction={isAdmin ? () => setInviteOpen(true) : undefined}
-        />
-      ) : null}
-
-      {!isAdmin ? (
-        <AppText variant="caption" tone="faint">
-          {t("organizations.membersCount", { count: members.length })} ·{" "}
-          {t("members.yourRole", { role: t(`organizations.${role ?? "member"}`).toLowerCase() })}.
-        </AppText>
-      ) : (
-        <AppText variant="caption" tone="faint">
-          <ShieldCheckIcon size={12} color={Theme.colors.textFaint} /> {t("members.adminFooter")}
-        </AppText>
-      )}
     </ModalScreen>
   )
 }
 
 const createStyles = () =>
   StyleSheet.create({
-    list: { gap: Theme.spacing.m },
-    memberRow: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.m },
-    inviteRow: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.m },
+    block: { gap: Theme.spacing.s },
+    surface: { overflow: "hidden" },
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.m,
+      paddingHorizontal: Theme.spacing.l,
+      paddingVertical: Theme.spacing.m,
+    },
+    divider: { borderTopWidth: 1, borderTopColor: Theme.colors.borderSoft },
     flex: { flex: 1, minWidth: 0 },
     nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-    actions: { flexDirection: "row", alignItems: "center", gap: 4 },
     roleRow: { gap: 6 },
   })

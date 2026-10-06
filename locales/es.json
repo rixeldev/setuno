@@ -895,7 +895,11 @@
     "adminFooter": "Eres admin: puedes editar canciones, listas, eventos y miembros.",
     "thatEmail": "Ese correo",
     "thisMember": "este miembro",
-    "thisBand": "esta banda"
+    "thisBand": "esta banda",
+    "actions": "Opciones de {{name}}",
+    "makeAdmin": "Hacer admin",
+    "makeMember": "Quitar admin",
+    "revoke": "Revocar"
   },
   "toasts": {
     "languageUpdated": "Idioma actualizado",
