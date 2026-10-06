@@ -683,7 +683,12 @@
     "createSetlist": "Create setlist",
     "discardWhat": "changes to this setlist",
     "usedInShows": "Events using this setlist",
-    "noShowsYet": "This setlist is not attached to any event yet."
+    "noShowsYet": "This setlist is not attached to any event yet.",
+    "manage": "Setlist options",
+    "editOrder": "Edit running order",
+    "editOrderHint": "Add, remove or reorder songs",
+    "moreShows_one": "+{{count}} more event",
+    "moreShows_other": "+{{count}} more events"
   },
   "performances": {
     "performances": "Events",

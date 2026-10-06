@@ -626,7 +626,12 @@
     "createSetlist": "Crear lista",
     "discardWhat": "cambios en esta lista",
     "usedInShows": "Eventos con esta lista",
-    "noShowsYet": "Esta lista aún no está vinculada a ningún evento."
+    "noShowsYet": "Esta lista aún no está vinculada a ningún evento.",
+    "manage": "Opciones de la lista",
+    "editOrder": "Editar el orden",
+    "editOrderHint": "Añade, quita o reordena canciones",
+    "moreShows_one": "+{{count}} evento más",
+    "moreShows_other": "+{{count}} eventos más"
   },
   "performances": {
     "performances": "Eventos",

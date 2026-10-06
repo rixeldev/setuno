@@ -6,20 +6,14 @@ import { useTranslation } from "react-i18next"
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
-import { Badge, Card, Section } from "@/components/ui/Card"
+import { Badge, Card } from "@/components/ui/Card"
 import { Button, IconButton } from "@/components/ui/Button"
+import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
 import { Dialog } from "@/components/ui/Dialog"
 import { EmptyState } from "@/components/ui/States"
 import { SearchInput } from "@/components/ui/Input"
 import { useToast } from "@/components/ui/Toast"
-import {
-  CloseIcon,
-  CopyListIcon,
-  EditIcon,
-  MusicIcon,
-  PlusIcon,
-  TrashIcon,
-} from "@/components/ui/Icons"
+import { CloseIcon, DotsIcon, MusicIcon, PlusIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
@@ -31,11 +25,11 @@ import type { RelativeDayLabels } from "@/libs/format"
 import { formatDateRange, formatDuration, formatDurationLong, formatRelativeDay } from "@/libs/format"
 import { parseIsoDate } from "@/libs/validation"
 import { estimateDurationSec } from "@/libs/songUtils"
-import { PERFORMANCE_STATUS_TONES } from "@/components/performances/PerformanceCard"
 
 /**
- * Setlist detail (docs §20): the running order with move up/down, an add-song
- * picker, a running duration and admin actions.
+ * Setlist detail (docs §20), built for playing live: the running order is the
+ * screen, rows open the song, and every management action (reorder, add,
+ * duplicate, delete…) stays behind the options sheet and an edit mode.
  */
 export default function SetlistDetail() {
   const { t, i18n } = useTranslation()
@@ -54,6 +48,8 @@ export default function SetlistDetail() {
   const { organizationId, isAdmin } = useOrganization()
   const { setlists, songs, songLibrary, performances } = useOrgData()
 
+  const [editing, setEditing] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -181,98 +177,53 @@ export default function SetlistDetail() {
   const candidates = filterSongs(songs, { ...EMPTY_FILTERS, search }).filter(
     (song) => !setlist.songs.some((entry) => entry.songId === song.id),
   )
+  const runsLabel = t("setlists.songsCount", {
+    count: setlist.songs.length,
+    duration: formatDurationLong(setlist.estimatedDurationSec),
+  })
+  const dateLabel = setlist.date ? formatRelativeDay(parseIsoDate(setlist.date), dayLabels) : ""
+  const hasNotes = setlist.description.trim().length > 0 || setlist.notes.trim().length > 0
 
   return (
     <ScreenContainer
       back
       title={setlist.name}
-      subtitle={
-        setlist.date
-          ? formatRelativeDay(parseIsoDate(setlist.date), dayLabels)
-          : t("organizations.songsCount", { count: setlist.songs.length })
-      }
+      subtitle={[dateLabel, runsLabel].filter(Boolean).join(" · ")}
       large
+      titleLines={2}
       headerRight={
-        <View style={styles.headerActions}>
-          {isAdmin ? (
-            <>
-              <IconButton
-                label={t("setlists.editSetlist")}
-                onPress={() => router.push(`/setlists/${setlist.id}/edit`)}
-                icon={<EditIcon size={18} color={Theme.colors.textMuted} />}
-              />
-              <IconButton
-                label={t("setlists.duplicate")}
-                onPress={() => void duplicate()}
-                icon={<CopyListIcon size={18} color={Theme.colors.textMuted} />}
-              />
-              <IconButton
-                label={t("setlists.deleteSetlist")}
-                variant="danger"
-                onPress={() => setConfirmDelete(true)}
-                icon={<TrashIcon size={18} color={Theme.colors.danger} />}
-              />
-            </>
-          ) : null}
-        </View>
+        isAdmin ? (
+          editing ? (
+            <Button
+              label={t("common.done")}
+              size="sm"
+              variant="ghost"
+              onPress={() => setEditing(false)}
+            />
+          ) : (
+            <IconButton
+              label={t("setlists.manage")}
+              onPress={() => setMenuOpen(true)}
+              icon={<DotsIcon size={18} color={Theme.colors.textMuted} />}
+            />
+          )
+        ) : null
       }
-      toolbar={
-        <Card style={styles.summary}>
-          <View style={styles.summaryRow}>
-            <View style={styles.flex}>
-              <AppText variant="caption" tone="faint">
-                {t("setlists.runningTime")}
-              </AppText>
-              <AppText variant="subheading">{formatDurationLong(setlist.estimatedDurationSec)}</AppText>
-            </View>
-            <View style={styles.flex}>
-              <AppText variant="caption" tone="faint">
-                {t("setlists.songs")}
-              </AppText>
-              <AppText variant="subheading">{setlist.songs.length}</AppText>
-            </View>
-          </View>
+    >
+      {hasNotes ? (
+        <View style={styles.notes}>
           {setlist.description.trim().length > 0 ? (
             <AppText variant="body" tone="muted">
               {setlist.description}
             </AppText>
           ) : null}
           {setlist.notes.trim().length > 0 ? (
-            <AppText variant="caption" tone="muted">
+            <AppText variant="caption" tone="faint">
               {setlist.notes}
             </AppText>
           ) : null}
-        </Card>
-      }
-    >
-      <Section title={t("setlists.usedInShows")}>
-        {relatedShows.length === 0 ? (
-          <AppText variant="caption" tone="faint">
-            {t("setlists.noShowsYet")}
-          </AppText>
-        ) : (
-          relatedShows.slice(0, 4).map((performance) => (
-            <Card
-              key={performance.id}
-              onPress={() => router.push(`/performances/${performance.id}`)}
-              style={styles.showRow}
-            >
-              <View style={styles.flex}>
-                <AppText variant="bodyStrong" numberOfLines={1}>
-                  {performance.name}
-                </AppText>
-                <AppText variant="caption" tone="muted" numberOfLines={1}>
-                  {formatDateRange(performance.date, performance.endDate, i18n.language)}
-                </AppText>
-              </View>
-              <Badge
-                label={t(`performances.${performance.status}`)}
-                tone={PERFORMANCE_STATUS_TONES[performance.status]}
-              />
-            </Card>
-          ))
-        )}
-      </Section>
+        </View>
+      ) : null}
 
       {setlist.songs.length === 0 ? (
         <EmptyState
@@ -283,86 +234,151 @@ export default function SetlistDetail() {
           onAction={isAdmin ? () => setPickerOpen(true) : undefined}
         />
       ) : (
-        <View style={styles.list}>
+        <Card padded={false} style={styles.listCard}>
           {setlist.songs.map((entry, index) => {
             const song = songLibrary.get(entry.songId)
             const seconds = song ? (song.durationSec ?? estimateDurationSec(song.sections)) : null
             return (
-              <Card key={`${entry.songId}-${index}`} padded={false} style={styles.songCard}>
-                <View style={styles.songRow}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t("setlists.openSong", { title: entry.title })}
-                    onPress={() => router.push(`/songs/${entry.songId}`)}
-                    style={styles.songMain}
-                  >
-                    <AppText variant="caption" tone="faint" style={styles.order}>
-                      {index + 1}
+              <View
+                key={`${entry.songId}-${index}`}
+                style={[styles.songRow, index > 0 && styles.songDivider]}
+              >
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("setlists.openSong", { title: entry.title })}
+                  onPress={() => router.push(`/songs/${entry.songId}`)}
+                  style={({ pressed }) => [styles.songMain, pressed && styles.pressed]}
+                >
+                  <AppText variant="caption" tone="faint" style={styles.order}>
+                    {index + 1}
+                  </AppText>
+                  <View style={styles.flex}>
+                    <AppText variant="bodyStrong" numberOfLines={1}>
+                      {entry.title}
                     </AppText>
-                    <View style={styles.flex}>
-                      <AppText variant="bodyStrong" numberOfLines={1}>
-                        {entry.title}
-                      </AppText>
-                      <AppText variant="caption" tone="muted" numberOfLines={1}>
-                        {[entry.artist || t("common.unknownArtist"), entry.key, formatDuration(seconds)]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </AppText>
-                    </View>
-                  </Pressable>
+                    <AppText variant="caption" tone="muted" numberOfLines={1}>
+                      {[entry.artist || t("common.unknownArtist"), formatDuration(seconds)]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </AppText>
+                  </View>
+                  {entry.key ? <Badge label={entry.key} tone="accent" /> : null}
+                </Pressable>
 
-                  {isAdmin ? (
-                    <View style={styles.rowActions}>
-                      <IconButton
-                        label={t("setlists.moveUp")}
-                        size={30}
-                        disabled={index === 0}
-                        onPress={() => move(index, -1)}
-                        icon={
-                          <AppText
-                            variant="bodyStrong"
-                            tone={index === 0 ? "faint" : "muted"}
-                          >
-                            ↑
-                          </AppText>
-                        }
-                      />
-                      <IconButton
-                        label={t("setlists.moveDown")}
-                        size={30}
-                        disabled={index === setlist.songs.length - 1}
-                        onPress={() => move(index, 1)}
-                        icon={
-                          <AppText
-                            variant="bodyStrong"
-                            tone={index === setlist.songs.length - 1 ? "faint" : "muted"}
-                          >
-                            ↓
-                          </AppText>
-                        }
-                      />
-                      <IconButton
-                        label={t("setlists.removeFromSetlist")}
-                        size={30}
-                        onPress={() => removeSong(entry.songId)}
-                        icon={<CloseIcon size={16} color={Theme.colors.danger} />}
-                      />
-                    </View>
-                  ) : null}
-                </View>
-              </Card>
+                {editing ? (
+                  <View style={styles.rowActions}>
+                    <IconButton
+                      label={t("setlists.moveUp")}
+                      size={30}
+                      disabled={index === 0}
+                      onPress={() => move(index, -1)}
+                      icon={
+                        <AppText variant="bodyStrong" tone={index === 0 ? "faint" : "muted"}>
+                          ↑
+                        </AppText>
+                      }
+                    />
+                    <IconButton
+                      label={t("setlists.moveDown")}
+                      size={30}
+                      disabled={index === setlist.songs.length - 1}
+                      onPress={() => move(index, 1)}
+                      icon={
+                        <AppText
+                          variant="bodyStrong"
+                          tone={index === setlist.songs.length - 1 ? "faint" : "muted"}
+                        >
+                          ↓
+                        </AppText>
+                      }
+                    />
+                    <IconButton
+                      label={t("setlists.removeFromSetlist")}
+                      size={30}
+                      onPress={() => removeSong(entry.songId)}
+                      icon={<CloseIcon size={15} color={Theme.colors.danger} />}
+                    />
+                  </View>
+                ) : null}
+              </View>
             )
           })}
-        </View>
+        </Card>
       )}
 
-      {isAdmin ? (
+      {isAdmin && editing ? (
         <Button
           label={t("setlists.addSongs")}
           icon={<PlusIcon size={16} color={Theme.colors.onPrimary} />}
           onPress={() => setPickerOpen(true)}
         />
       ) : null}
+
+      {relatedShows.length > 0 ? (
+        <View style={styles.shows}>
+          <AppText variant="label" tone="faint">
+            {t("setlists.usedInShows")}
+          </AppText>
+          {relatedShows.slice(0, 3).map((performance) => (
+            <Pressable
+              key={performance.id}
+              accessibilityRole="button"
+              accessibilityLabel={performance.name}
+              onPress={() => router.push(`/performances/${performance.id}`)}
+              style={({ pressed }) => [styles.showLine, pressed && styles.pressed]}
+            >
+              <AppText variant="caption" tone="muted" numberOfLines={1} style={styles.flex}>
+                {performance.name}
+              </AppText>
+              <AppText variant="caption" tone="faint" numberOfLines={1}>
+                {formatDateRange(performance.date, performance.endDate, i18n.language)}
+              </AppText>
+            </Pressable>
+          ))}
+          {relatedShows.length > 3 ? (
+            <AppText variant="caption" tone="faint">
+              {t("setlists.moreShows", { count: relatedShows.length - 3 })}
+            </AppText>
+          ) : null}
+        </View>
+      ) : null}
+
+      <BottomSheet
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        title={setlist.name}
+        subtitle={runsLabel}
+      >
+        <SheetOptionRow
+          label={t("setlists.editOrder")}
+          hint={t("setlists.editOrderHint")}
+          onPress={() => {
+            setMenuOpen(false)
+            setEditing(true)
+          }}
+        />
+        <SheetOptionRow
+          label={t("setlists.editSetlist")}
+          onPress={() => {
+            setMenuOpen(false)
+            router.push(`/setlists/${setlist.id}/edit`)
+          }}
+        />
+        <SheetOptionRow
+          label={t("setlists.duplicate")}
+          onPress={() => {
+            setMenuOpen(false)
+            void duplicate()
+          }}
+        />
+        <SheetOptionRow
+          label={t("setlists.deleteSetlist")}
+          onPress={() => {
+            setMenuOpen(false)
+            setConfirmDelete(true)
+          }}
+        />
+      </BottomSheet>
 
       <Dialog
         visible={pickerOpen}
@@ -425,24 +441,29 @@ export default function SetlistDetail() {
 
 const createStyles = () =>
   StyleSheet.create({
-    headerActions: { flexDirection: "row", alignItems: "center", gap: 2 },
-    summary: { gap: Theme.spacing.s },
-    summaryRow: { flexDirection: "row", gap: Theme.spacing.l },
     flex: { flex: 1, minWidth: 0 },
-    showRow: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.s },
-    list: { gap: Theme.spacing.m },
-    songCard: { overflow: "hidden" },
-    songRow: { flexDirection: "row", alignItems: "center" },
-    songMain: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.m, padding: Theme.spacing.m, flex: 1 },
-    order: {
-      width: 24,
-      textAlign: "center",
-      paddingVertical: 3,
-      borderRadius: Theme.radii.pill,
-      backgroundColor: Theme.colors.surfaceHigh,
-      overflow: "hidden",
+    notes: {
+      gap: Theme.spacing.s,
+      borderLeftWidth: 2,
+      borderLeftColor: Theme.colors.primary,
+      paddingLeft: Theme.spacing.m,
     },
+    listCard: { overflow: "hidden" },
+    songRow: { flexDirection: "row", alignItems: "center" },
+    songDivider: { borderTopWidth: 1, borderTopColor: Theme.colors.borderSoft },
+    songMain: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.m,
+      paddingVertical: Theme.spacing.m,
+      paddingLeft: Theme.spacing.l,
+    },
+    order: { width: 20, textAlign: "right" },
     rowActions: { flexDirection: "row", alignItems: "center", paddingRight: Theme.spacing.xs },
+    shows: { gap: Theme.spacing.xs },
+    showLine: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.m },
+    pressed: { opacity: 0.7 },
     pickerList: { maxHeight: 320, width: "100%" },
     pickerRow: {
       flexDirection: "row",
@@ -452,5 +473,4 @@ const createStyles = () =>
       borderBottomWidth: 1,
       borderBottomColor: Theme.colors.border,
     },
-    pressed: { opacity: 0.7 },
   })
