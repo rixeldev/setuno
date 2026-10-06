@@ -125,30 +125,57 @@ export default function MoreScreen() {
                 item.badge === "suggestions" && pendingSuggestions.length > 0
                   ? t("common.newCount", { count: pendingSuggestions.length })
                   : null
+              // Settings reads better as a full-width row; the rest stay as tiles.
+              const horizontal = item.href === "/settings"
               return (
                 <Pressable
                   key={item.href}
                   accessibilityRole="button"
                   accessibilityLabel={hint ? `${t(item.label)}. ${hint}` : t(item.label)}
                   onPress={() => router.push(item.href as never)}
-                  style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
+                  style={({ pressed }) => [
+                    styles.tile,
+                    horizontal && styles.tileRow,
+                    pressed && styles.tilePressed,
+                  ]}
                 >
-                  <View style={styles.tileHeader}>
-                    <View style={styles.tileIcon}>
-                      <Icon size={20} color={Theme.colors.primary} />
-                    </View>
-                    {hint ? <Badge label={hint} tone="accent" /> : null}
-                  </View>
-                  <View style={styles.tileText}>
-                    <AppText variant="bodyStrong" numberOfLines={1}>
-                      {t(item.label)}
-                    </AppText>
-                    {item.description ? (
-                      <AppText variant="caption" tone="faint" numberOfLines={2}>
-                        {t(item.description)}
-                      </AppText>
-                    ) : null}
-                  </View>
+                  {horizontal ? (
+                    <>
+                      <View style={styles.tileIcon}>
+                        <Icon size={20} color={Theme.colors.primary} />
+                      </View>
+                      <View style={styles.tileTextRow}>
+                        <AppText variant="bodyStrong" numberOfLines={1}>
+                          {t(item.label)}
+                        </AppText>
+                        {item.description ? (
+                          <AppText variant="caption" tone="faint" numberOfLines={1}>
+                            {t(item.description)}
+                          </AppText>
+                        ) : null}
+                      </View>
+                      <ChevronRightIcon size={18} color={Theme.colors.textFaint} />
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.tileHeader}>
+                        <View style={styles.tileIcon}>
+                          <Icon size={20} color={Theme.colors.primary} />
+                        </View>
+                        {hint ? <Badge label={hint} tone="accent" /> : null}
+                      </View>
+                      <View style={styles.tileText}>
+                        <AppText variant="bodyStrong" numberOfLines={1}>
+                          {t(item.label)}
+                        </AppText>
+                        {item.description ? (
+                          <AppText variant="caption" tone="faint" numberOfLines={2}>
+                            {t(item.description)}
+                          </AppText>
+                        ) : null}
+                      </View>
+                    </>
+                  )}
                 </Pressable>
               )
             })}
@@ -236,6 +263,18 @@ const createStyles = () =>
       ...Theme.shadows.sm,
     },
     tilePressed: { opacity: 0.75 },
+    // Full-width horizontal variant (settings): icon, texts, chevron.
+    tileRow: {
+      flexBasis: "100%",
+      flexGrow: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "flex-start",
+      minHeight: 0,
+      gap: Theme.spacing.m,
+      paddingVertical: Theme.spacing.m,
+    },
+    tileTextRow: { flex: 1, minWidth: 0, gap: 2 },
     tileHeader: {
       flexDirection: "row",
       alignItems: "center",
