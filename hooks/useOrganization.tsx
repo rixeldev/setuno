@@ -102,17 +102,35 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   }, [uid])
 
   // 5. Load the active band document + the caller's membership.
+  //
+  // Offline-first race: right after accepting an invitation the local cache
+  // already shows the new membership, but the server may not have committed
+  // (and rules-approved) the batch yet, so the first read can be denied. Retry
+  // briefly instead of throwing an unhandled permission error.
   useEffect(() => {
     if (!activeIdResolved || !uid) return
     let cancelled = false
-    void Promise.all([
-      fetchOrganization(activeIdResolved),
-      fetchMember(activeIdResolved, uid),
-    ]).then(([nextOrganization, nextMember]) => {
-      if (!cancelled) setDetail({ id: activeIdResolved, organization: nextOrganization, member: nextMember })
-    })
+    let retry: ReturnType<typeof setTimeout> | null = null
+
+    const load = async (attempt: number): Promise<void> => {
+      try {
+        const [nextOrganization, nextMember] = await Promise.all([
+          fetchOrganization(activeIdResolved),
+          fetchMember(activeIdResolved, uid),
+        ])
+        if (!cancelled) {
+          setDetail({ id: activeIdResolved, organization: nextOrganization, member: nextMember })
+        }
+      } catch {
+        if (cancelled || attempt >= 2) return
+        retry = setTimeout(() => void load(attempt + 1), 1500)
+      }
+    }
+
+    void load(0)
     return () => {
       cancelled = true
+      if (retry) clearTimeout(retry)
     }
   }, [activeIdResolved, uid])
 
