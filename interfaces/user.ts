@@ -38,6 +38,8 @@ export interface UserProfile {
   activeOrganizationId: string | null
   preferences: UserPreferences
   onboarded: boolean
+  /** When the username was last changed (null: never). One change per 3 months. */
+  usernameChangedAt: TimestampLike | null
   createdAt: TimestampLike
   updatedAt: TimestampLike
 }

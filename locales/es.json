@@ -806,7 +806,10 @@
     "photoA11y": "Foto de perfil de {{name}}",
     "saveProfile": "Guardar perfil",
     "removePhotoTitle": "¿Quitar tu foto?",
-    "removePhotoDescription": "Tus compañeros verán tus iniciales en su lugar."
+    "removePhotoDescription": "Tus compañeros verán tus iniciales en su lugar.",
+    "usernameHint": "Único, y solo se puede cambiar una vez cada 3 meses.",
+    "usernameTaken": "Ese nombre ya está en uso.",
+    "usernameTooSoon": "Solo puedes cambiar tu nombre una vez cada 3 meses."
   },
   "organizations": {
     "bands": "Bandas",
@@ -867,7 +870,8 @@
     "joinBand": "Unirse a la banda",
     "createAnotherBand": "Crear otra banda",
     "bandSwitched": "Banda cambiada.",
-    "couldNotSwitch": "No pudimos cambiar de banda."
+    "couldNotSwitch": "No pudimos cambiar de banda.",
+    "invitationHint": "Sin invitaciones pendientes. Cuando una banda invite a {{email}}, aparecerá aquí para unirte con un toque."
   },
   "members": {
     "inviteSomeone": "Invitar a alguien",

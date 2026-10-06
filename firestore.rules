@@ -103,8 +103,11 @@ service cloud.firestore {
       allow create: if isSelf(uid)
         && request.resource.data.keys().hasOnly([
           'uid', 'displayName', 'email', 'photoURL', 'organizationIds',
-          'activeOrganizationId', 'preferences', 'onboarded', 'createdAt', 'updatedAt'
-        ]);
+          'activeOrganizationId', 'preferences', 'onboarded', 'createdAt', 'updatedAt',
+          'usernameChangedAt'
+        ])
+        // New accounts must own the claim for their (lowercased) username.
+        && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.displayName.lower())).data.uid == request.auth.uid;
 
       allow update: if isSelf(uid)
         // The email mirrors the auth identity: it may be (re)written but only to
@@ -112,8 +115,22 @@ service cloud.firestore {
         && request.resource.data.email == tokenEmail()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'uid', 'displayName', 'email', 'photoURL', 'preferences',
-          'onboarded', 'activeOrganizationId', 'organizationIds', 'updatedAt'
-        ]);
+          'onboarded', 'activeOrganizationId', 'organizationIds', 'updatedAt',
+          'usernameChangedAt'
+        ])
+        && (
+          request.resource.data.displayName == resource.data.displayName
+          || (
+            // Renaming: stamp the change, respect the three-month cooldown and
+            // make sure the caller owns the claim for the new name.
+            request.resource.data.usernameChangedAt == request.time
+            && (
+              resource.data.get('usernameChangedAt', null) == null
+              || resource.data.get('usernameChangedAt', null) + duration.value(90, 'd') <= request.time
+            )
+            && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.displayName.lower())).data.uid == request.auth.uid
+          )
+        );
 
       allow delete: if false;
 
@@ -133,6 +150,21 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasAll(['name', 'role', 'logoURL', 'joinedAt']);
         allow delete: if isSelf(uid);
       }
+    }
+
+    // ------------------------------------------------------------- usernames
+    //
+    // Public (signed-in) registry of name claims, keyed by the lowercased name.
+    // Claiming is an atomic create, so `Rixel` and `rixel` can never belong to
+    // two accounts. Renames are a batch that claims the new key and releases the
+    // old one (see `services/usernames.ts`).
+    match /usernames/{name} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
     // ------------------------------------------- invitations (collection group)

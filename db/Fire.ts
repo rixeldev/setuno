@@ -79,6 +79,8 @@ export const firestore = createFirestore(app as FirebaseApp)
 export const paths = {
   users: "users",
   user: (uid: string) => `users/${uid}`,
+  /** Public claim registry: usernames/{lowercased, trimmed name}. */
+  username: (name: string) => `usernames/${name}`,
   userOrganizations: (uid: string) => `users/${uid}/organizations`,
   userOrganization: (uid: string, orgId: string) => `users/${uid}/organizations/${orgId}`,
   organizations: "organizations",

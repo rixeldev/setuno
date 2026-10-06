@@ -265,7 +265,8 @@
     "joinBand": "Join band",
     "createAnotherBand": "Create another band",
     "bandSwitched": "Band switched.",
-    "couldNotSwitch": "We couldn't switch bands."
+    "couldNotSwitch": "We couldn't switch bands.",
+    "invitationHint": "No pending invitations. When a band invites {{email}}, it will show up here to join with one tap."
   },
   "members": {
     "inviteSomeone": "Invite someone",
@@ -938,7 +939,10 @@
     "photoA11y": "Profile photo of {{name}}",
     "saveProfile": "Save profile",
     "removePhotoTitle": "Remove your photo?",
-    "removePhotoDescription": "Your band members will see your initials instead."
+    "removePhotoDescription": "Your band members will see your initials instead.",
+    "usernameHint": "Unique, and only changeable once every 3 months.",
+    "usernameTaken": "That name is already taken.",
+    "usernameTooSoon": "You can only change your name once every 3 months."
   },
   "activity": {
     "songCreated": "{{actor}} added \"{{target}}\"",

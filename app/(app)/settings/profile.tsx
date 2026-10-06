@@ -17,9 +17,12 @@ import { ModalScreen } from "@/components/app/ModalScreen"
 import { useAuth } from "@/hooks/useAuth"
 import { toFriendlyError } from "@/services/errors"
 import { updateAuthDisplayName, updateAuthPhotoUrl } from "@/services/auth"
+import { changeUsername, isUsernameTaken } from "@/services/usernames"
 import { uploadImage } from "@/services/uploads"
 import { validateRequired } from "@/libs/validation"
+import { canChangeUsername, normalizeUsername } from "@/libs/username"
 import { pickImageBase64 } from "@/libs/imagePicker"
+import { toDate } from "@/interfaces/timestamp"
 
 /** Profile settings (docs §32): the name and photo the band sees. */
 export default function ProfileSettings() {
@@ -55,13 +58,37 @@ export default function ProfileSettings() {
 
   const save = async (): Promise<void> => {
     const nameError = validateRequired(name, t("auth.nameHint"))
-    setErrors({ ...(nameError ? { name: nameError } : {}) })
-    if (nameError) return
+    if (nameError) {
+      setErrors({ name: nameError })
+      return
+    }
+    setErrors({})
+
+    const normalized = normalizeUsername(name)
+    const current = normalizeUsername(profile?.displayName ?? "")
+    const nameChanged = normalized !== current
+    const lastChangedMs = profile?.usernameChangedAt
+      ? (toDate(profile.usernameChangedAt)?.getTime() ?? null)
+      : null
 
     setSaving(true)
     try {
-      await updateProfile({ displayName: name.trim(), photoURL })
-      await updateAuthDisplayName(name.trim()).catch(() => undefined)
+      if (nameChanged) {
+        // Feedback instead of a failed write: cooldown, then availability.
+        if (!canChangeUsername(lastChangedMs, Date.now())) {
+          setErrors({ name: t("settings.usernameTooSoon") })
+          return
+        }
+        if (await isUsernameTaken(normalized)) {
+          setErrors({ name: t("settings.usernameTaken") })
+          return
+        }
+        if (profile?.uid) {
+          await changeUsername(profile.uid, current, normalized)
+        }
+      }
+      await updateProfile({ displayName: normalized, photoURL })
+      await updateAuthDisplayName(normalized).catch(() => undefined)
       toast.showSuccess(t("settings.profileUpdated"))
       router.back()
     } catch (error) {
@@ -106,6 +133,7 @@ export default function ProfileSettings() {
           value={name}
           onChangeText={setName}
           placeholder={t("settings.displayNamePlaceholder")}
+          hint={t("settings.usernameHint")}
           error={errors.name}
           autoCapitalize="words"
         />

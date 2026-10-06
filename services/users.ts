@@ -19,6 +19,7 @@ import {
 } from "@/interfaces"
 import { applyAccent, applyAppearanceMode, applyAppearance } from "@/services/themeManager"
 import { updateCachedPreferences, writeCachedPreferences } from "@/services/prefs"
+import { claimUsername } from "@/services/usernames"
 import { isAccentId, isAppearanceMode } from "@/libs/appearance"
 
 const mapUser = (data: Record<string, unknown>, id: string): UserProfile =>
@@ -33,6 +34,7 @@ const mapUser = (data: Record<string, unknown>, id: string): UserProfile =>
     activeOrganizationId: (data.activeOrganizationId as string | null) ?? null,
     preferences: { ...DEFAULT_PREFERENCES, ...((data.preferences as Partial<UserPreferences>) ?? {}) },
     onboarded: Boolean(data.onboarded),
+    usernameChangedAt: (data.usernameChangedAt as UserProfile["usernameChangedAt"]) ?? null,
     createdAt: data.createdAt as UserProfile["createdAt"],
     updatedAt: data.updatedAt as UserProfile["updatedAt"],
   }) as UserProfile
@@ -56,14 +58,18 @@ export const ensureUserProfile = async (input: EnsureProfileInput): Promise<User
   const now = serverTimestamp()
 
   if (!snapshot.exists()) {
+    // Brand new account: reserve a unique username first (with a `-1234` suffix
+    // when the plain one is taken), then create the profile that owns it.
+    const username = await claimUsername(input.uid, input.displayName)
     const payload = {
-      displayName: input.displayName,
+      displayName: username,
       email: normalizeEmail(input.email),
       photoURL: input.photoURL ?? null,
       organizationIds: [],
       activeOrganizationId: null,
       preferences: DEFAULT_PREFERENCES,
       onboarded: false,
+      usernameChangedAt: null,
       createdAt: now,
       updatedAt: now,
     }
@@ -73,8 +79,9 @@ export const ensureUserProfile = async (input: EnsureProfileInput): Promise<User
 
   const data = snapshot.data() as Record<string, unknown>
   const patch: Record<string, unknown> = {}
-  // Keep the profile in sync with Firebase Auth without overwriting edits.
-  if (data.displayName !== input.displayName && input.displayName.length > 0) {
+  // The display name is the claimed username: only seed it while empty, never
+  // overwrite it from the auth account (the username is the source of truth).
+  if (!data.displayName && input.displayName.length > 0) {
     patch.displayName = input.displayName
   }
   if (data.email !== normalizeEmail(input.email) && input.email.length > 0) {
