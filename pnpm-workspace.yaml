@@ -2,3 +2,9 @@ ignoredBuiltDependencies:
   - '@firebase/util'
   - protobufjs
   - unrs-resolver
+
+# pnpm settings (pnpm >= 10): flat node_modules (npm-style) instead of the default
+# `.pnpm/<pkg>@<hash>/node_modules` nesting. Windows Android builds (CMake/Ninja) break
+# on the resulting >250-char object paths:
+#   "ninja: error: manifest 'build.ninja' still dirty after 100 tries".
+nodeLinker: hoisted

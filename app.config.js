@@ -5,7 +5,7 @@ export default {
     slug: "stage-book",
     scheme: "stagebook",
     version: "1.0.0",
-    orientation: "default",
+    orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
@@ -18,11 +18,16 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.rixeldev.stagebook",
+      googleServicesFile: "./GoogleService-Info.plist",
       buildNumber: "1",
     },
     android: {
       package: "com.rixeldev.stagebook",
       versionCode: 1,
+      version: "1.0.0",
+      minSdkVersion: 24,
+      ndkVersion: "29.0.14206865",
+      googleServicesFile: "./google-services.json",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#0B0B14",
@@ -30,8 +35,8 @@ export default {
       },
       icon: "./assets/icon.png",
       predictiveBackGestureEnabled: true,
-      edgeToEdgeEnabled: true,
-      softwareKeyboardLayoutMode: "resize",
+      softwareKeyboardLayoutMode: "pan",
+      enableProguardInReleaseBuilds: true,
     },
     web: {
       bundler: "metro",
