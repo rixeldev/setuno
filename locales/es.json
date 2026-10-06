@@ -631,7 +631,8 @@
     "editOrder": "Editar el orden",
     "editOrderHint": "Añade, quita o reordena canciones",
     "moreShows_one": "+{{count}} evento más",
-    "moreShows_other": "+{{count}} eventos más"
+    "moreShows_other": "+{{count}} eventos más",
+    "withoutEvent": "Sin evento"
   },
   "performances": {
     "performances": "Eventos",

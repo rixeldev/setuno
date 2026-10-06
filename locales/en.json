@@ -694,7 +694,8 @@
     "editOrder": "Edit running order",
     "editOrderHint": "Add, remove or reorder songs",
     "moreShows_one": "+{{count}} more event",
-    "moreShows_other": "+{{count}} more events"
+    "moreShows_other": "+{{count}} more events",
+    "withoutEvent": "Not attached to an event"
   },
   "performances": {
     "performances": "Events",
