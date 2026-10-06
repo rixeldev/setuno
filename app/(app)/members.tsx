@@ -168,26 +168,38 @@ export default function MembersScreen() {
                     {member.uid === profile?.uid ? (
                       <Badge label={t("members.you")} tone="primary" />
                     ) : null}
-                    {member.uid === organization?.ownerId ? (
-                      <Badge label={t("organizations.owner")} tone="accent" />
-                    ) : null}
                   </View>
-                  {member.email ? (
-                    <AppText variant="caption" tone="muted" numberOfLines={1}>
-                      {member.email}
-                    </AppText>
-                  ) : null}
-                  {member.joinedAt ? (
+                  <AppText
+                    variant="caption"
+                    tone={
+                      member.uid === organization?.ownerId
+                        ? "accent"
+                        : member.role === "admin"
+                          ? "primary"
+                          : "muted"
+                    }
+                    numberOfLines={1}
+                  >
+                    {member.uid === organization?.ownerId
+                      ? t("organizations.owner")
+                      : member.role === "admin"
+                        ? t("organizations.admin")
+                        : t("organizations.member")}
+                  </AppText>
+                  {member.email || member.joinedAt ? (
                     <AppText variant="caption" tone="faint" numberOfLines={1}>
-                      {t("members.joined", { time: formatRelativeTime(toDate(member.joinedAt)) })}
+                      {[
+                        member.email,
+                        member.joinedAt
+                          ? t("members.joined", { time: formatRelativeTime(toDate(member.joinedAt)) })
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </AppText>
                   ) : null}
                 </View>
 
-                <Badge
-                  label={t(`organizations.${member.role}`)}
-                  tone={member.role === "admin" ? "primary" : "default"}
-                />
                 {canManage(member) ? (
                   <IconButton
                     label={t("members.actions", { name: member.displayName })}
@@ -331,7 +343,7 @@ const createStyles = () =>
       paddingVertical: Theme.spacing.m,
     },
     divider: { borderTopWidth: 1, borderTopColor: Theme.colors.borderSoft },
-    flex: { flex: 1, minWidth: 0 },
+    flex: { flex: 1, minWidth: 0, gap: 2 },
     nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
     roleRow: { gap: 6 },
   })
