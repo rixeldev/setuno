@@ -61,6 +61,8 @@ const NO_ORGANIZATIONS: OrganizationRef[] = []
 const NO_INVITATIONS: Invitation[] = []
 /** Backoff attempts before a dropped listener surfaces an error to the UI. */
 const BANDS_RETRIES = 4
+/** How long to wait for the server before offering a retry instead of a spinner. */
+const BANDS_SERVER_DEADLINE_MS = 10000
 
 /**
  * Resolves which organization the user is currently working in, exposes their
@@ -117,19 +119,41 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     let attempts = 0
     let unsubscribe: () => void = () => undefined
     let retryTimer: ReturnType<typeof setTimeout> | null = null
+    let slowTimer: ReturnType<typeof setTimeout> | null = null
 
     const listen = (): void => {
       unsubscribe()
+      if (slowTimer) {
+        clearTimeout(slowTimer)
+        slowTimer = null
+      }
       unsubscribe = subscribeMyOrganizations(
         uid,
         (items, fromCache) => {
           if (cancelled) return
           attempts = 0
+          if (slowTimer) {
+            clearTimeout(slowTimer)
+            slowTimer = null
+          }
           setBandsError(null)
           setBandRefs(items)
           // Wait for the server snapshot when the cache has nothing: the user
-          // may belong to bands this device has never seen.
-          if (!fromCache || items.length > 0) setLoadedFor(uid)
+          // may belong to bands this device has never seen. If the server does
+          // not answer, surface a retry instead of an endless spinner.
+          if (!fromCache || items.length > 0) {
+            setLoadedFor(uid)
+          } else {
+            slowTimer = setTimeout(() => {
+              if (cancelled) return
+              setBandsError(
+                toFriendlyError(
+                  undefined,
+                  "Your bands are taking longer than expected. Try again.",
+                ),
+              )
+            }, BANDS_SERVER_DEADLINE_MS)
+          }
         },
         (error) => {
           if (cancelled) return
@@ -158,6 +182,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       cancelled = true
       bandsRetryRef.current = null
       if (retryTimer) clearTimeout(retryTimer)
+      if (slowTimer) clearTimeout(slowTimer)
       unsubscribe()
     }
   }, [uid])

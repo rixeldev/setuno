@@ -125,6 +125,16 @@ export default function Dashboard() {
     )
   }
 
+  // A band list that could not be read is not "no band": offer a retry instead
+  // of an endless skeleton or an invitation to create a duplicate band.
+  if (organizationsError && state !== "ready") {
+    return (
+      <ScreenContainer title={t("dashboard.dashboard")} large>
+        <ErrorState message={organizationsError} onRetry={retryOrganizations} />
+      </ScreenContainer>
+    )
+  }
+
   // The band list is still resolving: keep the dashboard's shape instead of
   // flashing the onboarding (“no band”) screen while we wait.
   if (state === "loading") {
@@ -167,21 +177,6 @@ export default function Dashboard() {
   // Accounts are not tied to a band: a new user lands here and decides later
   // whether to lead a band or wait for an invitation (docs §7).
   if (state === "needs-organization") {
-    // A band list that could not be read is not "no band": offer a retry
-    // instead of inviting the user to create a duplicate organization.
-    if (organizationsError) {
-      return (
-        <ScreenContainer
-          title={t("dashboard.setupTitle")}
-          subtitle={t("dashboard.setupSubtitle")}
-          large
-          headerTop={account}
-        >
-          <ErrorState message={organizationsError} onRetry={retryOrganizations} />
-        </ScreenContainer>
-      )
-    }
-
     const features = [
       {
         icon: MusicIcon,

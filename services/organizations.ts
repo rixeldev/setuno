@@ -358,6 +358,11 @@ export const subscribeMyOrganizations = (
   }
   return onSnapshot(
     collection(firestore, paths.userOrganizations(uid)),
+    // Metadata changes matter here: the cache answers first (possibly empty)
+    // and, when the server answer carries the same data, only a
+    // metadata-only snapshot tells us the server has spoken — without it the
+    // caller could wait forever for an answer that already arrived.
+    { includeMetadataChanges: true },
     (snapshot) => onChange(mapDocs(snapshot, mapOrganizationRef), snapshot.metadata.fromCache),
     (error) => {
       if (onError) onError(error)
