@@ -1,5 +1,5 @@
 import React, { useState } from "react"
-import { StyleSheet, View } from "react-native"
+import { ActivityIndicator, StyleSheet, View } from "react-native"
 import { useRouter } from "expo-router"
 import { useTranslation } from "react-i18next"
 
@@ -11,7 +11,7 @@ import { Button, IconButton } from "@/components/ui/Button"
 import { Dialog } from "@/components/ui/Dialog"
 import { EmptyState } from "@/components/ui/States"
 import { useToast } from "@/components/ui/Toast"
-import { CheckCircleIcon, PlusIcon, UserIcon } from "@/components/ui/Icons"
+import { CheckCircleIcon, ChevronRightIcon, PlusIcon, UserIcon } from "@/components/ui/Icons"
 import { ModalScreen } from "@/components/app/ModalScreen"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
@@ -39,7 +39,7 @@ export default function OrganizationsScreen() {
   }
 
   const choose = async (id: string): Promise<void> => {
-    if (id === organizationId) return
+    if (id === organizationId || switching !== null) return
     setSwitching(id)
     try {
       await switchOrganization(id)
@@ -77,12 +77,14 @@ export default function OrganizationsScreen() {
       subtitle={t("organizations.bandsCount", { count: organizations.length })}
       onClose={close}
       headerRight={
-        <IconButton
-          label={t("organizations.createBand")}
-          variant="secondary"
-          onPress={() => router.push("/organizations/new")}
-          icon={<PlusIcon size={18} color={Theme.colors.text} />}
-        />
+        organizations.length > 0 ? (
+          <IconButton
+            label={t("organizations.createBand")}
+            variant="secondary"
+            onPress={() => router.push("/organizations/new")}
+            icon={<PlusIcon size={18} color={Theme.colors.text} />}
+          />
+        ) : null
       }
     >
       {organizations.length === 0 ? (
@@ -120,14 +122,10 @@ export default function OrganizationsScreen() {
                 </View>
                 {active ? (
                   <Badge label={t("organizations.current")} tone="primary" />
+                ) : switching === organization.id ? (
+                  <ActivityIndicator color={Theme.colors.primary} />
                 ) : (
-                  <Button
-                    label={switching === organization.id ? t("organizations.switching") : t("organizations.switch")}
-                    size="sm"
-                    variant="secondary"
-                    disabled={switching !== null}
-                    onPress={() => void choose(organization.id)}
-                  />
+                  <ChevronRightIcon size={18} color={Theme.colors.textFaint} />
                 )}
               </Card>
             )
@@ -156,13 +154,6 @@ export default function OrganizationsScreen() {
           ))}
         </Section>
       ) : null}
-
-      <Button
-        label={t("organizations.createAnotherBand")}
-        variant="secondary"
-        icon={<PlusIcon size={16} color={Theme.colors.text} />}
-        onPress={() => router.push("/organizations/new")}
-      />
 
       <Dialog
         visible={accepting !== null}
