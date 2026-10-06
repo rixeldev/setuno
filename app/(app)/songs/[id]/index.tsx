@@ -237,6 +237,7 @@ export default function SongScreen() {
         title={song.title}
         subtitle={song.artist || undefined}
         titleLines={2}
+        titleVariant="heading"
         back
         elevated
         right={
