@@ -1,6 +1,7 @@
 import React from "react"
 import { StyleSheet, View } from "react-native"
 import { useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -12,11 +13,18 @@ import { ListIcon, PlusIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
-import { formatDurationLong, formatRelativeDay, pluralize } from "@/libs/format"
+import type { RelativeDayLabels } from "@/libs/format"
+import { formatDurationLong, formatRelativeDay } from "@/libs/format"
 import { parseIsoDate } from "@/libs/validation"
 
 /** Reusable running orders for gigs and rehearsals (docs §20). */
 export default function SetlistsScreen() {
+  const { t } = useTranslation()
+  const dayLabels: RelativeDayLabels = {
+    today: t("common.today"),
+    tomorrow: t("common.tomorrow"),
+    yesterday: t("common.yesterday"),
+  }
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
   const { isAdmin } = useOrganization()
@@ -24,13 +32,15 @@ export default function SetlistsScreen() {
 
   return (
     <ScreenContainer
-      title="Setlists"
-      subtitle={loading ? "Loading setlists…" : pluralize(setlists.length, "setlist")}
+      title={t("setlists.setlists")}
+      subtitle={
+        loading ? t("setlists.loading") : t("organizations.setlistsCount", { count: setlists.length })
+      }
       large
       headerRight={
         isAdmin ? (
           <IconButton
-            label="New setlist"
+            label={t("setlists.newSetlist")}
             variant="secondary"
             onPress={() => router.push("/setlists/new")}
             icon={<PlusIcon size={18} color={Theme.colors.text} />}
@@ -45,13 +55,9 @@ export default function SetlistsScreen() {
       ) : setlists.length === 0 ? (
         <EmptyState
           icon={<ListIcon size={24} color={Theme.colors.primary} />}
-          title="No setlists yet"
-          message={
-            isAdmin
-              ? "A setlist is a running order you can reuse for every gig. Start with your next show."
-              : "No setlists yet. An admin can build the running order for each show."
-          }
-          actionLabel={isAdmin ? "Create a setlist" : undefined}
+          title={t("setlists.noSetlists")}
+          message={isAdmin ? t("setlists.emptyAdmin") : t("setlists.emptyMember")}
+          actionLabel={isAdmin ? t("setlists.newSetlist") : undefined}
           onAction={isAdmin ? () => router.push("/setlists/new") : undefined}
         />
       ) : (
@@ -60,7 +66,7 @@ export default function SetlistsScreen() {
             <Card
               key={setlist.id}
               onPress={() => router.push(`/setlists/${setlist.id}`)}
-              accessibilityLabel={`${setlist.name}, ${pluralize(setlist.songs.length, "song")}`}
+              accessibilityLabel={`${setlist.name}, ${t("organizations.songsCount", { count: setlist.songs.length })}`}
               style={{ gap: Theme.spacing.s }}
             >
               <View style={styles.row}>
@@ -68,7 +74,7 @@ export default function SetlistsScreen() {
                   {setlist.name}
                 </AppText>
                 {setlist.date ? (
-                  <Badge label={formatRelativeDay(parseIsoDate(setlist.date))} tone="primary" />
+                  <Badge label={formatRelativeDay(parseIsoDate(setlist.date), dayLabels)} tone="primary" />
                 ) : null}
               </View>
 
@@ -79,8 +85,10 @@ export default function SetlistsScreen() {
               ) : null}
 
               <AppText variant="caption" tone="faint">
-                {pluralize(setlist.songs.length, "song")} ·{" "}
-                {formatDurationLong(setlist.estimatedDurationSec)}
+                {t("setlists.songsCount", {
+                  count: setlist.songs.length,
+                  duration: formatDurationLong(setlist.estimatedDurationSec),
+                })}
               </AppText>
             </Card>
           ))}

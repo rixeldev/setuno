@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from "react"
 import { FlatList, Pressable, StyleSheet, View } from "react-native"
 import { useLocalSearchParams, useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
-import { Badge, Card } from "@/components/ui/Card"
+import { Badge, Card, Section } from "@/components/ui/Card"
 import { Button, IconButton } from "@/components/ui/Button"
 import { Dialog } from "@/components/ui/Dialog"
 import { EmptyState } from "@/components/ui/States"
@@ -26,15 +27,23 @@ import { useOrgData } from "@/hooks/useOrgData"
 import { deleteSetlist, duplicateSetlist, updateSetlist } from "@/services/setlists"
 import { toFriendlyError } from "@/services/errors"
 import { filterSongs, EMPTY_FILTERS } from "@/libs/songSearch"
-import { formatDuration, formatDurationLong, formatRelativeDay, pluralize } from "@/libs/format"
+import type { RelativeDayLabels } from "@/libs/format"
+import { formatDateRange, formatDuration, formatDurationLong, formatRelativeDay } from "@/libs/format"
 import { parseIsoDate } from "@/libs/validation"
 import { estimateDurationSec } from "@/libs/songUtils"
+import { PERFORMANCE_STATUS_TONES } from "@/components/performances/PerformanceCard"
 
 /**
  * Setlist detail (docs §20): the running order with move up/down, an add-song
  * picker, a running duration and admin actions.
  */
 export default function SetlistDetail() {
+  const { t, i18n } = useTranslation()
+  const dayLabels: RelativeDayLabels = {
+    today: t("common.today"),
+    tomorrow: t("common.tomorrow"),
+    yesterday: t("common.yesterday"),
+  }
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
   const toast = useToast()
@@ -43,7 +52,7 @@ export default function SetlistDetail() {
 
   const { profile } = useAuth()
   const { organizationId, isAdmin } = useOrganization()
-  const { setlists, songs, songLibrary } = useOrgData()
+  const { setlists, songs, songLibrary, performances } = useOrgData()
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [search, setSearch] = useState("")
@@ -53,6 +62,20 @@ export default function SetlistDetail() {
   const setlist = useMemo(
     () => setlists.find((entry) => entry.id === setlistId) ?? null,
     [setlists, setlistId],
+  )
+  // Shows that have this setlist attached, newest first (reverse of the link
+  // the performance form creates).
+  const relatedShows = useMemo(
+    () =>
+      setlistId === null
+        ? []
+        : performances
+            .filter(
+              (performance) =>
+                performance.setlistId === setlistId && performance.status !== "cancelled",
+            )
+            .sort((a, b) => b.date.localeCompare(a.date)),
+    [performances, setlistId],
   )
   const actor = { id: profile?.uid ?? "", name: profile?.displayName || "An admin" }
 
@@ -73,7 +96,7 @@ export default function SetlistDetail() {
         actor,
       )
     } catch (error) {
-      toast.showError(toFriendlyError(error, "We couldn't update the running order."))
+      toast.showError(toFriendlyError(error, t("setlists.couldNotUpdateOrder")))
     }
   }
 
@@ -101,7 +124,7 @@ export default function SetlistDetail() {
     void persistOrder([...existing, ...ids])
     setPickerOpen(false)
     setSearch("")
-    toast.showSuccess(`${pluralize(ids.length, "song")} added.`)
+    toast.showSuccess(t("setlists.songsAdded", { count: ids.length }))
   }
 
   const duplicate = async (): Promise<void> => {
@@ -109,10 +132,10 @@ export default function SetlistDetail() {
     setBusy(true)
     try {
       const id = await duplicateSetlist(organizationId ?? "", setlist.id, "copy", actor)
-      toast.showSuccess("Setlist duplicated.")
+      toast.showSuccess(t("setlists.duplicated"))
       router.replace(`/setlists/${id}`)
     } catch (error) {
-      toast.showError(toFriendlyError(error, "We couldn't duplicate that setlist."))
+      toast.showError(toFriendlyError(error, t("setlists.couldNotDuplicate")))
     } finally {
       setBusy(false)
     }
@@ -124,10 +147,10 @@ export default function SetlistDetail() {
     try {
       await deleteSetlist(organizationId ?? "", setlist.id, actor)
       setConfirmDelete(false)
-      toast.showSuccess(`"${setlist.name}" was deleted.`)
+      toast.showSuccess(t("setlists.setlistDeleted", { name: setlist.name }))
       router.replace("/setlists")
     } catch (error) {
-      toast.showError(toFriendlyError(error, "We couldn't delete that setlist."))
+      toast.showError(toFriendlyError(error, t("setlists.couldNotDelete")))
     } finally {
       setBusy(false)
     }
@@ -135,19 +158,19 @@ export default function SetlistDetail() {
 
   if (!setlistId) {
     return (
-      <ScreenContainer back title="Setlist">
-        <EmptyState title="Setlist not found" message="Pick one from the setlists screen." />
+      <ScreenContainer back title={t("setlists.setlist")}>
+        <EmptyState title={t("setlists.setlistNotFound")} message={t("setlists.pickOne")} />
       </ScreenContainer>
     )
   }
 
   if (!setlist) {
     return (
-      <ScreenContainer back title="Setlist">
+      <ScreenContainer back title={t("setlists.setlist")}>
         <EmptyState
-          title="Setlist not found"
-          message="It may have been deleted, or you may not have access to this band."
-          actionLabel="Back to setlists"
+          title={t("setlists.setlistNotFound")}
+          message={t("setlists.setlistNotFoundDescription")}
+          actionLabel={t("setlists.backToSetlists")}
           onAction={() => router.replace("/setlists")}
         />
       </ScreenContainer>
@@ -163,7 +186,9 @@ export default function SetlistDetail() {
       back
       title={setlist.name}
       subtitle={
-        setlist.date ? formatRelativeDay(parseIsoDate(setlist.date)) : pluralize(setlist.songs.length, "song")
+        setlist.date
+          ? formatRelativeDay(parseIsoDate(setlist.date), dayLabels)
+          : t("organizations.songsCount", { count: setlist.songs.length })
       }
       large
       headerRight={
@@ -171,17 +196,17 @@ export default function SetlistDetail() {
           {isAdmin ? (
             <>
               <IconButton
-                label="Edit setlist"
+                label={t("setlists.editSetlist")}
                 onPress={() => router.push(`/setlists/${setlist.id}/edit`)}
                 icon={<EditIcon size={18} color={Theme.colors.textMuted} />}
               />
               <IconButton
-                label="Duplicate setlist"
+                label={t("setlists.duplicate")}
                 onPress={() => void duplicate()}
                 icon={<CopyListIcon size={18} color={Theme.colors.textMuted} />}
               />
               <IconButton
-                label="Delete setlist"
+                label={t("setlists.deleteSetlist")}
                 variant="danger"
                 onPress={() => setConfirmDelete(true)}
                 icon={<TrashIcon size={18} color={Theme.colors.danger} />}
@@ -195,13 +220,13 @@ export default function SetlistDetail() {
           <View style={styles.summaryRow}>
             <View style={styles.flex}>
               <AppText variant="caption" tone="faint">
-                Running time
+                {t("setlists.runningTime")}
               </AppText>
               <AppText variant="subheading">{formatDurationLong(setlist.estimatedDurationSec)}</AppText>
             </View>
             <View style={styles.flex}>
               <AppText variant="caption" tone="faint">
-                Songs
+                {t("setlists.songs")}
               </AppText>
               <AppText variant="subheading">{setlist.songs.length}</AppText>
             </View>
@@ -219,12 +244,41 @@ export default function SetlistDetail() {
         </Card>
       }
     >
+      <Section title={t("setlists.usedInShows")}>
+        {relatedShows.length === 0 ? (
+          <AppText variant="caption" tone="faint">
+            {t("setlists.noShowsYet")}
+          </AppText>
+        ) : (
+          relatedShows.slice(0, 4).map((performance) => (
+            <Card
+              key={performance.id}
+              onPress={() => router.push(`/performances/${performance.id}`)}
+              style={styles.showRow}
+            >
+              <View style={styles.flex}>
+                <AppText variant="bodyStrong" numberOfLines={1}>
+                  {performance.name}
+                </AppText>
+                <AppText variant="caption" tone="muted" numberOfLines={1}>
+                  {formatDateRange(performance.date, performance.endDate, i18n.language)}
+                </AppText>
+              </View>
+              <Badge
+                label={t(`performances.${performance.status}`)}
+                tone={PERFORMANCE_STATUS_TONES[performance.status]}
+              />
+            </Card>
+          ))
+        )}
+      </Section>
+
       {setlist.songs.length === 0 ? (
         <EmptyState
           icon={<MusicIcon size={24} color={Theme.colors.primary} />}
-          title="No songs yet"
-          message="Add the songs you plan to play, in order."
-          actionLabel={isAdmin ? "Add songs" : undefined}
+          title={t("setlists.noSongsYet")}
+          message={t("setlists.addSongsHint")}
+          actionLabel={isAdmin ? t("setlists.addSongs") : undefined}
           onAction={isAdmin ? () => setPickerOpen(true) : undefined}
         />
       ) : (
@@ -237,7 +291,7 @@ export default function SetlistDetail() {
                 <View style={styles.songRow}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Open ${entry.title}`}
+                    accessibilityLabel={t("setlists.openSong", { title: entry.title })}
                     onPress={() => router.push(`/songs/${entry.songId}`)}
                     style={styles.songMain}
                   >
@@ -249,7 +303,7 @@ export default function SetlistDetail() {
                         {entry.title}
                       </AppText>
                       <AppText variant="caption" tone="muted" numberOfLines={1}>
-                        {[entry.artist || "Unknown artist", entry.key, formatDuration(seconds)]
+                        {[entry.artist || t("common.unknownArtist"), entry.key, formatDuration(seconds)]
                           .filter(Boolean)
                           .join(" · ")}
                       </AppText>
@@ -259,7 +313,7 @@ export default function SetlistDetail() {
                   {isAdmin ? (
                     <View style={styles.rowActions}>
                       <IconButton
-                        label={`Move ${entry.title} up`}
+                        label={t("setlists.moveUp")}
                         size={30}
                         disabled={index === 0}
                         onPress={() => move(index, -1)}
@@ -273,7 +327,7 @@ export default function SetlistDetail() {
                         }
                       />
                       <IconButton
-                        label={`Move ${entry.title} down`}
+                        label={t("setlists.moveDown")}
                         size={30}
                         disabled={index === setlist.songs.length - 1}
                         onPress={() => move(index, 1)}
@@ -287,7 +341,7 @@ export default function SetlistDetail() {
                         }
                       />
                       <IconButton
-                        label={`Remove ${entry.title}`}
+                        label={t("setlists.removeFromSetlist")}
                         size={30}
                         onPress={() => removeSong(entry.songId)}
                         icon={<CloseIcon size={16} color={Theme.colors.danger} />}
@@ -303,16 +357,21 @@ export default function SetlistDetail() {
 
       {isAdmin ? (
         <Button
-          label="Add songs"
+          label={t("setlists.addSongs")}
           icon={<PlusIcon size={16} color={Theme.colors.onPrimary} />}
           onPress={() => setPickerOpen(true)}
         />
       ) : null}
 
-      <Dialog visible={pickerOpen} onClose={() => setPickerOpen(false)} title="Add songs" hideActions>
+      <Dialog
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title={t("setlists.addSongs")}
+        hideActions
+      >
         <SearchInput
-          label="Search the songbook"
-          placeholder="Title or artist"
+          label={t("setlists.searchSongs")}
+          placeholder={t("setlists.searchPlaceholder")}
           value={search}
           onChangeText={setSearch}
           onClear={() => setSearch("")}
@@ -324,13 +383,13 @@ export default function SetlistDetail() {
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <AppText variant="caption" tone="faint">
-              {songs.length === 0 ? "Your songbook is empty." : "No more songs to add."}
+              {songs.length === 0 ? t("setlists.songbookEmpty") : t("setlists.noMoreSongs")}
             </AppText>
           }
           renderItem={({ item }) => (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Add ${item.title}`}
+              accessibilityLabel={t("setlists.addSongA11y", { title: item.title })}
               onPress={() => addSongs([item.id])}
               style={({ pressed }) => [styles.pickerRow, pressed && styles.pressed]}
             >
@@ -339,22 +398,22 @@ export default function SetlistDetail() {
                   {item.title}
                 </AppText>
                 <AppText variant="caption" tone="muted" numberOfLines={1}>
-                  {item.artist || "Unknown artist"}
+                  {item.artist || t("common.unknownArtist")}
                 </AppText>
               </View>
               <Badge label={item.key || "—"} tone="accent" />
             </Pressable>
           )}
         />
-        <Button label="Done" variant="secondary" onPress={() => setPickerOpen(false)} />
+        <Button label={t("common.done")} variant="secondary" onPress={() => setPickerOpen(false)} />
       </Dialog>
 
       <Dialog
         visible={confirmDelete}
         onClose={() => setConfirmDelete(false)}
-        title={`Delete "${setlist.name}"?`}
-        description="The running order is removed. The songs themselves stay in the songbook."
-        confirmLabel="Delete setlist"
+        title={t("setlists.deleteSetlistConfirm", { name: setlist.name })}
+        description={t("setlists.deleteSetlistDescription")}
+        confirmLabel={t("setlists.deleteSetlist")}
         tone="danger"
         confirmLoading={busy}
         onConfirm={() => void remove()}
@@ -369,6 +428,7 @@ const createStyles = () =>
     summary: { gap: Theme.spacing.s },
     summaryRow: { flexDirection: "row", gap: Theme.spacing.l },
     flex: { flex: 1, minWidth: 0 },
+    showRow: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.s },
     list: { gap: Theme.spacing.m },
     songCard: { overflow: "hidden" },
     songRow: { flexDirection: "row", alignItems: "center" },
