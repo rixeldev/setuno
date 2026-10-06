@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { useLocalSearchParams, useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -11,24 +12,24 @@ import { Input } from "@/components/ui/Input"
 import { Dialog } from "@/components/ui/Dialog"
 import { EmptyState } from "@/components/ui/States"
 import { useToast } from "@/components/ui/Toast"
-import { ScreenContainer } from "@/components/app/ScreenContainer"
+import { ModalScreen } from "@/components/app/ModalScreen"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { acceptSuggestion, rejectSuggestion } from "@/services/suggestions"
 import { toFriendlyError } from "@/services/errors"
 import { formatRelativeTime } from "@/libs/format"
+import { buildChordRow } from "@/libs/songUtils"
 import { toDate } from "@/interfaces/timestamp"
-import { buildChordRow } from "@/components/songs/ChordLine"
 
-const TYPE_LABELS: Record<string, string> = {
-  chord_change: "Chord change",
-  add_chord: "Add chord",
-  remove_chord: "Remove chord",
-  key_change: "Key change",
-  lyrics_change: "Lyric fix",
-  new_song: "New song",
-  other: "Other",
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  chord_change: "suggestions.chordChange",
+  add_chord: "songs.addChord",
+  remove_chord: "songs.removeChord",
+  key_change: "suggestions.keyChange",
+  lyrics_change: "suggestions.lyricFix",
+  new_song: "suggestions.newSong",
+  other: "suggestions.other",
 }
 
 /**
@@ -36,6 +37,7 @@ const TYPE_LABELS: Record<string, string> = {
  * songbook) or reject with a note; authors can withdraw their own request.
  */
 export default function SuggestionDetail() {
+  const { t } = useTranslation()
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
   const toast = useToast()
@@ -75,16 +77,16 @@ export default function SuggestionDetail() {
       const reviewer = { id: profile?.uid ?? "", name: profile?.displayName || "An admin" }
       if (action === "accept") {
         await acceptSuggestion(organizationId, suggestion.id, reviewer)
-        toast.showSuccess("Suggestion accepted and applied to the songbook.")
+        toast.showSuccess(t("suggestions.acceptedApplied"))
         router.replace(suggestion.songId ? `/songs/${suggestion.songId}` : "/songs")
         return
       }
       await rejectSuggestion(organizationId, suggestion.id, reviewer, note)
       setRejectOpen(false)
       setNote("")
-      toast.showSuccess("Suggestion rejected.")
+      toast.showSuccess(t("suggestions.suggestionRejected"))
     } catch (error) {
-      toast.showError(toFriendlyError(error, "We couldn't review that suggestion."))
+      toast.showError(toFriendlyError(error, t("suggestions.couldNotReview")))
     } finally {
       setBusy(false)
     }
@@ -92,24 +94,27 @@ export default function SuggestionDetail() {
 
   if (!suggestion) {
     return (
-      <ScreenContainer back title="Suggestion">
+      <ModalScreen title={t("suggestions.suggestion")}>
         <EmptyState
-          title="Suggestion not found"
-          message="It may have been deleted by its author."
-          actionLabel="Back to suggestions"
+          title={t("suggestions.suggestionNotFound")}
+          message={t("suggestions.suggestionNotFoundDescription")}
+          actionLabel={t("suggestions.backToSuggestions")}
           onAction={() => router.replace("/suggestions")}
         />
-      </ScreenContainer>
+      </ModalScreen>
     )
   }
 
   return (
-    <ScreenContainer back title="Suggestion" subtitle={suggestion.songTitle || "New song"}>
+    <ModalScreen
+      title={t("suggestions.suggestion")}
+      subtitle={suggestion.songTitle || t("suggestions.newSong")}
+    >
       <Card style={{ gap: Theme.spacing.m }}>
         <View style={styles.row}>
-          <Chip label={TYPE_LABELS[suggestion.type] ?? suggestion.type} tone="primary" />
+          <Chip label={t(TYPE_LABEL_KEYS[suggestion.type] ?? suggestion.type)} tone="primary" />
           <Badge
-            label={suggestion.status}
+            label={t(`suggestions.${suggestion.status}`)}
             tone={
               suggestion.status === "accepted"
                 ? "success"
@@ -131,26 +136,30 @@ export default function SuggestionDetail() {
         ) : null}
 
         <AppText variant="caption" tone="faint">
-          Suggested by {suggestion.authorName} · {formatRelativeTime(toDate(suggestion.createdAt))}
+          {t("suggestions.author", { name: suggestion.authorName })} ·{" "}
+          {formatRelativeTime(toDate(suggestion.createdAt))}
         </AppText>
 
         {suggestion.reviewedAt ? (
           <AppText variant="caption" tone="faint">
-            {suggestion.status === "accepted" ? "Accepted" : "Rejected"} by{" "}
-            {suggestion.reviewedByName || "an admin"} · {formatRelativeTime(toDate(suggestion.reviewedAt))}
+            {t("suggestions.reviewedStatus", {
+              status: t(`suggestions.${suggestion.status}`),
+              name: suggestion.reviewedByName || t("common.unknownAdmin"),
+              time: formatRelativeTime(toDate(suggestion.reviewedAt)),
+            })}
           </AppText>
         ) : null}
 
         {suggestion.reviewNote.trim().length > 0 ? (
           <AppText variant="caption" tone="muted">
-            Admin note: {suggestion.reviewNote}
+            {t("suggestions.adminNote", { note: suggestion.reviewNote })}
           </AppText>
         ) : null}
       </Card>
 
       <Card style={{ gap: Theme.spacing.m }}>
         <AppText variant="label" tone="faint">
-          Proposed change
+          {t("suggestions.proposedChange")}
         </AppText>
 
         {chordDiff ? (
@@ -158,18 +167,18 @@ export default function SuggestionDetail() {
             <View style={styles.diff}>
               <View style={[styles.diffCol, styles.diffFrom]}>
                 <AppText variant="caption" tone="faint">
-                  Current
+                  {t("suggestions.current")}
                 </AppText>
                 <AppText variant="mono" tone={chordDiff.from.length > 0 ? "default" : "faint"}>
-                  {chordDiff.from || "no chord"}
+                  {chordDiff.from || t("suggestions.noChord")}
                 </AppText>
               </View>
               <View style={[styles.diffCol, styles.diffTo]}>
                 <AppText variant="caption" tone="faint">
-                  Proposed
+                  {t("suggestions.proposed")}
                 </AppText>
                 <AppText variant="mono" tone={chordDiff.to.length > 0 ? "accent" : "faint"}>
-                  {chordDiff.to || "remove it"}
+                  {chordDiff.to || t("suggestions.removeIt")}
                 </AppText>
               </View>
             </View>
@@ -177,7 +186,7 @@ export default function SuggestionDetail() {
             {sourceLine ? (
               <View style={{ gap: 4 }}>
                 <AppText variant="caption" tone="faint">
-                  Line {chordDiff.lineIndex + 1}
+                  {t("suggestions.lineNumber", { line: chordDiff.lineIndex + 1 })}
                 </AppText>
                 <AppText variant="mono" tone="primary">
                   {buildChordRow(sourceLine.chords, sourceLine.text)}
@@ -188,7 +197,7 @@ export default function SuggestionDetail() {
               </View>
             ) : (
               <AppText variant="caption" tone="faint">
-                The original song is no longer available, so only the chord change is shown.
+                {t("suggestions.originalUnavailable")}
               </AppText>
             )}
           </View>
@@ -198,15 +207,15 @@ export default function SuggestionDetail() {
           <View style={styles.diff}>
             <View style={[styles.diffCol, styles.diffFrom]}>
               <AppText variant="caption" tone="faint">
-                Current
+                {t("suggestions.current")}
               </AppText>
               <AppText variant="mono" tone="faint">
-                {change.from || "no key"}
+                {change.from || t("suggestions.noKey")}
               </AppText>
             </View>
             <View style={[styles.diffCol, styles.diffTo]}>
               <AppText variant="caption" tone="faint">
-                Proposed
+                {t("suggestions.proposed")}
               </AppText>
               <AppText variant="mono" tone="accent">
                 {change.to}
@@ -219,7 +228,7 @@ export default function SuggestionDetail() {
           <View style={{ gap: 6 }}>
             <View style={{ gap: 2 }}>
               <AppText variant="caption" tone="faint">
-                Current
+                {t("suggestions.current")}
               </AppText>
               <AppText variant="body" tone="faint" style={styles.strike}>
                 {sourceLyrics?.text || change.from}
@@ -227,7 +236,7 @@ export default function SuggestionDetail() {
             </View>
             <View style={{ gap: 2 }}>
               <AppText variant="caption" tone="faint">
-                Proposed
+                {t("suggestions.proposed")}
               </AppText>
               <AppText variant="body">{change.to}</AppText>
             </View>
@@ -238,7 +247,7 @@ export default function SuggestionDetail() {
           <View style={{ gap: 6 }}>
             <AppText variant="bodyStrong">{change.title}</AppText>
             <AppText variant="caption" tone="muted">
-              {[change.artist, change.key].filter(Boolean).join(" · ") || "No artist or key given"}
+              {[change.artist, change.key].filter(Boolean).join(" · ") || t("suggestions.noArtistOrKey")}
             </AppText>
             {change.lyrics.trim().length > 0 ? (
               <AppText variant="mono" tone="muted" style={styles.preview}>
@@ -250,7 +259,7 @@ export default function SuggestionDetail() {
 
         {change?.kind === "other" ? (
           <AppText variant="caption" tone="muted">
-            A general note for the band — accepting it won’t change the songbook.
+            {t("suggestions.generalNote")}
           </AppText>
         ) : null}
       </Card>
@@ -258,30 +267,30 @@ export default function SuggestionDetail() {
       {canReview ? (
         <View style={styles.actions}>
           <Button
-            label="Reject"
+            label={t("common.reject")}
             variant="secondary"
             onPress={() => setRejectOpen(true)}
             style={styles.action}
           />
           <Button
-            label="Accept & apply"
+            label={t("suggestions.acceptApply")}
             loading={busy}
             onPress={() => void review("accept")}
             style={styles.action}
-            accessibilityHint="Applies this change to the shared songbook"
+            accessibilityHint={t("suggestions.acceptHint")}
           />
         </View>
       ) : null}
 
       {!canReview && isAuthor && suggestion.status === "pending" ? (
         <AppText variant="caption" tone="muted">
-          Waiting for an admin to review. You’ll see the result here.
+          {t("suggestions.pendingNote")}
         </AppText>
       ) : null}
 
       {suggestion.songId ? (
         <Button
-          label="Open the song"
+          label={t("suggestions.openSong")}
           variant="ghost"
           onPress={() => router.push(`/songs/${suggestion.songId}`)}
         />
@@ -290,22 +299,22 @@ export default function SuggestionDetail() {
       <Dialog
         visible={rejectOpen}
         onClose={() => setRejectOpen(false)}
-        title="Reject this suggestion?"
-        description="The suggestion stays in the list as rejected. The songbook is untouched."
-        confirmLabel="Reject"
+        title={t("suggestions.rejectTitle")}
+        description={t("suggestions.rejectDescription")}
+        confirmLabel={t("common.reject")}
         tone="danger"
         confirmLoading={busy}
         onConfirm={() => void review("reject")}
       >
         <Input
-          label="Note (optional)"
+          label={t("suggestions.noteOptional")}
           value={note}
           onChangeText={setNote}
-          placeholder="We sing it the other way round on stage."
+          placeholder={t("suggestions.rejectPlaceholder")}
           multiline
         />
       </Dialog>
-    </ScreenContainer>
+    </ModalScreen>
   )
 }
 

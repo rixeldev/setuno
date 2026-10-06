@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react"
 import { StyleSheet, View } from "react-native"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -12,16 +13,15 @@ import { Input } from "@/components/ui/Input"
 import { EmptyState, ErrorState, SkeletonList } from "@/components/ui/States"
 import { useToast } from "@/components/ui/Toast"
 import { CloseIcon, EmailIcon, GroupIcon, PlusIcon, ShieldCheckIcon, TrashIcon } from "@/components/ui/Icons"
-import { ScreenContainer } from "@/components/app/ScreenContainer"
+import { ModalScreen } from "@/components/app/ModalScreen"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { addMemberByEmail, removeMember, revokeInvitation, updateMemberRole } from "@/services/organizations"
 import { toFriendlyError } from "@/services/errors"
-import { formatRelativeTime, pluralize } from "@/libs/format"
+import { formatRelativeTime } from "@/libs/format"
 import { toDate } from "@/interfaces/timestamp"
 import { validateEmail } from "@/libs/validation"
-import { ROLE_LABELS } from "@/interfaces"
 import type { OrganizationMember, OrganizationRole } from "@/interfaces"
 
 /**
@@ -29,6 +29,7 @@ import type { OrganizationMember, OrganizationRole } from "@/interfaces"
  * and remove people; everyone can see who is in the band.
  */
 export default function MembersScreen() {
+  const { t } = useTranslation()
   const styles = useThemedStyles(createStyles)
   const toast = useToast()
   const { profile } = useAuth()
@@ -49,7 +50,7 @@ export default function MembersScreen() {
   )
 
   const invite = async (): Promise<void> => {
-    const problem = validateEmail(email, "That email")
+    const problem = validateEmail(email, t("members.thatEmail"))
     if (problem) {
       setEmailError(problem)
       return
@@ -62,11 +63,11 @@ export default function MembersScreen() {
       setInviteOpen(false)
       toast.showSuccess(
         result.invited
-          ? `${email} can join now — they just need to accept the invitation.`
-          : "They were added to the band.",
+          ? t("organizations.invited", { email })
+          : t("organizations.memberAdded", { name: email }),
       )
     } catch (err) {
-      toast.showError(toFriendlyError(err, "We couldn't invite that person."))
+      toast.showError(toFriendlyError(err, t("members.couldNotInvite")))
     } finally {
       setBusy(false)
     }
@@ -76,9 +77,14 @@ export default function MembersScreen() {
     if (member.role === next) return
     try {
       await updateMemberRole(organizationId ?? "", member.uid, next, actor)
-      toast.showSuccess(`${member.displayName} is now ${ROLE_LABELS[next].toLowerCase()}.`)
+      toast.showSuccess(
+        t("organizations.memberRoleChanged", {
+          name: member.displayName,
+          role: t(`organizations.${next}`).toLowerCase(),
+        }),
+      )
     } catch (err) {
-      toast.showError(toFriendlyError(err, "We couldn't change that role."))
+      toast.showError(toFriendlyError(err, t("members.couldNotChangeRole")))
     }
   }
 
@@ -87,10 +93,10 @@ export default function MembersScreen() {
     setBusy(true)
     try {
       await removeMember(organizationId ?? "", pendingRemoval.uid, actor)
-      toast.showSuccess(`${pendingRemoval.displayName} was removed from the band.`)
+      toast.showSuccess(t("organizations.memberRemoved", { name: pendingRemoval.displayName }))
       setPendingRemoval(null)
     } catch (err) {
-      toast.showError(toFriendlyError(err, "We couldn't remove that member."))
+      toast.showError(toFriendlyError(err, t("members.couldNotRemove")))
     } finally {
       setBusy(false)
     }
@@ -99,21 +105,20 @@ export default function MembersScreen() {
   const revoke = async (invitationId: string, invitee: string): Promise<void> => {
     try {
       await revokeInvitation(organizationId ?? "", invitationId, actor)
-      toast.showSuccess(`The invitation for ${invitee} was revoked.`)
+      toast.showSuccess(t("members.invitationRevokedFor", { email: invitee }))
     } catch (err) {
-      toast.showError(toFriendlyError(err, "We couldn't revoke that invitation."))
+      toast.showError(toFriendlyError(err, t("members.couldNotRevoke")))
     }
   }
 
   return (
-    <ScreenContainer
-      title="Members"
+    <ModalScreen
+      title={t("organizations.members")}
       subtitle={organization?.name}
-      large
       headerRight={
         isAdmin ? (
           <IconButton
-            label="Invite someone"
+            label={t("members.inviteSomeone")}
             variant="secondary"
             onPress={() => setInviteOpen(true)}
             icon={<PlusIcon size={18} color={Theme.colors.text} />}
@@ -141,9 +146,9 @@ export default function MembersScreen() {
                   <AppText variant="bodyStrong" numberOfLines={1}>
                     {member.displayName}
                   </AppText>
-                  {member.uid === profile?.uid ? <Badge label="You" tone="primary" /> : null}
+                  {member.uid === profile?.uid ? <Badge label={t("members.you")} tone="primary" /> : null}
                   {member.uid === organization?.ownerId ? (
-                    <Badge label="Owner" tone="accent" />
+                    <Badge label={t("organizations.owner")} tone="accent" />
                   ) : null}
                 </View>
                 {member.email ? (
@@ -153,7 +158,7 @@ export default function MembersScreen() {
                 ) : null}
                 {member.joinedAt ? (
                   <AppText variant="caption" tone="faint">
-                    Joined {formatRelativeTime(toDate(member.joinedAt))}
+                    {t("members.joined", { time: formatRelativeTime(toDate(member.joinedAt)) })}
                   </AppText>
                 ) : null}
               </View>
@@ -161,14 +166,17 @@ export default function MembersScreen() {
               {isAdmin ? (
                 <View style={styles.actions}>
                   <Chip
-                    label={ROLE_LABELS[member.role]}
+                    label={t(`organizations.${member.role}`)}
                     tone={member.role === "admin" ? "primary" : "default"}
                     onPress={() => void changeRole(member, member.role === "admin" ? "member" : "admin")}
-                    accessibilityLabel={`${member.displayName} is ${ROLE_LABELS[member.role]}. Tap to change the role.`}
+                    accessibilityLabel={t("members.roleA11y", {
+                      name: member.displayName,
+                      role: t(`organizations.${member.role}`),
+                    })}
                   />
                   {member.uid !== profile?.uid ? (
                     <IconButton
-                      label={`Remove ${member.displayName}`}
+                      label={t("members.removeA11y", { name: member.displayName })}
                       size={32}
                       onPress={() => setPendingRemoval(member)}
                       icon={<TrashIcon size={16} color={Theme.colors.danger} />}
@@ -176,7 +184,10 @@ export default function MembersScreen() {
                   ) : null}
                 </View>
               ) : (
-                <Badge label={ROLE_LABELS[member.role]} tone={member.role === "admin" ? "primary" : "default"} />
+                <Badge
+                  label={t(`organizations.${member.role}`)}
+                  tone={member.role === "admin" ? "primary" : "default"}
+                />
               )}
             </Card>
           ))}
@@ -185,16 +196,16 @@ export default function MembersScreen() {
 
       {isAdmin ? (
         <Section
-          title="Pending invitations"
+          title={t("members.pendingInvitations")}
           subtitle={
             pendingInvitations.length > 0
-              ? `${pendingInvitations.length} open · they join when the invitation is accepted`
+              ? t("members.openInvites", { count: pendingInvitations.length })
               : undefined
           }
         >
           {pendingInvitations.length === 0 ? (
             <AppText variant="caption" tone="faint">
-              No open invitations. Invite someone by email — they join when they accept it.
+              {t("organizations.noInvites")}
             </AppText>
           ) : (
             pendingInvitations.map((invitation) => (
@@ -205,12 +216,12 @@ export default function MembersScreen() {
                     {invitation.email}
                   </AppText>
                   <AppText variant="caption" tone="muted">
-                    Invited by {invitation.invitedByName || "an admin"} ·{" "}
-                    {ROLE_LABELS[invitation.role]}
+                    {t("auth.invitedBy", { name: invitation.invitedByName || t("common.unknownAdmin") })} ·{" "}
+                    {t(`organizations.${invitation.role}`)}
                   </AppText>
                 </View>
                 <IconButton
-                  label={`Revoke the invitation for ${invitation.email}`}
+                  label={t("members.revokeA11y", { email: invitation.email })}
                   size={32}
                   onPress={() => void revoke(invitation.id, invitation.email)}
                   icon={<CloseIcon size={16} color={Theme.colors.danger} />}
@@ -224,18 +235,18 @@ export default function MembersScreen() {
       <Dialog
         visible={inviteOpen}
         onClose={() => setInviteOpen(false)}
-        title="Invite someone"
-        description="They join with one tap as soon as they sign in with this email address."
-        confirmLabel="Send invite"
+        title={t("members.inviteSomeone")}
+        description={t("organizations.inviteDescription")}
+        confirmLabel={t("members.sendInvite")}
         confirmLoading={busy}
         onConfirm={() => void invite()}
       >
         <Input
-          label="Email"
+          label={t("auth.email")}
           required
           value={email}
           onChangeText={setEmail}
-          placeholder="player@band.com"
+          placeholder={t("organizations.emailPlaceholder")}
           keyboardType="email-address"
           autoCapitalize="none"
           error={emailError}
@@ -245,7 +256,7 @@ export default function MembersScreen() {
           {(["member", "admin"] as OrganizationRole[]).map((entry) => (
             <Chip
               key={entry}
-              label={entry === "admin" ? "Admin — can edit everything" : "Member — can suggest changes"}
+              label={entry === "admin" ? t("members.adminCanEdit") : t("members.memberCanSuggest")}
               tone="primary"
               selected={inviteRole === entry}
               onPress={() => setInviteRole(entry)}
@@ -257,9 +268,11 @@ export default function MembersScreen() {
       <Dialog
         visible={pendingRemoval !== null}
         onClose={() => setPendingRemoval(null)}
-        title={`Remove ${pendingRemoval?.displayName ?? "this member"}?`}
-        description={`They lose access to ${organization?.name ?? "this band"} straight away. Their suggestions stay in the history.`}
-        confirmLabel="Remove member"
+        title={t("members.removeTitle", { name: pendingRemoval?.displayName ?? t("members.thisMember") })}
+        description={t("members.removeDescription", {
+          band: organization?.name ?? t("members.thisBand"),
+        })}
+        confirmLabel={t("organizations.removeMember")}
         tone="danger"
         confirmLoading={busy}
         onConfirm={() => void remove()}
@@ -268,28 +281,24 @@ export default function MembersScreen() {
       {!loading && members.length === 0 ? (
         <EmptyState
           icon={<GroupIcon size={24} color={Theme.colors.primary} />}
-          title="No members yet"
-          message={
-            isAdmin
-              ? "Invite the rest of the band by email."
-              : "Only admins can see this list."
-          }
-          actionLabel={isAdmin ? "Invite someone" : undefined}
+          title={t("organizations.noMembers")}
+          message={isAdmin ? t("members.noMembersAdmin") : t("members.noMembersViewer")}
+          actionLabel={isAdmin ? t("members.inviteSomeone") : undefined}
           onAction={isAdmin ? () => setInviteOpen(true) : undefined}
         />
       ) : null}
 
       {!isAdmin ? (
         <AppText variant="caption" tone="faint">
-          {pluralize(members.length, "member")} · your role is {ROLE_LABELS[role ?? "member"].toLowerCase()}.
+          {t("organizations.membersCount", { count: members.length })} ·{" "}
+          {t("members.yourRole", { role: t(`organizations.${role ?? "member"}`).toLowerCase() })}.
         </AppText>
       ) : (
         <AppText variant="caption" tone="faint">
-          <ShieldCheckIcon size={12} color={Theme.colors.textFaint} /> You are an admin: you can edit songs,
-          setlists, shows and members.
+          <ShieldCheckIcon size={12} color={Theme.colors.textFaint} /> {t("members.adminFooter")}
         </AppText>
       )}
-    </ScreenContainer>
+    </ModalScreen>
   )
 }
 

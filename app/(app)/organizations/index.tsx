@@ -1,6 +1,7 @@
 import React, { useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -11,16 +12,16 @@ import { Dialog } from "@/components/ui/Dialog"
 import { EmptyState } from "@/components/ui/States"
 import { useToast } from "@/components/ui/Toast"
 import { CheckCircleIcon, PlusIcon, UserIcon } from "@/components/ui/Icons"
-import { ScreenContainer } from "@/components/app/ScreenContainer"
+import { ModalScreen } from "@/components/app/ModalScreen"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { acceptInvitation } from "@/services/organizations"
 import { toFriendlyError } from "@/services/errors"
-import { pluralize } from "@/libs/format"
 import type { Invitation } from "@/interfaces"
 
 /** Band switcher (docs §7): switch, join an invitation or create a band. */
 export default function OrganizationsScreen() {
+  const { t } = useTranslation()
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
   const toast = useToast()
@@ -31,15 +32,21 @@ export default function OrganizationsScreen() {
   const [accepting, setAccepting] = useState<Invitation | null>(null)
   const [busy, setBusy] = useState(false)
 
+  /** Closes the modal, falling back to the dashboard when opened at the root. */
+  const close = (): void => {
+    if (router.canGoBack()) router.back()
+    else router.replace("/")
+  }
+
   const choose = async (id: string): Promise<void> => {
     if (id === organizationId) return
     setSwitching(id)
     try {
       await switchOrganization(id)
-      toast.showSuccess("Band switched.")
-      router.replace("/")
+      toast.showSuccess(t("organizations.bandSwitched"))
+      close()
     } catch (error) {
-      toast.showError(toFriendlyError(error, "We couldn't switch bands."))
+      toast.showError(toFriendlyError(error, t("organizations.couldNotSwitch")))
     } finally {
       setSwitching(null)
     }
@@ -54,25 +61,24 @@ export default function OrganizationsScreen() {
         email: profile?.email || user?.email || "",
       })
       setAccepting(null)
-      toast.showSuccess(`Welcome to ${invitation.organizationName}.`)
+      toast.showSuccess(t("auth.welcomeToBand", { name: invitation.organizationName }))
       await switchOrganization(invitation.organizationId)
-      router.replace("/")
+      close()
     } catch (error) {
-      toast.showError(toFriendlyError(error, "We couldn't join that band."))
+      toast.showError(toFriendlyError(error, t("auth.couldNotJoinBand")))
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <ScreenContainer
-      back
-      title="Your bands"
-      subtitle={pluralize(organizations.length, "band")}
-      large
+    <ModalScreen
+      title={t("organizations.yourBands")}
+      subtitle={t("organizations.bandsCount", { count: organizations.length })}
+      onClose={close}
       headerRight={
         <IconButton
-          label="Create a band"
+          label={t("organizations.createBand")}
           variant="secondary"
           onPress={() => router.push("/organizations/new")}
           icon={<PlusIcon size={18} color={Theme.colors.text} />}
@@ -82,9 +88,9 @@ export default function OrganizationsScreen() {
       {organizations.length === 0 ? (
         <EmptyState
           icon={<UserIcon size={24} color={Theme.colors.primary} />}
-          title="You're not in a band yet"
-          message="Create one and start typing your songs, or accept an invitation below."
-          actionLabel="Create a band"
+          title={t("organizations.noBandsTitle")}
+          message={t("organizations.noBandsDescription")}
+          actionLabel={t("organizations.createBand")}
           onAction={() => router.push("/organizations/new")}
         />
       ) : (
@@ -95,7 +101,7 @@ export default function OrganizationsScreen() {
               <Card
                 key={organization.id}
                 onPress={() => void choose(organization.id)}
-                accessibilityLabel={`${organization.name}${active ? ", current band" : ""}`}
+                accessibilityLabel={`${organization.name}${active ? `, ${t("organizations.currentBand")}` : ""}`}
                 style={styles.row}
               >
                 <View style={styles.initial}>
@@ -109,14 +115,14 @@ export default function OrganizationsScreen() {
                     {organization.name}
                   </AppText>
                   <AppText variant="caption" tone="muted">
-                    {organization.role === "admin" ? "You're an admin" : "Member"}
+                    {organization.role === "admin" ? t("organizations.youreAdmin") : t("organizations.member")}
                   </AppText>
                 </View>
                 {active ? (
-                  <Badge label="Current" tone="primary" />
+                  <Badge label={t("organizations.current")} tone="primary" />
                 ) : (
                   <Button
-                    label={switching === organization.id ? "Switching…" : "Switch"}
+                    label={switching === organization.id ? t("organizations.switching") : t("organizations.switch")}
                     size="sm"
                     variant="secondary"
                     disabled={switching !== null}
@@ -130,18 +136,18 @@ export default function OrganizationsScreen() {
       )}
 
       {invitations.length > 0 ? (
-        <Section title="Invitations for you" subtitle="Join another band with one tap">
+        <Section title={t("auth.invitationsForYou")} subtitle={t("organizations.joinWithOneTap")}>
           {invitations.map((invitation) => (
             <Card key={invitation.id} style={{ gap: Theme.spacing.m }}>
               <AppText variant="bodyStrong" numberOfLines={1}>
                 {invitation.organizationName}
               </AppText>
               <AppText variant="caption" tone="muted">
-                Invited by {invitation.invitedByName || "an admin"} ·{" "}
-                {invitation.role === "admin" ? "as an admin" : "as a member"}
+                {t("auth.invitedBy", { name: invitation.invitedByName || t("common.unknownAdmin") })} ·{" "}
+                {invitation.role === "admin" ? t("organizations.asAdmin") : t("organizations.asMember")}
               </AppText>
               <Button
-                label="Accept invitation"
+                label={t("auth.acceptInvitation")}
                 icon={<CheckCircleIcon size={16} color={Theme.colors.onPrimary} />}
                 disabled={busy}
                 onPress={() => setAccepting(invitation)}
@@ -152,7 +158,7 @@ export default function OrganizationsScreen() {
       ) : null}
 
       <Button
-        label="Create another band"
+        label={t("organizations.createAnotherBand")}
         variant="secondary"
         icon={<PlusIcon size={16} color={Theme.colors.text} />}
         onPress={() => router.push("/organizations/new")}
@@ -161,15 +167,17 @@ export default function OrganizationsScreen() {
       <Dialog
         visible={accepting !== null}
         onClose={() => setAccepting(null)}
-        title={accepting ? `Join ${accepting.organizationName}?` : "Join band"}
-        description={`You'll join as ${accepting?.role === "admin" ? "an admin" : "a musician"}.`}
-        confirmLabel="Join band"
+        title={accepting ? t("auth.joinBandTitle", { name: accepting.organizationName }) : t("organizations.joinBand")}
+        description={t("auth.joinBandDescription", {
+          role: accepting?.role === "admin" ? t("auth.roleAdmin") : t("auth.roleMusician"),
+        })}
+        confirmLabel={t("organizations.joinBand")}
         confirmLoading={busy}
         onConfirm={() => {
           if (accepting) void accept(accepting)
         }}
       />
-    </ScreenContainer>
+    </ModalScreen>
   )
 }
 

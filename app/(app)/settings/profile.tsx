@@ -1,6 +1,7 @@
 import React, { useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -12,7 +13,7 @@ import { Input } from "@/components/ui/Input"
 import { Dialog } from "@/components/ui/Dialog"
 import { useToast } from "@/components/ui/Toast"
 import { AccountIcon } from "@/components/ui/Icons"
-import { ScreenContainer } from "@/components/app/ScreenContainer"
+import { ModalScreen } from "@/components/app/ModalScreen"
 import { useAuth } from "@/hooks/useAuth"
 import { toFriendlyError } from "@/services/errors"
 import { updateAuthDisplayName, updateAuthPhotoUrl } from "@/services/auth"
@@ -22,6 +23,7 @@ import { pickImageBase64 } from "@/libs/imagePicker"
 
 /** Profile settings (docs §32): the name and photo the band sees. */
 export default function ProfileSettings() {
+  const { t } = useTranslation()
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
   const toast = useToast()
@@ -43,16 +45,16 @@ export default function ProfileSettings() {
       const uploaded = await uploadImage("avatars", picked)
       setPhotoURL(uploaded.url)
       await updateAuthPhotoUrl(uploaded.url)
-      toast.showSuccess("Photo updated.")
+      toast.showSuccess(t("settings.photoUpdated"))
     } catch (error) {
-      toast.showError(toFriendlyError(error, "We couldn't upload that photo."))
+      toast.showError(toFriendlyError(error, t("settings.couldNotUploadPhoto")))
     } finally {
       setUploading(false)
     }
   }
 
   const save = async (): Promise<void> => {
-    const nameError = validateRequired(name, "Enter the name your band knows you by.")
+    const nameError = validateRequired(name, t("auth.nameHint"))
     setErrors({ ...(nameError ? { name: nameError } : {}) })
     if (nameError) return
 
@@ -60,28 +62,28 @@ export default function ProfileSettings() {
     try {
       await updateProfile({ displayName: name.trim(), photoURL })
       await updateAuthDisplayName(name.trim()).catch(() => undefined)
-      toast.showSuccess("Your profile was updated.")
+      toast.showSuccess(t("settings.profileUpdated"))
       router.back()
     } catch (error) {
-      toast.showError(toFriendlyError(error, "We couldn't save your profile."))
+      toast.showError(toFriendlyError(error, t("settings.couldNotSaveProfile")))
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <ScreenContainer back title="Your profile" subtitle="How the band sees you" large>
+    <ModalScreen title={t("settings.yourProfile")} subtitle={t("settings.profileSubtitle")}>
       <Card style={styles.card}>
         <View style={styles.avatarRow}>
           <Avatar
             name={name || "?"}
             photoURL={photoURL}
             size={72}
-            accessibilityLabel={`Profile photo of ${name || "you"}`}
+            accessibilityLabel={t("settings.photoA11y", { name: name || t("common.you") })}
           />
           <View style={styles.flex}>
             <Button
-              label={uploading ? "Uploading…" : "Change photo"}
+              label={uploading ? t("settings.uploading") : t("settings.changePhoto")}
               variant="secondary"
               loading={uploading}
               icon={<AccountIcon size={15} color={Theme.colors.text} />}
@@ -89,7 +91,7 @@ export default function ProfileSettings() {
             />
             {photoURL ? (
               <Button
-                label="Remove photo"
+                label={t("settings.removePhoto")}
                 variant="ghost"
                 size="sm"
                 onPress={() => setConfirmRemovePhoto(true)}
@@ -99,39 +101,49 @@ export default function ProfileSettings() {
         </View>
 
         <Input
-          label="Display name"
+          label={t("settings.displayName")}
           required
           value={name}
           onChangeText={setName}
-          placeholder="Alex Rivera"
+          placeholder={t("settings.displayNamePlaceholder")}
           error={errors.name}
           autoCapitalize="words"
         />
 
         <View style={{ gap: 4 }}>
           <AppText variant="caption" tone="muted">
-            Email
+            {t("settings.email")}
           </AppText>
           <AppText variant="body" tone="faint">
-            {profile?.email || user?.email || "Not available"}
+            {profile?.email || user?.email || t("common.notAvailable")}
           </AppText>
           <AppText variant="caption" tone="faint">
-            Your sign-in email can’t be changed here.
+            {t("settings.emailNote")}
           </AppText>
         </View>
       </Card>
 
       <View style={styles.actions}>
-        <Button label="Cancel" variant="ghost" onPress={() => router.back()} style={styles.action} />
-        <Button label="Save profile" loading={saving} onPress={() => void save()} style={styles.action} />
+        <Button
+          label={t("common.cancel")}
+          variant="ghost"
+          onPress={() => router.back()}
+          style={styles.action}
+        />
+        <Button
+          label={t("settings.saveProfile")}
+          loading={saving}
+          onPress={() => void save()}
+          style={styles.action}
+        />
       </View>
 
       <Dialog
         visible={confirmRemovePhoto}
         onClose={() => setConfirmRemovePhoto(false)}
-        title="Remove your photo?"
-        description="Your band members will see your initials instead."
-        confirmLabel="Remove photo"
+        title={t("settings.removePhotoTitle")}
+        description={t("settings.removePhotoDescription")}
+        confirmLabel={t("settings.removePhoto")}
         tone="danger"
         onConfirm={async () => {
           setConfirmRemovePhoto(false)
@@ -139,7 +151,7 @@ export default function ProfileSettings() {
           await updateAuthPhotoUrl("").catch(() => undefined)
         }}
       />
-    </ScreenContainer>
+    </ModalScreen>
   )
 }
 

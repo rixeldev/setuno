@@ -1,6 +1,7 @@
 import React, { useState } from "react"
 import { Image, StyleSheet, View } from "react-native"
 import { useRouter } from "expo-router"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -11,7 +12,7 @@ import { Input } from "@/components/ui/Input"
 import { Dialog } from "@/components/ui/Dialog"
 import { useToast } from "@/components/ui/Toast"
 import { OrganizationIcon } from "@/components/ui/Icons"
-import { ScreenContainer } from "@/components/app/ScreenContainer"
+import { ModalScreen } from "@/components/app/ModalScreen"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
@@ -20,12 +21,12 @@ import { toFriendlyError } from "@/services/errors"
 import { uploadImage } from "@/services/uploads"
 import { pickImageBase64 } from "@/libs/imagePicker"
 import { validateRequired } from "@/libs/validation"
-import { formatDate, pluralize } from "@/libs/format"
+import { formatDate } from "@/libs/format"
 import { toDate } from "@/interfaces/timestamp"
-import { ROLE_LABELS } from "@/interfaces"
 
 /** Band settings (docs §31): rename, describe, logo, danger zone (admins only). */
 export default function OrganizationSettings() {
+  const { t } = useTranslation()
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
   const toast = useToast()
@@ -54,16 +55,16 @@ export default function OrganizationSettings() {
       const uploaded = await uploadImage("organizations", picked)
       setLogoURL(uploaded.url)
       await updateOrganization(organizationId ?? "", { name: organization?.name ?? "", description: organization?.description ?? "", logoURL: uploaded.url }, actor)
-      toast.showSuccess("Logo updated.")
+      toast.showSuccess(t("organizations.logoUpdated"))
     } catch (error) {
-      toast.showError(toFriendlyError(error, "We couldn't upload that logo."))
+      toast.showError(toFriendlyError(error, t("settings.couldNotUploadLogo")))
     } finally {
       setUploading(false)
     }
   }
 
   const save = async (): Promise<void> => {
-    const nameError = validateRequired(name, "Your band needs a name.")
+    const nameError = validateRequired(name, t("auth.giveBandName"))
     setErrors({ ...(nameError ? { name: nameError } : {}) })
     if (nameError) return
 
@@ -74,9 +75,9 @@ export default function OrganizationSettings() {
         { name: name.trim(), description: description.trim(), logoURL },
         actor,
       )
-      toast.showSuccess("Band details saved.")
+      toast.showSuccess(t("organizations.updated"))
     } catch (error) {
-      toast.showError(toFriendlyError(error, "We couldn't save those details."))
+      toast.showError(toFriendlyError(error, t("settings.couldNotSaveBand")))
     } finally {
       setSaving(false)
     }
@@ -88,7 +89,7 @@ export default function OrganizationSettings() {
       const fallback = organizations.find((entry) => entry.id !== organizationId)
       await deleteOrganization(organizationId ?? "")
       setConfirmDelete(false)
-      toast.showSuccess(`${deletionPhrase} was deleted.`)
+      toast.showSuccess(t("organizations.deleted"))
       if (fallback) {
         await switchOrganization(fallback.id)
       } else {
@@ -96,24 +97,26 @@ export default function OrganizationSettings() {
         router.replace("/organizations")
       }
     } catch (error) {
-      toast.showError(toFriendlyError(error, "We couldn't delete that band."))
+      toast.showError(toFriendlyError(error, t("settings.couldNotDeleteBand")))
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <ScreenContainer back title="Band details" subtitle={organization?.name} large>
+    <ModalScreen title={t("settings.bandDetails")} subtitle={organization?.name}>
       <Card style={styles.card}>
         <AppText variant="label" tone="faint">
-          Logo
+          {t("organizations.bandLogo")}
         </AppText>
         <View style={styles.logoRow}>
           {logoURL ? (
             <Image
               source={{ uri: logoURL }}
               style={styles.logoImage}
-              accessibilityLabel={`${organization?.name ?? "Band"} logo`}
+              accessibilityLabel={t("settings.logoA11y", {
+                name: organization?.name ?? t("organizations.band"),
+              })}
             />
           ) : (
             <View style={[styles.logo, styles.logoEmpty]}>
@@ -122,14 +125,20 @@ export default function OrganizationSettings() {
           )}
           <View style={styles.flex}>
             <Button
-              label={uploading ? "Uploading…" : logoURL ? "Replace logo" : "Upload a logo"}
+              label={
+                uploading
+                  ? t("settings.uploading")
+                  : logoURL
+                    ? t("settings.replaceLogo")
+                    : t("settings.uploadLogo")
+              }
               variant="secondary"
               loading={uploading}
               disabled={!isAdmin}
               onPress={() => void chooseLogo()}
             />
             <AppText variant="caption" tone="faint">
-              Square images work best.
+              {t("settings.logoHint")}
             </AppText>
           </View>
         </View>
@@ -137,7 +146,7 @@ export default function OrganizationSettings() {
 
       <Card style={styles.card}>
         <Input
-          label="Band name"
+          label={t("organizations.bandName")}
           required
           value={name}
           onChangeText={setName}
@@ -146,47 +155,50 @@ export default function OrganizationSettings() {
           autoCapitalize="words"
         />
         <Input
-          label="Description"
+          label={t("organizations.bandDescription")}
           value={description}
           onChangeText={setDescription}
           editable={isAdmin}
           multiline
-          placeholder="Rock covers, Thursday jams…"
+          placeholder={t("organizations.bandDescriptionPlaceholder")}
         />
         {isAdmin ? (
-          <Button label="Save details" loading={saving} onPress={() => void save()} />
+          <Button label={t("settings.saveDetails")} loading={saving} onPress={() => void save()} />
         ) : (
           <AppText variant="caption" tone="faint">
-            Only admins can change the band name and logo.
+            {t("settings.adminOnlyBand")}
           </AppText>
         )}
       </Card>
 
       <Card style={styles.card}>
         <AppText variant="label" tone="faint">
-          At a glance
+          {t("settings.atAGlance")}
         </AppText>
         <AppText variant="caption" tone="muted">
-          {pluralize(members.length, "member")} · {pluralize(songs.length, "song")} ·{" "}
-          {pluralize(setlists.length, "setlist")} · {pluralize(performances.length, "show")}
+          {t("organizations.membersCount", { count: members.length })} ·{" "}
+          {t("organizations.songsCount", { count: songs.length })} ·{" "}
+          {t("organizations.setlistsCount", { count: setlists.length })} ·{" "}
+          {t("organizations.showsCount", { count: performances.length })}
         </AppText>
         <AppText variant="caption" tone="faint">
-          Created {formatDate(toDate(organization?.createdAt ?? null))} · your role is{" "}
-          {ROLE_LABELS[role ?? "member"].toLowerCase()}
+          {t("settings.createdRole", {
+            date: formatDate(toDate(organization?.createdAt ?? null)),
+            role: t(`organizations.${role ?? "member"}`).toLowerCase(),
+          })}
         </AppText>
       </Card>
 
       {isAdmin && isOwner ? (
         <Card style={[styles.card, styles.dangerCard]}>
           <AppText variant="label" tone="danger">
-            Danger zone
+            {t("settings.dangerZone")}
           </AppText>
           <AppText variant="caption" tone="muted">
-            Deleting {deletionPhrase} removes every song, setlist, show and suggestion for the whole band. This
-            can’t be undone.
+            {t("organizations.deleteBandDescription", { phrase: deletionPhrase })}
           </AppText>
           <Button
-            label="Delete this band"
+            label={t("organizations.deleteBand")}
             variant="danger"
             onPress={() => {
               setTypedName("")
@@ -199,23 +211,23 @@ export default function OrganizationSettings() {
       <Dialog
         visible={confirmDelete}
         onClose={() => setConfirmDelete(false)}
-        title={`Delete ${deletionPhrase}?`}
-        description={`Type ${deletionPhrase} to confirm. Every song, setlist and show is deleted for everyone.`}
-        confirmLabel="Delete band"
+        title={t("organizations.deleteBandConfirm", { name: deletionPhrase })}
+        description={t("settings.deleteConfirmDescription", { name: deletionPhrase })}
+        confirmLabel={t("organizations.deleteBand")}
         tone="danger"
         confirmDisabled={typedName.trim() !== deletionPhrase.trim()}
         confirmLoading={saving}
         onConfirm={() => void remove()}
       >
         <Input
-          label="Band name"
+          label={t("organizations.bandName")}
           value={typedName}
           onChangeText={setTypedName}
           placeholder={deletionPhrase}
           autoCapitalize="words"
         />
       </Dialog>
-    </ScreenContainer>
+    </ModalScreen>
   )
 }
 

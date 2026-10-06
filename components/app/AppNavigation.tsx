@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react"
 import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native"
 import { usePathname, useRouter } from "expo-router"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -21,25 +22,26 @@ import { MOBILE_NAV, SIDEBAR_NAV, isNavActive } from "@/libs/navigation"
  */
 export function OrgSwitcher({ compact = false }: { compact?: boolean }) {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const router = useRouter()
   const { organizations, organization, switchOrganization } = useOrganization()
   const [open, setOpen] = useState(false)
 
-  const name = organization?.name || "No band yet"
+  const name = organization?.name || t("organizations.noBand")
 
   return (
     <View style={compact ? undefined : styles.host}>
       <Pressable
         onPress={() => setOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel={`Active band: ${name}. Tap to switch band`}
+        accessibilityLabel={t("organizations.switcherLabel", { name })}
         style={({ pressed }) => [styles.trigger, compact && styles.triggerCompact, pressed && styles.pressed]}
       >
         <Avatar name={name} photoURL={organization?.logoURL} size={compact ? 28 : 32} />
         {!compact ? (
           <View style={styles.triggerText}>
             <AppText variant="caption" tone="faint">
-              Band
+              {t("settings.organization")}
             </AppText>
             <AppText variant="bodyStrong" numberOfLines={1}>
               {name}
@@ -53,14 +55,14 @@ export function OrgSwitcher({ compact = false }: { compact?: boolean }) {
         <Pressable
           style={styles.backdrop}
           accessibilityRole="button"
-          accessibilityLabel="Close band switcher"
+          accessibilityLabel={t("common.close")}
           onPress={() => setOpen(false)}
         />
         <View style={styles.sheet}>
           <View style={styles.sheetHeader}>
-            <AppText variant="heading">Your bands</AppText>
+            <AppText variant="heading">{t("organizations.bands")}</AppText>
             <IconButton
-              label="Close"
+              label={t("common.close")}
               size={34}
               onPress={() => setOpen(false)}
               icon={<CloseIcon size={16} color={Theme.colors.textMuted} />}
@@ -88,11 +90,11 @@ export function OrgSwitcher({ compact = false }: { compact?: boolean }) {
                       {item.name}
                     </AppText>
                     <AppText variant="caption" tone="faint">
-                      {item.role === "admin" ? "Admin" : "Musician"}
+                      {item.role === "admin" ? t("organizations.admin") : t("auth.musician")}
                     </AppText>
                   </View>
                   {active ? (
-                    <Chip label="Active" tone="primary" size="sm" />
+                    <Chip label={t("common.active")} tone="primary" size="sm" />
                   ) : (
                     <SwapIcon size={16} color={Theme.colors.textFaint} />
                   )}
@@ -102,7 +104,7 @@ export function OrgSwitcher({ compact = false }: { compact?: boolean }) {
           </ScrollView>
 
           <Button
-            label="Manage bands"
+            label={t("organizations.bands")}
             variant="secondary"
             onPress={() => {
               setOpen(false)
@@ -118,6 +120,7 @@ export function OrgSwitcher({ compact = false }: { compact?: boolean }) {
 /** Web sidebar navigation with the band switcher and account footer. */
 export function SidebarNav() {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const router = useRouter()
   const pathname = usePathname()
   const { pendingSuggestions } = useOrgData()
@@ -142,7 +145,7 @@ export function SidebarNav() {
             <Pressable
               key={item.href}
               accessibilityRole="link"
-              accessibilityLabel={item.label}
+              accessibilityLabel={t(item.label)}
               accessibilityState={{ selected: active }}
               onPress={() => router.push(item.href as never)}
               style={({ pressed }) => [
@@ -153,7 +156,7 @@ export function SidebarNav() {
             >
               <Icon size={18} color={active ? Theme.colors.primary : Theme.colors.textMuted} />
               <AppText variant="body" tone={active ? "primary" : "muted"} style={styles.navLabel}>
-                {item.label}
+                {t(item.label)}
               </AppText>
               {badge > 0 ? (
                 <View style={styles.badge}>
@@ -171,20 +174,20 @@ export function SidebarNav() {
         <Pressable
           onPress={() => router.push("/settings/profile")}
           accessibilityRole="button"
-          accessibilityLabel="Open your profile"
+          accessibilityLabel={t("settings.profile")}
           style={({ pressed }) => [styles.userRow, pressed && styles.pressed]}
         >
           <Avatar name={profile?.displayName || "?"} photoURL={profile?.photoURL} size={34} />
           <View style={styles.rowText}>
             <AppText variant="caption" numberOfLines={1}>
-              {profile?.displayName || "Musician"}
+              {profile?.displayName || t("auth.musician")}
             </AppText>
             <AppText variant="caption" tone="faint" numberOfLines={1}>
               {profile?.email}
             </AppText>
           </View>
         </Pressable>
-        <Button label="Sign out" variant="ghost" size="sm" onPress={() => void signOut()} />
+        <Button label={t("settings.signOut")} variant="ghost" size="sm" onPress={() => void signOut()} />
       </View>
     </View>
   )
@@ -193,6 +196,7 @@ export function SidebarNav() {
 /** Mobile bottom tab bar (docs §18). */
 export function BottomBar() {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   const router = useRouter()
   const pathname = usePathname()
   const insets = useSafeAreaInsets()
@@ -210,7 +214,7 @@ export function BottomBar() {
           <Pressable
             key={item.href}
             accessibilityRole="link"
-            accessibilityLabel={item.label}
+            accessibilityLabel={t(item.label)}
             accessibilityState={{ selected: active }}
             onPress={() => router.push(item.href as never)}
             style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
@@ -226,7 +230,7 @@ export function BottomBar() {
               ) : null}
             </View>
             <AppText variant="caption" tone={active ? "primary" : "faint"}>
-              {item.label}
+              {t(item.label)}
             </AppText>
           </Pressable>
         )
