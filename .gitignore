@@ -45,5 +45,9 @@ GoogleService-Info.plist
 # DB config file
 /db/firebaseConfig.ts
 
+# local env files (see .env.example)
+.env
+.env.local
+
 # Docs
 docs
