@@ -1,9 +1,11 @@
 // Native Google sign-in (Android / iOS).
 //
-// `GoogleSignin` obtains a Google ID token which is exchanged for a Firebase
-// credential, so the resulting session is identical to the email/password one:
-// `ensureUserProfile` backfills `users/{uid}` and the organization listeners
-// pick the account up exactly as they would for any other sign-in.
+// `GoogleSignin` obtains Google sign-in tokens (an ID token when a web client
+// ID is configured, an access token otherwise) and exchanges them for a
+// Firebase credential, so the resulting session is identical to the
+// email/password one: `ensureUserProfile` backfills `users/{uid}` and the
+// organization listeners pick the account up exactly as they would for any
+// other sign-in.
 //
 // This file is the native implementation. Metro resolves `googleAuth.web.ts`
 // for the web bundle (platform extension), so the browser never pulls in a
@@ -45,9 +47,9 @@ export const signInWithGoogle = async (): Promise<boolean> => {
     if (!isSuccessResponse(response)) return false
 
     // Fast path: the ID token that travels with the response saves a network
-    // round-trip. Some Android configurations only expose it through
-    // `getTokens()`, and a rejected credential must never end the flow, so the
-    // classic exchange below stays as the reliable fallback.
+    // round-trip (it is only present when a web client ID is configured).
+    // A rejected credential must never end the flow, so the classic exchange
+    // below stays as the reliable fallback.
     const responseToken = response.data.idToken?.trim()
     if (responseToken) {
       try {
@@ -59,7 +61,13 @@ export const signInWithGoogle = async (): Promise<boolean> => {
     }
 
     const tokens = await GoogleSignin.getTokens()
-    if (!tokens.idToken) throw new Error("Google did not return an ID token.")
+    // Firebase builds a valid credential from the ID token, the access token or
+    // both. Some Android setups cannot request an ID token (no web client ID
+    // configured), so the access-token-only case must keep working: only having
+    // neither token is fatal.
+    if (!tokens.idToken && !tokens.accessToken) {
+      throw new Error("Google did not return sign-in tokens.")
+    }
     await signInWithCredential(
       auth,
       GoogleAuthProvider.credential(tokens.idToken, tokens.accessToken),
