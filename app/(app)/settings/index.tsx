@@ -38,6 +38,8 @@ interface RowProps {
   subtitle?: string
   onPress: () => void
   danger?: boolean
+  /** Brings its own padding, for rows living in a `padded={false}` card. */
+  compact?: boolean
 }
 
 /**
@@ -165,11 +167,12 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
-      <Card>
+      <Card padded={false}>
         <Row
           icon={LogoutIcon}
           title={t("settings.signOut")}
           danger
+          compact
           onPress={() => setConfirmSignOut(true)}
         />
       </Card>
@@ -196,14 +199,18 @@ export default function SettingsScreen() {
   )
 }
 
-function Row({ icon: Icon, title, subtitle, onPress, danger }: RowProps) {
+function Row({ icon: Icon, title, subtitle, onPress, danger, compact = false }: RowProps) {
   const styles = useThemedStyles(createStyles)
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={title}
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      style={({ pressed }) => [
+        styles.row,
+        compact && styles.rowCompact,
+        pressed && styles.rowPressed,
+      ]}
     >
       <View style={[styles.rowIcon, danger && styles.rowIconDanger]}>
         <Icon
@@ -277,6 +284,11 @@ const createStyles = () =>
       flexDirection: "row",
       alignItems: "center",
       gap: Theme.spacing.s,
+      paddingVertical: Theme.spacing.s,
+    },
+    // Compact rows (sign out) carry their own padding so the card stays slim.
+    rowCompact: {
+      paddingHorizontal: Theme.spacing.l,
       paddingVertical: Theme.spacing.s,
     },
     rowPressed: {
