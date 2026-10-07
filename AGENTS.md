@@ -18,7 +18,7 @@ Expo ships breaking changes every SDK release. APIs you remember are likely rena
 - Lint is **ESLint 9 flat config** (`eslint.config.js`) — do not upgrade to ESLint 10, `eslint-config-expo` is not compatible with it.
 - Routes live in **`app/`** (not `src/app/`). There is no `src/` directory.
 - Native `ios/` and `android/` directories do not exist (Continuous Native Generation) — see *Building with EAS*.
-- Local Gradle/CMake builds need **JDK 17**: on JDK 24+ Android Gradle Plugin aborts the native tasks with `WARNING: A restricted method in java.lang.System has been called`. In Android Studio set *Settings → Build, Execution and Deployment → Build Tools → Gradle → Gradle JDK* to 17 (its bundled JBR is often newer, e.g. 25); CLI builds pick it up from `JAVA_HOME`.
+- Local Gradle/CMake builds need **JDK 17**: on JDK 24+ Android Gradle Plugin aborts the native tasks with `WARNING: A restricted method in java.lang.System has been called`. In Android Studio set *Settings → Build, Execution and Deployment → Build Tools → Gradle → Gradle JDK* to 17 (its bundled JBR is often newer, e.g. 25); CLI builds pick it up from `JAVA_HOME`. Leave *Gradle user home* **empty** — a JDK path there puts `wrapper/dists` inside `Program Files` and every sync fails. A successful AS sync writes `android/gradle/gradle-daemon-jvm.properties` with the selected JDK version, and that file also forces the JVM of plain `gradlew` runs (`toolchainVersion=25` reintroduces the CMake failure); delete it or re-sync with the IDE's Gradle JDK at 17.
 
 ## Commands
 
