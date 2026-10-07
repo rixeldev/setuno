@@ -1,9 +1,10 @@
-import React from "react"
+import React, { useEffect } from "react"
 import { Platform, StyleSheet, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { usePathname } from "expo-router"
 
 import { useThemedStyles } from "@/hooks/useThemedStyles"
+import { setBottomChromeHeight } from "@/hooks/useBottomChrome"
 import { BottomBar, SidebarNav } from "@/components/app/AppNavigation"
 import { SyncBanner } from "@/components/app/SyncBanner"
 import { BannerAdSlot } from "@/components/ads/BannerAdSlot"
@@ -26,6 +27,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // mobile slot below is persistent while the navigation is visible.
   const onDashboard = pathname === "/" && !focused
 
+  // Floating UI (the toast) anchors above the measured bottom chrome; release
+  // it while the bar is hidden and when the shell goes away.
+  useEffect(() => {
+    if (focused) setBottomChromeHeight(0)
+  }, [focused])
+  useEffect(() => () => setBottomChromeHeight(0), [])
+
   if (usesSidebar) {
     return (
       <View style={styles.desktop}>
@@ -45,10 +53,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SyncBanner />
         {children}
       </SafeAreaView>
-      {focused ? null : <BottomBar />}
-      {/* The banner stays mounted under the tab bar across tabs, so it never
-          appears and disappears while navigating. */}
-      {focused ? null : <BannerAdSlot fullWidth />}
+      {focused ? null : (
+        <View
+          onLayout={(event) => setBottomChromeHeight(event.nativeEvent.layout.height)}
+        >
+          <BottomBar />
+          {/* The banner stays mounted under the tab bar across tabs, so it
+              never appears and disappears while navigating. */}
+          <BannerAdSlot fullWidth />
+        </View>
+      )}
     </View>
   )
 }

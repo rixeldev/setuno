@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
+import { useBottomChromeHeight } from "@/hooks/useBottomChrome"
 import { CheckIcon, CloseIcon, InfoIcon } from "@/components/ui/Icons"
 
 export type ToastKind = "success" | "error" | "info"
@@ -83,6 +84,7 @@ function ToastSnackbar({ toast, onDismiss }: { toast: ToastItem; onDismiss: () =
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
+  const chrome = useBottomChromeHeight()
   const progress = useState(() => new Animated.Value(0))[0]
 
   useEffect(() => {
@@ -104,7 +106,7 @@ function ToastSnackbar({ toast, onDismiss }: { toast: ToastItem; onDismiss: () =
         : Theme.colors.primary
 
   return (
-    <View style={[styles.host, { pointerEvents: "none" }]}>
+    <View style={styles.host}>
       <Animated.View
         style={[
           styles.snackbar,
@@ -112,13 +114,18 @@ function ToastSnackbar({ toast, onDismiss }: { toast: ToastItem; onDismiss: () =
             borderColor: accent,
             opacity: progress,
             transform: [{ translateY }],
-            bottom: Math.max(insets.bottom, 12) + (Platform.OS === "web" ? 24 : 76),
+            // Right above the measured bottom chrome (tab bar + banner); with
+            // no chrome, close to the bottom edge.
+            bottom:
+              chrome > 0
+                ? chrome + Theme.spacing.m
+                : Math.max(insets.bottom, 12) + Theme.spacing.m,
             // `pointerEvents` belongs to the style on react-native-web.
             pointerEvents: "box-none",
           },
         ]}
       >
-        <View style={[styles.row, { pointerEvents: "none" }]}>
+        <View style={styles.row}>
           <View style={[styles.iconWrap, { backgroundColor: `${accent}22` }]}>
             {toast.kind === "success" ? (
               <CheckIcon color={accent} size={16} />
@@ -168,6 +175,7 @@ const createStyles = () =>
       bottom: 0,
       justifyContent: "flex-end",
       zIndex: 10_000,
+      pointerEvents: "box-none",
     },
     snackbar: {
       position: "absolute",
