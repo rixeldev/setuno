@@ -91,6 +91,7 @@ export default function SettingsScreen() {
       title={t("settings.settings")}
       subtitle={t("settings.subtitle")}
       large
+      back
     >
       <Card style={styles.card}>
         <View style={styles.profile}>
