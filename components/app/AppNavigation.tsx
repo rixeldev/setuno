@@ -218,21 +218,39 @@ export function BottomBar() {
             accessibilityLabel={t(item.label)}
             accessibilityState={{ selected: active }}
             onPress={() => goToTab(item.href)}
-            style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
+            style={styles.tab}
           >
-            <View style={[styles.tabIcon, active && styles.tabIconActive]}>
-              <Icon size={21} color={active ? Theme.colors.primary : Theme.colors.textMuted} />
-              {badge > 0 ? (
-                <View style={styles.tabBadge}>
-                  <AppText variant="caption" tone="inverse" style={styles.tabBadgeText}>
-                    {badge}
-                  </AppText>
+            {({ pressed }) => (
+              <>
+                {/* Remounting the bubble when the active state flips makes
+                    Android build the rounded drawable from scratch — the path
+                    that renders it round. Press feedback lives on the icon and
+                    label instead of the whole cell: dimming an ancestor of the
+                    rounded view can repaint it square on Android. */}
+                <View
+                  key={active ? "active" : "idle"}
+                  style={[styles.tabIcon, active && styles.tabIconActive]}
+                >
+                  <View style={pressed ? styles.pressedLeaf : undefined}>
+                    <Icon size={21} color={active ? Theme.colors.primary : Theme.colors.textMuted} />
+                  </View>
+                  {badge > 0 ? (
+                    <View style={styles.tabBadge}>
+                      <AppText variant="caption" tone="inverse" style={styles.tabBadgeText}>
+                        {badge}
+                      </AppText>
+                    </View>
+                  ) : null}
                 </View>
-              ) : null}
-            </View>
-            <AppText variant="caption" tone={active ? "primary" : "faint"}>
-              {t(item.label)}
-            </AppText>
+                <AppText
+                  variant="caption"
+                  tone={active ? "primary" : "faint"}
+                  style={pressed ? styles.pressedLeaf : undefined}
+                >
+                  {t(item.label)}
+                </AppText>
+              </>
+            )}
           </Pressable>
         )
       })}
@@ -289,6 +307,8 @@ const createStyles = () =>
     userRow: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.s },
     rowText: { flex: 1, minWidth: 0 },
     pressed: { opacity: 0.7 },
+    /** Press feedback for leaves inside the tab bubble (never the ancestor). */
+    pressedLeaf: { opacity: 0.7 },
     host: { paddingHorizontal: Theme.spacing.s },
     trigger: {
       flexDirection: "row",
