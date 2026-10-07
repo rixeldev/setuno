@@ -39,7 +39,7 @@ export function PianoChord({ shape, label }: PianoChordProps) {
   const isBass = (pitch: number): boolean => shape.bassIndex !== null && pitch === shape.bassIndex
 
   return (
-    <View accessible accessibilityLabel={label} style={styles.wrap}>
+    <View accessible accessibilityRole="image" accessibilityLabel={label} style={styles.wrap}>
       <View
         style={[styles.board, { width, height: WHITE_H }]}
         accessibilityElementsHidden

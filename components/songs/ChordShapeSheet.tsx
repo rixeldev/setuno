@@ -161,7 +161,16 @@ export function ChordShapeSheet({
 
   const pianoView = piano ? (
     <View style={styles.pianoWrap}>
-      <PianoChord shape={piano} label={`${display} · ${notes.join(" ")}`} />
+      {/* Two octaves do not fit a very narrow phone: scrolling keeps every
+          key reachable instead of clipping the keyboard. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.pianoScroll}
+        contentContainerStyle={styles.pianoScrollContent}
+      >
+        <PianoChord shape={piano} label={`${display} · ${notes.join(" ")}`} />
+      </ScrollView>
       <AppText variant="caption" tone="muted">
         {t("songs.chordNotes", { notes: notes.join("  ") })}
       </AppText>
@@ -218,4 +227,6 @@ const createStyles = () =>
     },
     flipped: { transform: [{ rotate: "180deg" }] },
     pianoWrap: { gap: Theme.spacing.s, alignItems: "center" },
+    pianoScroll: { width: "100%" },
+    pianoScrollContent: { flexGrow: 1, justifyContent: "center", alignItems: "center" },
   })

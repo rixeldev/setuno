@@ -34,7 +34,7 @@ export function FretboardDiagram({ shape, label }: FretboardDiagramProps) {
   const rowTop = (fret: number): number => TOP + (fret - 1) * FRET_GAP
 
   return (
-    <View accessible accessibilityLabel={label} style={styles.wrap}>
+    <View accessible accessibilityRole="image" accessibilityLabel={label} style={styles.wrap}>
       <View
         style={[styles.board, { width, height }]}
         accessibilityElementsHidden
