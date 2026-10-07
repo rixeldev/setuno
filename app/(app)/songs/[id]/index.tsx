@@ -25,6 +25,7 @@ import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { AppBackground } from "@/components/app/AppBackground"
 import { PageHeader } from "@/components/ui/PageHeader"
 import { SongContent } from "@/components/songs/SongContent"
+import { ChordShapeSheet } from "@/components/songs/ChordShapeSheet"
 import { SongControls } from "@/components/songs/SongControls"
 import { SongNavArrows } from "@/components/songs/SongNavArrows"
 import { useToast } from "@/components/ui/Toast"
@@ -91,6 +92,8 @@ export default function SongScreen() {
   // general songbook always opens in the regular layout.
   const [immersive, setImmersive] = useState(() => (setlistId ? readImmersiveMode() : false))
   const [notesOpen, setNotesOpen] = useState(false)
+  // Letter chord tapped in the reader; opens the “how to play” sheet.
+  const [chordHelp, setChordHelp] = useState<string | null>(null)
 
   const enterImmersive = (): void => {
     writeImmersiveMode(true)
@@ -224,8 +227,23 @@ export default function SongScreen() {
         showChords={showChords}
         semitones={semitones}
         notation={notation}
+        onChordPress={setChordHelp}
       />
     )
+
+  // “How to play” sheet: piano keys or every guitar voicing for the tapped
+  // chord, with the current capo applied to the guitar shapes.
+  const chordSheet = (
+    <ChordShapeSheet
+      visible={chordHelp !== null}
+      chord={chordHelp}
+      capo={capo}
+      notation={notation}
+      instrument={preferences.chordInstrument ?? "guitar"}
+      onInstrumentChange={(next) => saveDisplayPreference({ chordInstrument: next })}
+      onClose={() => setChordHelp(null)}
+    />
+  )
 
   // Stage mode: only the song, the exit control and the current key.
   if (immersive) {
@@ -268,6 +286,7 @@ export default function SongScreen() {
         {step ? (
           <SongNavArrows previousId={step.previousId} nextId={step.nextId} onNavigate={openSong} />
         ) : null}
+        {chordSheet}
       </View>
     )
   }
@@ -437,6 +456,7 @@ export default function SongScreen() {
       {step ? (
         <SongNavArrows previousId={step.previousId} nextId={step.nextId} onNavigate={openSong} />
       ) : null}
+      {chordSheet}
     </View>
   )
 }

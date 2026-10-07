@@ -19,6 +19,8 @@ interface SongContentProps {
   notation?: ChordNotation
   /** Highlights a section while scrolling from a suggestion. */
   highlightSectionId?: string | null
+  /** Makes every chord tappable (the reader opens its “how to play” sheet). */
+  onChordPress?: (chord: string) => void
 }
 
 /**
@@ -32,6 +34,7 @@ export function SongContent({
   semitones = 0,
   notation = "letters",
   highlightSectionId = null,
+  onChordPress,
 }: SongContentProps) {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
@@ -69,6 +72,7 @@ export function SongContent({
                 fontSize={fontSize}
                 showChords={showChords}
                 notation={notation}
+                onChordPress={onChordPress}
               />
             ))}
           </View>

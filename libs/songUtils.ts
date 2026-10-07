@@ -258,6 +258,43 @@ export const shiftChordByCharacter = (
   )
 }
 
+export interface ChordRowSegment {
+  text: string
+  /**
+   * Set on the chord segments (letter spelling): the reader makes them
+   * tappable. Spacing lives in plain segments so the monospace grid is kept.
+   */
+  chord?: string
+}
+
+/**
+ * Splits the padded monospace chord row into segments: plain spacing plus one
+ * segment per chord. This lets the reader keep the exact character grid while
+ * making every chord tappable; `buildChordRow` is simply the joined text.
+ */
+export const buildChordSegments = (
+  chords: (ChordPosition & { label?: string })[],
+  text: string,
+): ChordRowSegment[] => {
+  if (chords.length === 0) return []
+  const limit = text.length
+  const segments: ChordRowSegment[] = []
+  let length = 0
+
+  for (const chord of chords) {
+    const label = (chord.label ?? chord.chord).trim()
+    const target = Math.max(0, Math.min(Math.round(chord.position), limit))
+    // Never place a chord before the end of the previous one.
+    const start = Math.max(target, length)
+    if (start > length) segments.push({ text: " ".repeat(start - length) })
+    segments.push({ text: label, chord: chord.chord.trim() })
+    segments.push({ text: " " })
+    length = start + label.length + 1
+  }
+
+  return segments
+}
+
 /**
  * Pads a monospace string so each chord starts exactly `position` characters
  * into the row. Overlapping chords are shifted one column so nothing is drawn
@@ -266,22 +303,10 @@ export const shiftChordByCharacter = (
  * Shared by the reader and the editor preview, and always rendered with the
  * same font size as the lyric line underneath so the columns line up.
  */
-export const buildChordRow = (chords: ChordPosition[], text: string): string => {
-  if (chords.length === 0) return ""
-  const limit = text.length
-  let row = ""
-
-  for (const chord of chords) {
-    const target = Math.max(0, Math.min(Math.round(chord.position), limit))
-    // Never place a chord before the end of the previous one.
-    const start = Math.max(target, row.length)
-    if (start > row.length) row += " ".repeat(start - row.length)
-    row += chord.chord.trim()
-    row += " "
-  }
-
-  return row
-}
+export const buildChordRow = (chords: ChordPosition[], text: string): string =>
+  buildChordSegments(chords, text)
+    .map((segment) => segment.text)
+    .join("")
 
 const commonPrefixLength = (a: string, b: string): number => {
   const max = Math.min(a.length, b.length)

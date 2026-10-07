@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import type { SongSection } from "@/interfaces/song"
 import {
   buildChordRow,
+  buildChordSegments,
   chordAnchors,
   chordPositionLimit,
   cloneSections,
@@ -303,6 +304,26 @@ describe("buildChordRow", () => {
 
   it("returns an empty row without chords", () => {
     expect(buildChordRow([], "Hi")).toBe("")
+  })
+})
+
+describe("buildChordSegments", () => {
+  it("joins back into the exact buildChordRow text", () => {
+    const entries = [
+      { chord: "C", position: 0 },
+      { chord: "G", position: 6 },
+    ]
+    expect(buildChordSegments(entries, "Hello world").map((segment) => segment.text).join("")).toBe(
+      buildChordRow(entries, "Hello world"),
+    )
+  })
+
+  it("tags chord segments with the letter spelling and keeps the display label", () => {
+    const segments = buildChordSegments(
+      [{ chord: "F#m7", position: 3, label: "Fa#m7" }],
+      "Hello world",
+    )
+    expect(segments).toEqual([{ text: "   " }, { text: "Fa#m7", chord: "F#m7" }, { text: " " }])
   })
 })
 
