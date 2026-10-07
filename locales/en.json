@@ -956,7 +956,8 @@
     "removePhotoDescription": "Your band members will see your initials instead.",
     "usernameHint": "Unique, and only changeable once every 3 months.",
     "usernameTaken": "That name is already taken.",
-    "usernameTooSoon": "You can only change your name once every 3 months."
+    "usernameTooSoon": "You can only change your name once every 3 months.",
+    "signOutDescription": "Your songs stay safe on the server. Sign back in any time."
   },
   "activity": {
     "songCreated": "{{actor}} added \"{{target}}\"",
