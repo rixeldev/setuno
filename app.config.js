@@ -27,6 +27,7 @@ export default {
       version: "1.0.0",
       minSdkVersion: 24,
       ndkVersion: "29.0.14206865",
+      targetSdkVersion: 36,
       googleServicesFile: "./google-services.json",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
