@@ -7,6 +7,7 @@ import { Stack } from "expo-router"
 import * as SplashScreen from "expo-splash-screen"
 import { useFonts } from "expo-font"
 import { Onest_400Regular, Onest_700Bold } from "@expo-google-fonts/onest"
+import { JetBrainsMono_400Regular } from "@expo-google-fonts/jetbrains-mono"
 
 import { Theme } from "@/constants/Theme"
 import { AuthProvider } from "@/hooks/useAuth"
@@ -41,6 +42,9 @@ export default function Layout() {
   const [fontsLoaded, fontError] = useFonts({
     Onest: Onest_400Regular,
     OnestBold: Onest_700Bold,
+    // Bundled mono for the chord/lyric grids: identical metrics on every
+    // platform (Android's system `monospace` is not truly monospaced).
+    Mono: JetBrainsMono_400Regular,
   })
 
   // Every stored preference (theme, language, reader settings) is restored

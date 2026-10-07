@@ -1,4 +1,4 @@
-import { Dimensions, Platform } from "react-native"
+import { Dimensions } from "react-native"
 
 export const colorWithOpacity = (color: string, opacity: number): string => {
   const match = /^#?([\da-f]{6})$/i.exec(color)
@@ -84,11 +84,12 @@ export const Theme = {
     onest: "Onest",
     onestBold: "OnestBold",
     /**
-     * Monospaced face used by the chord rows and lyric grids. `monospace` is a
-     * system alias on Android and web; iOS needs its own mono family or the
-     * fallback is proportional and the padded chord columns drift.
+     * Monospaced face for the chord rows and lyric grids. It ships with the app
+     * (registered in the root layout) because Android's system `monospace` is
+     * not truly monospaced for every glyph, which made the padded chord columns
+     * drift left while web looked fine.
      */
-    mono: Platform.OS === "ios" ? "Menlo" : "monospace",
+    mono: "Mono",
   },
   sizes: {
     hero: 31,
