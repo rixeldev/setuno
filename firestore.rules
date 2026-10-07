@@ -136,8 +136,9 @@ service cloud.firestore {
 
       /**
        * Denormalised membership index so the app can list a user's bands in one
-       * read. Only the user themselves writes it (when they accept an invite or
-       * leave a band); admins never write into another user's document.
+       * read. The user themselves writes it when they accept an invite or leave
+       * a band; the band's admins keep the mirrored role in step when they
+       * change or remove a member — only that field, never the rest.
        */
       match /organizations/{organizationId} {
         allow read: if isSelf(uid)
@@ -146,9 +147,17 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['name', 'role', 'logoURL', 'joinedAt'])
           && request.resource.data.role in ['admin', 'member']
           && acceptedOwnInvitationAfterBatch(organizationId);
-        allow update: if isSelf(uid)
-          && request.resource.data.diff(resource.data).affectedKeys().hasAll(['name', 'role', 'logoURL', 'joinedAt']);
-        allow delete: if isSelf(uid);
+        allow update: if (
+            isSelf(uid)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'role', 'logoURL', 'joinedAt'])
+          ) || (
+            signedIn()
+            && isAdmin(organizationId)
+            && exists(memberPath(organizationId, uid))
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+          );
+        allow delete: if isSelf(uid)
+          || (signedIn() && isAdmin(organizationId) && uid != request.auth.uid);
       }
     }
 
