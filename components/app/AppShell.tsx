@@ -22,9 +22,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { usesSidebar } = useResponsive()
   const pathname = usePathname()
   const focused = isFocusRoute(pathname)
-  // One banner, on the dashboard, sitting under the navigation. It hides
-  // itself when there is nothing to show (no fill, offline, web).
-  const showDashboardBanner = pathname === "/" && !focused
+  // On desktop the banner stays a dashboard detail (web renders nothing); the
+  // mobile slot below is persistent while the navigation is visible.
+  const onDashboard = pathname === "/" && !focused
 
   if (usesSidebar) {
     return (
@@ -33,7 +33,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <View style={styles.desktopContent}>
           <SyncBanner />
           {children}
-          {showDashboardBanner ? <BannerAdSlot /> : null}
+          {onDashboard ? <BannerAdSlot /> : null}
         </View>
       </View>
     )
@@ -46,8 +46,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </SafeAreaView>
       {focused ? null : <BottomBar />}
-      {/* The dashboard banner lives under the tab bar, full width. */}
-      {showDashboardBanner ? <BannerAdSlot fullWidth /> : null}
+      {/* The banner stays mounted under the tab bar across tabs, so it never
+          appears and disappears while navigating. */}
+      {focused ? null : <BannerAdSlot fullWidth />}
     </View>
   )
 }
