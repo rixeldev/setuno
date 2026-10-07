@@ -1,4 +1,4 @@
-import { Dimensions } from "react-native"
+import { Dimensions, Platform } from "react-native"
 
 export const colorWithOpacity = (color: string, opacity: number): string => {
   const match = /^#?([\da-f]{6})$/i.exec(color)
@@ -83,8 +83,12 @@ export const Theme = {
   fonts: {
     onest: "Onest",
     onestBold: "OnestBold",
-    /** Monospaced face used by the chord/lyric editor. */
-    mono: "monospace",
+    /**
+     * Monospaced face used by the chord rows and lyric grids. `monospace` is a
+     * system alias on Android and web; iOS needs its own mono family or the
+     * fallback is proportional and the padded chord columns drift.
+     */
+    mono: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   sizes: {
     hero: 31,

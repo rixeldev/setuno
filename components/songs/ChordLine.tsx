@@ -102,7 +102,11 @@ const createStyles = () =>
     chords: {
       color: Theme.colors.accent,
       fontFamily: Theme.fonts.mono,
-      fontWeight: "700",
+      // No `fontWeight` here: the chord row is a character grid padded with
+      // spaces, and on Android a bold request on a family without a bold face
+      // can resolve to the default proportional font — the spaces then render
+      // narrower than the lyric characters and every chord drifts left. The
+      // accent colour is what makes the row stand out.
       includeFontPadding: false,
     },
     lyrics: {
