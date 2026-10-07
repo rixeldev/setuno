@@ -3,6 +3,7 @@ import { Redirect, Stack } from "expo-router"
 
 import { AppShell } from "@/components/app/AppShell"
 import { useAuth } from "@/hooks/useAuth"
+import { useReaderDirection } from "@/hooks/useReaderSession"
 import { Theme } from "@/constants/Theme"
 
 /** Deep links open with the dashboard underneath, so back always lands there. */
@@ -15,6 +16,7 @@ export const unstable_settings = { anchor: "index" }
  */
 export default function AppLayout() {
   const { status } = useAuth()
+  const readerDirection = useReaderDirection()
 
   if (status === "signed-out") return <Redirect href="/(auth)/sign-in" />
 
@@ -33,7 +35,12 @@ export default function AppLayout() {
         <Stack.Screen name="index" options={{ animation: "none" }} />
         <Stack.Screen name="songs/index" options={{ animation: "none" }} />
         <Stack.Screen name="songs/new" />
-        <Stack.Screen name="songs/[id]/index" />
+        {/* Stepping through an event's setlist replaces this screen; the
+            direction makes the transition animate forwards or backwards. */}
+        <Stack.Screen
+          name="songs/[id]/index"
+          options={{ animationTypeForReplace: readerDirection }}
+        />
         <Stack.Screen name="songs/[id]/edit" />
         <Stack.Screen name="songs/[id]/suggest" />
         <Stack.Screen name="setlists/index" options={{ animation: "none" }} />

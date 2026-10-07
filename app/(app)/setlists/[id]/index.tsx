@@ -250,7 +250,13 @@ export default function SetlistDetail() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t("setlists.openSong", { title: entry.title })}
-                  onPress={() => router.push(`/songs/${entry.songId}`)}
+                  onPress={() =>
+                    router.push(
+                      relatedShows.length > 0
+                        ? `/songs/${entry.songId}?setlist=${setlist.id}`
+                        : `/songs/${entry.songId}`,
+                    )
+                  }
                   style={({ pressed }) => [styles.songMain, pressed && styles.pressed]}
                 >
                   <AppText variant="caption" tone="faint" style={styles.order}>

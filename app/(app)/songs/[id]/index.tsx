@@ -32,9 +32,9 @@ import { useAuth } from "@/hooks/useAuth"
 import { useResponsive } from "@/hooks/useResponsive"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
+import { readImmersiveMode, setReaderDirection, writeImmersiveMode } from "@/hooks/useReaderSession"
 import { deleteSong, subscribeSong } from "@/services/songs"
 import { updatePreferences } from "@/services/users"
-import { todayIsoDate } from "@/services/performances"
 import { updateCachedPreferences, usePreferences } from "@/services/prefs"
 import { toFriendlyError } from "@/services/errors"
 import { displayKey as spellKey, transposeKey } from "@/libs/chords"
@@ -42,7 +42,7 @@ import { formatRelativeTime, formatDuration } from "@/libs/format"
 import { toDate } from "@/interfaces/timestamp"
 import type { UserPreferences } from "@/interfaces"
 import { songLyricsText, sectionLabelFor } from "@/libs/songUtils"
-import { findSetlistNavigation } from "@/libs/setlistNavigation"
+import { setlistStep } from "@/libs/setlistNavigation"
 import * as Clipboard from "expo-clipboard"
 
 /**
@@ -59,8 +59,11 @@ export default function SongScreen() {
   const router = useRouter()
   const toast = useToast()
   const { gutter } = useResponsive()
-  const params = useLocalSearchParams<{ id?: string }>()
+  const params = useLocalSearchParams<{ id?: string; setlist?: string }>()
   const songId = params.id ?? null
+  // Set by the setlist screen when the song is part of a list: only then does
+  // the reader offer the running-order arrows.
+  const setlistId = params.setlist ?? null
 
   const { profile } = useAuth()
   const { organizationId, isAdmin } = useOrganization()
@@ -84,8 +87,20 @@ export default function SongScreen() {
   const notation = preferences.chordNotation ?? "letters"
   const [fontSize, setFontSize] = useState(preferences.songFontSize)
   const [showChords, setShowChords] = useState(preferences.chordsVisible)
-  const [immersive, setImmersive] = useState(false)
+  // Stage mode survives the screen swap while stepping through a setlist; the
+  // general songbook always opens in the regular layout.
+  const [immersive, setImmersive] = useState(() => (setlistId ? readImmersiveMode() : false))
   const [notesOpen, setNotesOpen] = useState(false)
+
+  const enterImmersive = (): void => {
+    writeImmersiveMode(true)
+    setImmersive(true)
+  }
+
+  const exitImmersive = (): void => {
+    writeImmersiveMode(false)
+    setImmersive(false)
+  }
 
   const saveDisplayPreference = (patch: Partial<UserPreferences>): void => {
     updateCachedPreferences(patch)
@@ -99,12 +114,29 @@ export default function SongScreen() {
     return spellKey(transposeKey(song.key, semitones), notation)
   }, [song, semitones, notation])
 
-  // Corner arrows to walk the running order: only when this song belongs to a
-  // setlist attached to an event (a "list of an event", see the lib helper).
-  const navigation = useMemo(
-    () => (song ? findSetlistNavigation(song.id, setlists, performances, todayIsoDate()) : null),
-    [performances, setlists, song],
+  // Corner arrows to walk the running order: only for songs opened from a
+  // setlist screen, and only when that list really belongs to a live event —
+  // never for the general songbook or a draft list.
+  const contextSetlist = useMemo(
+    () => (setlistId ? (setlists.find((entry) => entry.id === setlistId) ?? null) : null),
+    [setlistId, setlists],
   )
+  const step = useMemo(() => {
+    if (!song || !contextSetlist) return null
+    const belongsToEvent = performances.some(
+      (performance) =>
+        performance.status !== "cancelled" &&
+        performance.setlists.some((reference) => reference.id === contextSetlist.id),
+    )
+    return belongsToEvent ? setlistStep(song.id, contextSetlist.songs) : null
+  }, [contextSetlist, performances, song])
+
+  // Stepping opens the next reader screen and tells the stack which way to
+  // animate: "pop" when walking back, "push" when walking forward.
+  const openSong = (targetId: string): void => {
+    setReaderDirection(step?.previousId === targetId ? "pop" : "push")
+    router.replace(setlistId ? `/songs/${targetId}?setlist=${setlistId}` : `/songs/${targetId}`)
+  }
 
   // Opening a different song resets the reader controls to their defaults
   // (adjust state while rendering, as documented by React).
@@ -212,14 +244,14 @@ export default function SongScreen() {
             variant="secondary"
             size="sm"
             icon={<FullscreenExitIcon size={15} color={Theme.colors.text} />}
-            onPress={() => setImmersive(false)}
+            onPress={exitImmersive}
           />
         </View>
         <ScrollView
           style={styles.immersiveScroll}
           contentContainerStyle={[
             styles.immersiveContent,
-            navigation ? styles.withNavPadding : null,
+            step ? styles.withNavPadding : null,
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -233,12 +265,8 @@ export default function SongScreen() {
           {lyrics}
         </ScrollView>
 
-        {navigation ? (
-          <SongNavArrows
-            previousId={navigation.previousId}
-            nextId={navigation.nextId}
-            onNavigate={(next) => router.replace(`/songs/${next}`)}
-          />
+        {step ? (
+          <SongNavArrows previousId={step.previousId} nextId={step.nextId} onNavigate={openSong} />
         ) : null}
       </View>
     )
@@ -264,7 +292,7 @@ export default function SongScreen() {
           <>
             <IconButton
               label={t("songs.stageMode")}
-              onPress={() => setImmersive(true)}
+              onPress={enterImmersive}
               icon={<FullscreenIcon size={18} color={Theme.colors.textMuted} />}
             />
             {isAdmin ? (
@@ -301,7 +329,7 @@ export default function SongScreen() {
       />
 
       <ScreenContainer scroll padded={false} style={[styles.scrollBody, { paddingHorizontal: gutter }]}>
-        <View style={[styles.content, navigation ? styles.withNavPadding : null]}>
+        <View style={[styles.content, step ? styles.withNavPadding : null]}>
           {details.length > 0 ? (
             <AppText variant="caption" tone="faint">
               {details.join("  ·  ")}
@@ -406,12 +434,8 @@ export default function SongScreen() {
         onConfirm={() => void remove()}
       />
 
-      {navigation ? (
-        <SongNavArrows
-          previousId={navigation.previousId}
-          nextId={navigation.nextId}
-          onNavigate={(next) => router.replace(`/songs/${next}`)}
-        />
+      {step ? (
+        <SongNavArrows previousId={step.previousId} nextId={step.nextId} onNavigate={openSong} />
       ) : null}
     </View>
   )
