@@ -153,6 +153,7 @@ pnpm start      # Expo dev server, pick a target from the menu
 | `pnpm deploy:rules` | Publish `firestore.rules` to the pinned Firebase project |
 | `pnpm deploy:indexes` | Publish `firestore.indexes.json` |
 | `pnpm assets:generate` | Regenerate the launcher icons/splash from `scripts/generate-assets.mjs` |
+| `pnpm assets:store [es\|en]` | Build the Play Store graphics (feature graphic + 5 screenshots) from the captures in `docs/images/` |
 
 > **Before declaring any task done:** `pnpm typecheck` and `pnpm lint` must both pass.
 

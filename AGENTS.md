@@ -36,6 +36,7 @@ pnpm test:integration   # vitest against the Firebase emulator
 pnpm export:web         # production web export
 pnpm deploy:rules       # publish firestore.rules to the pinned project
 pnpm deploy:indexes     # publish firestore.indexes.json
+pnpm assets:store [es|en] # Play Store graphics from docs/images captures
 npx expo-doctor         # diagnose dependency and config issues
 ```
 
