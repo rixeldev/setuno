@@ -125,6 +125,21 @@ npx expo-doctor         # diagnose dependency and config issues
 Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
 Docs: https://docs.expo.dev/eas/index.md
 
+## Deploying the web (Vercel)
+
+`vercel.json` at the repo root is ready for the static export: it runs
+`pnpm export:web`, serves `dist`, adds the SPA rewrite Expo Router needs for
+deep links and caches the hashed assets immutably. Deploy with `npx vercel`
+(preview) or `npx vercel --prod` (production), or import the repository in the
+Vercel dashboard (framework: Other; the file already defines the build command
+and output directory).
+
+After the first deploy, add the production domain in the Firebase Console
+(Authentication > Settings > Authorized domains) or the browser Google popup
+sign-in fails with `auth/unauthorized-domain`. No environment variables are
+required for the web build: `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` is only used by
+the native Google Sign-In SDK, and the `.env` file stays local.
+
 ## Rules
 
 - `ios/` and `android/` do not exist (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` / `app.config.js` and config plugins.

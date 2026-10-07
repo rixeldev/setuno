@@ -49,5 +49,8 @@ GoogleService-Info.plist
 .env
 .env.local
 
+# Vercel CLI project link
+.vercel
+
 # Docs
 docs
