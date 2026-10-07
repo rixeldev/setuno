@@ -10,12 +10,22 @@ import { AppText } from "@/components/ui/AppText"
 import { Avatar } from "@/components/ui/Avatar"
 import { Chip } from "@/components/ui/Card"
 import { Button, IconButton } from "@/components/ui/Button"
-import { ChevronDownIcon, CloseIcon, LogoIcon, SwapIcon } from "@/components/ui/Icons"
+import {
+  ChevronDownIcon,
+  CloseIcon,
+  LogoIcon,
+  SwapIcon,
+} from "@/components/ui/Icons"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { useTabNavigation } from "@/hooks/useTabNavigation"
-import { MOBILE_NAV, SIDEBAR_NAV, isNavActive, isTabActive } from "@/libs/navigation"
+import {
+  MOBILE_NAV,
+  SIDEBAR_NAV,
+  isNavActive,
+  isTabActive,
+} from "@/libs/navigation"
 
 /**
  * Organization switcher: shows the active band and lets the user move between
@@ -36,9 +46,17 @@ export function OrgSwitcher({ compact = false }: { compact?: boolean }) {
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={t("organizations.switcherLabel", { name })}
-        style={({ pressed }) => [styles.trigger, compact && styles.triggerCompact, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.trigger,
+          compact && styles.triggerCompact,
+          pressed && styles.pressed,
+        ]}
       >
-        <Avatar name={name} photoURL={organization?.logoURL} size={compact ? 28 : 32} />
+        <Avatar
+          name={name}
+          photoURL={organization?.logoURL}
+          size={compact ? 28 : 32}
+        />
         {!compact ? (
           <View style={styles.triggerText}>
             <AppText variant="caption" tone="faint">
@@ -52,7 +70,12 @@ export function OrgSwitcher({ compact = false }: { compact?: boolean }) {
         <ChevronDownIcon size={16} color={Theme.colors.textMuted} />
       </Pressable>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
         <Pressable
           style={styles.backdrop}
           accessibilityRole="button"
@@ -83,7 +106,10 @@ export function OrgSwitcher({ compact = false }: { compact?: boolean }) {
                     if (!active) await switchOrganization(item.id)
                     router.replace("/")
                   }}
-                  style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+                  style={({ pressed }) => [
+                    styles.row,
+                    pressed && styles.pressed,
+                  ]}
                 >
                   <Avatar name={item.name} photoURL={item.logoURL} size={36} />
                   <View style={styles.rowText}>
@@ -91,7 +117,9 @@ export function OrgSwitcher({ compact = false }: { compact?: boolean }) {
                       {item.name}
                     </AppText>
                     <AppText variant="caption" tone="faint">
-                      {item.role === "admin" ? t("organizations.admin") : t("auth.musician")}
+                      {item.role === "admin"
+                        ? t("organizations.admin")
+                        : t("auth.musician")}
                     </AppText>
                   </View>
                   {active ? (
@@ -140,7 +168,8 @@ export function SidebarNav() {
       <ScrollView style={styles.nav} contentContainerStyle={styles.navContent}>
         {SIDEBAR_NAV.map((item) => {
           const active = isNavActive(item.href, pathname)
-          const badge = item.badge === "suggestions" ? pendingSuggestions.length : 0
+          const badge =
+            item.badge === "suggestions" ? pendingSuggestions.length : 0
           const Icon = item.icon
           return (
             <Pressable
@@ -155,8 +184,15 @@ export function SidebarNav() {
                 pressed && styles.pressed,
               ]}
             >
-              <Icon size={18} color={active ? Theme.colors.primary : Theme.colors.textMuted} />
-              <AppText variant="body" tone={active ? "primary" : "muted"} style={styles.navLabel}>
+              <Icon
+                size={18}
+                color={active ? Theme.colors.primary : Theme.colors.textMuted}
+              />
+              <AppText
+                variant="body"
+                tone={active ? "primary" : "muted"}
+                style={styles.navLabel}
+              >
                 {t(item.label)}
               </AppText>
               {badge > 0 ? (
@@ -178,7 +214,11 @@ export function SidebarNav() {
           accessibilityLabel={t("settings.profile")}
           style={({ pressed }) => [styles.userRow, pressed && styles.pressed]}
         >
-          <Avatar name={profile?.displayName || "?"} photoURL={profile?.photoURL} size={34} />
+          <Avatar
+            name={profile?.displayName || "?"}
+            photoURL={profile?.photoURL}
+            size={34}
+          />
           <View style={styles.rowText}>
             <AppText variant="caption" numberOfLines={1}>
               {profile?.displayName || t("auth.musician")}
@@ -188,7 +228,12 @@ export function SidebarNav() {
             </AppText>
           </View>
         </Pressable>
-        <Button label={t("settings.signOut")} variant="ghost" size="sm" onPress={() => void signOut()} />
+        <Button
+          label={t("settings.signOut")}
+          variant="ghost"
+          size="sm"
+          onPress={() => void signOut()}
+        />
       </View>
     </View>
   )
@@ -206,10 +251,13 @@ export function BottomBar() {
   const items = useMemo(() => MOBILE_NAV, [])
 
   return (
-    <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <View
+      style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 8) }]}
+    >
       {items.map((item) => {
         const active = isTabActive(item.href, pathname)
-        const badge = item.badge === "suggestions" ? pendingSuggestions.length : 0
+        const badge =
+          item.badge === "suggestions" ? pendingSuggestions.length : 0
         const Icon = item.icon
         return (
           <Pressable
@@ -232,11 +280,20 @@ export function BottomBar() {
                   style={[styles.tabIcon, active && styles.tabIconActive]}
                 >
                   <View style={pressed ? styles.pressedLeaf : undefined}>
-                    <Icon size={21} color={active ? Theme.colors.primary : Theme.colors.textMuted} />
+                    <Icon
+                      size={21}
+                      color={
+                        active ? Theme.colors.primary : Theme.colors.textMuted
+                      }
+                    />
                   </View>
                   {badge > 0 ? (
                     <View style={styles.tabBadge}>
-                      <AppText variant="caption" tone="inverse" style={styles.tabBadgeText}>
+                      <AppText
+                        variant="caption"
+                        tone="inverse"
+                        style={styles.tabBadgeText}
+                      >
                         {badge}
                       </AppText>
                     </View>
@@ -304,7 +361,11 @@ const createStyles = () =>
       borderTopColor: Theme.colors.border,
       paddingTop: Theme.spacing.m,
     },
-    userRow: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.s },
+    userRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.s,
+    },
     rowText: { flex: 1, minWidth: 0 },
     pressed: { opacity: 0.7 },
     /** Press feedback for leaves inside the tab bubble (never the ancestor). */
@@ -320,7 +381,11 @@ const createStyles = () =>
       borderWidth: 1,
       borderColor: Theme.colors.border,
     },
-    triggerCompact: { padding: 4, backgroundColor: "transparent", borderColor: "transparent" },
+    triggerCompact: {
+      padding: 4,
+      backgroundColor: "transparent",
+      borderColor: "transparent",
+    },
     triggerText: { flex: 1, minWidth: 0 },
     backdrop: {
       position: "absolute",
@@ -344,7 +409,11 @@ const createStyles = () =>
       gap: Theme.spacing.m,
       ...Theme.shadows.lg,
     },
-    sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    sheetHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
     sheetList: { maxHeight: 320 },
     row: {
       flexDirection: "row",
@@ -368,11 +437,11 @@ const createStyles = () =>
     // defined on purpose: adding a background only when the tab activates made
     // Android paint it as a square, so the rounded drawable is created up front.
     tabIcon: {
-      width: 38,
-      height: 38,
+      width: 42,
+      height: 32,
       alignItems: "center",
       justifyContent: "center",
-      borderRadius: 19,
+      borderRadius: Theme.radii.m,
       backgroundColor: "transparent",
     },
     tabIconActive: { backgroundColor: Theme.colors.primarySoft },
