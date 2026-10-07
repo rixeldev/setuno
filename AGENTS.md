@@ -136,9 +136,13 @@ and output directory).
 
 After the first deploy, add the production domain in the Firebase Console
 (Authentication > Settings > Authorized domains) or the browser Google popup
-sign-in fails with `auth/unauthorized-domain`. No environment variables are
-required for the web build: `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` is only used by
-the native Google Sign-In SDK, and the `.env` file stays local.
+sign-in fails with `auth/unauthorized-domain`. The Firebase config itself is
+not in git (`db/firebaseConfig.ts`): `pnpm export:web` first runs
+`scripts/ensure-firebase-config.mjs`, which generates it from the
+`FIREBASE_*`/`ADMOB_*`/`APP_VERSION_ID` environment variables when the file is
+absent — set those in the Vercel project (Production and Preview). Locally the
+script is a no-op because the real file exists. No other environment variables
+are required for the web build.
 
 ## Rules
 

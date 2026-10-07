@@ -18,7 +18,7 @@
     "test:all": "vitest run",
     "deploy:rules": "npx firebase-tools@latest deploy --only firestore:rules",
     "deploy:indexes": "npx firebase-tools@latest deploy --only firestore:indexes",
-    "export:web": "expo export --platform web"
+    "export:web": "node scripts/ensure-firebase-config.mjs && expo export --platform web"
   },
   "dependencies": {
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
