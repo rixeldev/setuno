@@ -5,6 +5,8 @@ export type AppearanceMode = "dark" | "light" | "system"
 export type AccentId = "ember" | "ocean" | "emerald" | "sunset" | "magenta" | "indigo"
 /** How chords are spelled: american letters (C D E) or solfège (Do Re Mi). */
 export type ChordNotation = "letters" | "solfege"
+/** Instrument the reader shows shapes for when a chord is tapped. */
+export type ChordInstrument = "guitar" | "piano"
 
 /** Song reader defaults + display preferences stored on the user profile. */
 export interface UserPreferences {
@@ -16,6 +18,8 @@ export interface UserPreferences {
   chordsVisible: boolean
   /** Spell chords with letters (C, F#m) or solfège (Do, Fa#m). */
   chordNotation: ChordNotation
+  /** Preferred instrument for the “how to play” chord sheet. */
+  chordInstrument: ChordInstrument
   /** Reduce motion / subtle animation preference. */
   reduceMotion: boolean
   /**
@@ -67,6 +71,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   songFontSize: 18,
   chordsVisible: true,
   chordNotation: "letters",
+  chordInstrument: "guitar",
   reduceMotion: false,
 }
 
