@@ -232,14 +232,24 @@ service cloud.firestore {
               || (isSelf(memberUid) && acceptedOwnInvitationAfterBatch(organizationId))
             );
 
-        // Admins manage other members. Nobody may change their own role, and the
-        // owner flag stays with the account that created the band.
-        allow update: if isAdmin(organizationId)
-          && memberUid != request.auth.uid
-          && request.resource.data.uid == memberUid
-          && request.resource.data.role in ['admin', 'member']
-          && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['role', 'displayName', 'photoURL', 'email']);
+        // Admins manage other members; everyone keeps their own profile copy
+        // (name, email, photo) in step with their account. The role and the uid
+        // can never change from here, and the owner flag stays with the account
+        // that created the band.
+        allow update: if (
+            isAdmin(organizationId)
+            && memberUid != request.auth.uid
+            && request.resource.data.uid == memberUid
+            && request.resource.data.role in ['admin', 'member']
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['role', 'displayName', 'photoURL', 'email'])
+          ) || (
+            isSelf(memberUid)
+            && request.resource.data.uid == resource.data.uid
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['displayName', 'photoURL', 'email'])
+          );
 
         // Nobody may remove themselves: they would lose the ability to leave
         // cleanly and it lets an admin lock the owner out.

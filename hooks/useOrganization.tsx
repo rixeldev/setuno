@@ -16,6 +16,7 @@ import {
   subscribeMyInvitations,
   subscribeMyOrganizations,
   subscribeOrganization,
+  syncMemberProfile,
 } from "@/services/organizations"
 import { updateUserProfile } from "@/services/users"
 import { toFriendlyError } from "@/services/errors"
@@ -87,6 +88,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [invitesError, setInvitesError] = useState<string | null>(null)
   const [bandsError, setBandsError] = useState<string | null>(null)
   const bandsRetryRef = useRef<(() => void) | null>(null)
+  const memberSyncKey = useRef<string | null>(null)
 
   const loaded = uid !== null && loadedFor === uid
   const organizations = loaded ? bandRefs : NO_ORGANIZATIONS
@@ -265,6 +267,28 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       unsubscribeMember()
     }
   }, [activeIdResolved, uid])
+
+  // 6. Keep the caller's own membership copy in step with their profile. The
+  // member document is each band's snapshot of the account (members list,
+  // activity, suggestions): the owner's copy used to be created without a
+  // photo and later profile changes never reached it, so bandmates saw a
+  // stale row. One write per real difference; the role is untouchable by rule.
+  useEffect(() => {
+    if (!uid || !activeIdResolved || !member || !profile) return
+    const patch: { displayName?: string; email?: string; photoURL?: string | null } = {}
+    if (profile.displayName && profile.displayName !== member.displayName) {
+      patch.displayName = profile.displayName
+    }
+    if (profile.email && profile.email !== member.email) patch.email = profile.email
+    if ((profile.photoURL ?? null) !== (member.photoURL ?? null)) {
+      patch.photoURL = profile.photoURL ?? null
+    }
+    if (Object.keys(patch).length === 0) return
+    const key = `${activeIdResolved}:${JSON.stringify(patch)}`
+    if (memberSyncKey.current === key) return
+    memberSyncKey.current = key
+    void syncMemberProfile(activeIdResolved, uid, patch).catch(() => undefined)
+  }, [uid, activeIdResolved, member, profile])
 
   // 7. Pending invitations addressed to this user (join flow), always live so
   // an invite can be accepted whether or not the user already has a band.

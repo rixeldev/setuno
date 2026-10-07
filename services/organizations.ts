@@ -87,6 +87,10 @@ const mapOrganizationRef = (data: Record<string, unknown>, id: string): Organiza
 
 export interface CreateOrganizationInput extends OrganizationInput {
   ownerName: string
+  /** Profile email of the owner, mirrored into their membership copy. */
+  ownerEmail: string
+  /** Profile photo of the owner, mirrored into their membership copy. */
+  ownerPhotoURL: string | null
 }
 
 export const createOrganization = async (input: CreateOrganizationInput): Promise<string> => {
@@ -111,8 +115,8 @@ export const createOrganization = async (input: CreateOrganizationInput): Promis
   batch.set(doc(firestore, paths.member(organizationId, uid)), {
     uid,
     displayName: input.ownerName.trim() || "Owner",
-    email: "",
-    photoURL: null,
+    email: normalizeEmail(input.ownerEmail),
+    photoURL: input.ownerPhotoURL ?? null,
     role: "admin",
     joinedAt: now,
     invitedBy: null,
@@ -288,6 +292,22 @@ export const addMemberByEmail = async (
 ): Promise<{ joined: boolean; invited: boolean }> => {
   await createInvitation(organizationId, email, role, actor)
   return { joined: false, invited: true }
+}
+
+/**
+ * Updates the caller's own membership copy (display name, email, photo).
+ *
+ * Each band keeps its own snapshot of a profile for the members list, activity
+ * and suggestions; this keeps the caller's copy in step with their account.
+ * The role can never change from here — the rules enforce it.
+ */
+export const syncMemberProfile = async (
+  organizationId: string,
+  memberUid: string,
+  patch: { displayName?: string; email?: string; photoURL?: string | null },
+): Promise<void> => {
+  if (Object.keys(clean(patch)).length === 0) return
+  await updateDoc(doc(firestore, paths.member(organizationId, memberUid)), clean(patch))
 }
 
 export const updateMemberRole = async (

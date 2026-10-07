@@ -55,6 +55,8 @@ export default function Welcome() {
         name: values.name,
         description: values.description,
         ownerName: profile?.displayName || user?.displayName || "Band admin",
+        ownerEmail: profile?.email || user?.email || "",
+        ownerPhotoURL: profile?.photoURL ?? user?.photoURL ?? null,
       })
       reset({ name: "", description: "" })
       toast.showSuccess(t("auth.bandReady", { name: values.name }))

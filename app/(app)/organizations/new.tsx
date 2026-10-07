@@ -47,6 +47,8 @@ export default function NewOrganization() {
         name: name.trim(),
         description: description.trim(),
         ownerName: profile?.displayName || user?.displayName || "Band admin",
+        ownerEmail: profile?.email || user?.email || "",
+        ownerPhotoURL: profile?.photoURL ?? user?.photoURL ?? null,
       })
       await switchOrganization(id)
       await updateProfile({ onboarded: true })
