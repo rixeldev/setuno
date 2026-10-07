@@ -344,13 +344,16 @@ const createStyles = () =>
       borderTopColor: Theme.colors.border,
     },
     tab: { flex: 1, alignItems: "center", gap: 3, paddingVertical: 4 },
-    // Round focus bubble behind the icon (not a rectangle).
+    // Round focus bubble behind the icon. The transparent background is always
+    // defined on purpose: adding a background only when the tab activates made
+    // Android paint it as a square, so the rounded drawable is created up front.
     tabIcon: {
       width: 38,
       height: 38,
       alignItems: "center",
       justifyContent: "center",
-      borderRadius: Theme.radii.pill,
+      borderRadius: 19,
+      backgroundColor: "transparent",
     },
     tabIconActive: { backgroundColor: Theme.colors.primarySoft },
     tabBadge: {
