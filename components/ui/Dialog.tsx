@@ -31,6 +31,12 @@ interface DialogProps {
   tone?: "default" | "danger"
   /** Hides the confirm button (pure information dialog). */
   hideActions?: boolean
+  /**
+   * Scrolls the body content. Turn it off when the body brings its own
+   * scrolling list: a virtualized list inside this plain ScrollView breaks
+   * windowing (React Native warns about it) and nests two scrollers.
+   */
+  bodyScroll?: boolean
 }
 
 /**
@@ -50,6 +56,7 @@ export function Dialog({
   confirmDisabled = false,
   tone = "default",
   hideActions = false,
+  bodyScroll = true,
 }: DialogProps) {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
@@ -108,13 +115,17 @@ export function Dialog({
           </View>
 
           {children ? (
-            <ScrollView
-              style={styles.body}
-              contentContainerStyle={styles.bodyContent}
-              keyboardShouldPersistTaps="handled"
-            >
-              {children}
-            </ScrollView>
+            bodyScroll ? (
+              <ScrollView
+                style={styles.body}
+                contentContainerStyle={styles.bodyContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                {children}
+              </ScrollView>
+            ) : (
+              <View style={styles.bodyStatic}>{children}</View>
+            )
           ) : null}
 
           {hideActions ? null : (
@@ -187,6 +198,8 @@ const createStyles = () =>
     close: { padding: 4 },
     body: { maxHeight: 460 },
     bodyContent: { paddingBottom: Theme.spacing.s, gap: Theme.spacing.m },
+    /** Body for dialogs whose children own the scrolling (lists). */
+    bodyStatic: { gap: Theme.spacing.m, flexShrink: 1 },
     actions: { flexDirection: "row", flexWrap: "wrap", gap: Theme.spacing.m },
     // Buttons share the row when they fit (~two per line) and take the full
     // width when they do not, so labels are never squeezed into an ellipsis.

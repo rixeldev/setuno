@@ -401,6 +401,7 @@ export default function SetlistDetail() {
         onClose={() => setPickerOpen(false)}
         title={t("setlists.addSongs")}
         hideActions
+        bodyScroll={false}
       >
         <SearchInput
           label={t("setlists.searchSongs")}
@@ -488,7 +489,7 @@ const createStyles = () =>
     shows: { gap: Theme.spacing.xs },
     showLine: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.m },
     pressed: { opacity: 0.7 },
-    pickerList: { maxHeight: 320, width: "100%" },
+    pickerList: { maxHeight: 320, width: "100%", flexShrink: 1 },
     pickerRow: {
       flexDirection: "row",
       alignItems: "center",
