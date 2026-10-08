@@ -47,6 +47,12 @@ export default function OrganizationSettings() {
   const isOwner = organization?.ownerId === profile?.uid
   const deletionPhrase = organization?.name ?? ""
 
+  /** Closes the modal, falling back to the dashboard when opened at the root. */
+  const close = (): void => {
+    if (router.canGoBack()) router.back()
+    else router.replace("/")
+  }
+
   const chooseLogo = async (): Promise<void> => {
     const picked = await pickImageBase64()
     if (!picked) return
@@ -91,7 +97,11 @@ export default function OrganizationSettings() {
       setConfirmDelete(false)
       toast.showSuccess(t("organizations.deleted"))
       if (fallback) {
-        await switchOrganization(fallback.id)
+        // Switch before closing so the app never keeps pointing at the band
+        // that was just deleted. The provider state flips first, so a failed
+        // preference write must not keep the modal (with its stale form) open.
+        await switchOrganization(fallback.id).catch(() => undefined)
+        close()
       } else {
         await refresh()
         router.replace("/organizations")
