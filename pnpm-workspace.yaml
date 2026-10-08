@@ -1,7 +1,7 @@
-ignoredBuiltDependencies:
-  - '@firebase/util'
-  - protobufjs
-  - unrs-resolver
+allowBuilds:
+  '@firebase/util': false
+  protobufjs: false
+  unrs-resolver: false
 
 # pnpm settings (pnpm >= 10): flat node_modules (npm-style) instead of the default
 # `.pnpm/<pkg>@<hash>/node_modules` nesting. Windows Android builds (CMake/Ninja) break
