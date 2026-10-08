@@ -12,6 +12,7 @@ import {
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
+import { hapticTap } from "@/libs/haptics"
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "subtle"
 export type ButtonSize = "sm" | "md" | "lg"
@@ -50,6 +51,13 @@ export function Button({
 }: ButtonProps) {
   const styles = useThemedStyles(createStyles)
   const isDisabled = disabled || loading
+  const handlePress = onPress
+    ? () => {
+        // A light tap makes buttons feel physical without being loud.
+        hapticTap()
+        onPress()
+      }
+    : undefined
 
   return (
     <Pressable
@@ -59,7 +67,7 @@ export function Button({
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       disabled={isDisabled}
-      onPress={onPress}
+      onPress={handlePress}
       style={({ pressed }) => [
         styles.base,
         { minHeight: HEIGHTS[size] },

@@ -16,6 +16,7 @@ import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { Button } from "@/components/ui/Button"
 import { CloseIcon } from "@/components/ui/Icons"
+import { ToastOverlay } from "@/components/ui/Toast"
 
 interface DialogProps {
   visible: boolean
@@ -150,6 +151,7 @@ export function Dialog({
           )}
         </Animated.View>
       </KeyboardAvoidingView>
+      <ToastOverlay />
     </Modal>
   )
 }

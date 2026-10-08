@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react"
-import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native"
+import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native"
 import { usePathname, useRouter } from "expo-router"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useTranslation } from "react-i18next"
@@ -13,13 +13,14 @@ import { Button, IconButton } from "@/components/ui/Button"
 import {
   ChevronDownIcon,
   CloseIcon,
-  LogoIcon,
   SwapIcon,
 } from "@/components/ui/Icons"
+import { ToastOverlay } from "@/components/ui/Toast"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { useTabNavigation } from "@/hooks/useTabNavigation"
+import { hapticSelection } from "@/libs/haptics"
 import {
   MOBILE_NAV,
   SIDEBAR_NAV,
@@ -141,6 +142,7 @@ export function OrgSwitcher({ compact = false }: { compact?: boolean }) {
             }}
           />
         </View>
+        <ToastOverlay />
       </Modal>
     </View>
   )
@@ -159,8 +161,12 @@ export function SidebarNav() {
     <View style={styles.sidebar}>
       <View style={styles.sidebarTop}>
         <View style={styles.brand}>
-          <LogoIcon size={22} color={Theme.colors.primary} />
-          <AppText variant="title">Stage Book</AppText>
+          <Image
+            source={require("../../assets/icon.png")}
+            style={styles.brandLogo}
+            accessibilityIgnoresInvertColors
+          />
+          <AppText variant="title">Setuno</AppText>
         </View>
         <OrgSwitcher />
       </View>
@@ -265,7 +271,10 @@ export function BottomBar() {
             accessibilityRole="link"
             accessibilityLabel={t(item.label)}
             accessibilityState={{ selected: active }}
-            onPress={() => goToTab(item.href)}
+            onPress={() => {
+              hapticSelection()
+              goToTab(item.href)
+            }}
             style={styles.tab}
           >
             {({ pressed }) => (
@@ -334,6 +343,8 @@ const createStyles = () =>
       gap: Theme.spacing.s,
       paddingHorizontal: Theme.spacing.s,
     },
+    // The launcher icon doubles as the brand mark, like on the auth screens.
+    brandLogo: { width: 26, height: 26, borderRadius: Theme.radii.s },
     nav: { flex: 1 },
     navContent: { gap: 2, paddingBottom: Theme.spacing.l },
     navItem: {

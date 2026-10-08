@@ -7,6 +7,7 @@ import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { useBottomChromeHeight } from "@/hooks/useBottomChrome"
 import { CheckIcon, CloseIcon, InfoIcon } from "@/components/ui/Icons"
+import { hapticError, hapticSuccess, hapticTap } from "@/libs/haptics"
 
 export type ToastKind = "success" | "error" | "info"
 
@@ -23,11 +24,18 @@ interface ToastContextValue {
   showError: (message: string) => void
 }
 
+interface ToastStateValue {
+  toast: ToastItem | null
+  hide: () => void
+}
+
 const ToastContext = createContext<ToastContextValue | null>(null)
+const ToastStateContext = createContext<ToastStateValue | null>(null)
 
 /**
  * Lightweight snackbar used for every success/failure confirmation (docs §19
- * "toast feedback", §36 in-app notifications).
+ * "toast feedback", §36 in-app notifications). Every notification also carries
+ * a small haptic pulse so feedback lands without looking at the screen.
  */
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toast, setToast] = useState<ToastItem | null>(null)
@@ -42,6 +50,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const showToast = useCallback(
     (message: string, kind: ToastKind = "info", action?: ToastItem["action"]) => {
+      if (kind === "error") hapticError()
+      else if (kind === "success") hapticSuccess()
+      else hapticTap()
       counter.current += 1
       setToast({ id: counter.current, kind, message, action })
       if (timer.current) clearTimeout(timer.current)
@@ -66,10 +77,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [showToast],
   )
 
+  const state = useMemo<ToastStateValue>(() => ({ toast, hide }), [toast, hide])
+
   return (
     <ToastContext.Provider value={value}>
-      {children}
-      {toast ? <ToastSnackbar toast={toast} onDismiss={hide} /> : null}
+      <ToastStateContext.Provider value={state}>
+        {children}
+        <ToastOverlay />
+      </ToastStateContext.Provider>
     </ToastContext.Provider>
   )
 }
@@ -78,6 +93,18 @@ export function useToast(): ToastContextValue {
   const context = useContext(ToastContext)
   if (!context) throw new Error("useToast must be used inside a ToastProvider")
   return context
+}
+
+/**
+ * Paints the current snackbar. The provider mounts it at the root and every
+ * overlay that presents its own native `Modal` (Dialog, SheetSurface, the band
+ * switcher) mounts a copy too — the copies line up exactly, so the visible one
+ * always sits on the topmost modal instead of hiding behind it.
+ */
+export function ToastOverlay() {
+  const state = useContext(ToastStateContext)
+  if (!state || !state.toast) return null
+  return <ToastSnackbar toast={state.toast} onDismiss={state.hide} />
 }
 
 function ToastSnackbar({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }) {
