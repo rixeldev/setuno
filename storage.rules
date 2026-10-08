@@ -1,0 +1,38 @@
+rules_version = '2';
+
+/**
+ * Setuno — Cloud Storage security rules.
+ *
+ * Images live under `avatars/{uid}/…` and `organizations/{uid}/…`, where
+ * `{uid}` is the uploader (see services/uploads.ts). Files are displayed
+ * through their download URL, which carries its own token, so reads only need
+ * to stay open to signed-in users. Writes are limited to the uploader's own
+ * folder and to real images with a sane size cap.
+ */
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size < 10 * 1024 * 1024;
+    }
+
+    match /avatars/{uid}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid && isImage();
+    }
+
+    match /organizations/{uid}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid && isImage();
+    }
+
+    // Everything else is closed.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

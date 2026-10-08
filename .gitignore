@@ -19,6 +19,11 @@ expo-env.d.ts
 # Metro
 .metro-health-check*
 
+# Emulators
+firestore-debug.log
+storage-debug.log
+ui-debug.log
+
 # debug
 npm-debug.*
 yarn-debug.*
