@@ -32,6 +32,11 @@ export interface SetlistInput {
   date: string | null
   notes: string
   songIds: string[]
+  /**
+   * Key each song will be played in, keyed by song id. Falls back to the song's
+   * own key when missing.
+   */
+  songKeys?: Record<string, string>
 }
 
 /** Setlist row enriched with the resolved song object for rendering. */

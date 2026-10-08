@@ -17,7 +17,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges"
-import { createSetlist, updateSetlist } from "@/services/setlists"
+import { createSetlist, setlistSongKeys, updateSetlist } from "@/services/setlists"
 import { toFriendlyError } from "@/services/errors"
 import { parseIsoDate, validateRequired } from "@/libs/validation"
 import type { Setlist, SetlistInput } from "@/interfaces"
@@ -83,6 +83,7 @@ export function SetlistForm({ setlist, onSaved }: SetlistFormProps) {
       date: date.trim().length > 0 ? date.trim() : null,
       notes: notes.trim(),
       songIds: setlist?.songs.map((entry) => entry.songId) ?? [],
+      songKeys: setlist ? setlistSongKeys(setlist.songs) : undefined,
     }
 
     setSaving(true)

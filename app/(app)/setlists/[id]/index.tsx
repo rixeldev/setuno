@@ -15,10 +15,17 @@ import { SearchInput } from "@/components/ui/Input"
 import { useToast } from "@/components/ui/Toast"
 import { CloseIcon, DotsIcon, MusicIcon, PlusIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
+import { SetlistKeyDialog } from "@/components/setlists/SetlistKeyDialog"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
-import { deleteSetlist, duplicateSetlist, updateSetlist } from "@/services/setlists"
+import {
+  deleteSetlist,
+  duplicateSetlist,
+  setlistSongKeys,
+  updateSetlist,
+  updateSetlistSongKey,
+} from "@/services/setlists"
 import { toFriendlyError } from "@/services/errors"
 import { filterSongs, EMPTY_FILTERS } from "@/libs/songSearch"
 import type { RelativeDayLabels } from "@/libs/format"
@@ -58,6 +65,15 @@ export default function SetlistDetail() {
   const [search, setSearch] = useState("")
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
+  // Song whose play key is being chosen, and whether it is being added from
+  // the picker or changed from the running order.
+  const [keyTarget, setKeyTarget] = useState<{
+    songId: string
+    title: string
+    originalKey: string
+    key: string
+    mode: "add" | "edit"
+  } | null>(null)
 
   const setlist = useMemo(
     () => setlists.find((entry) => entry.id === setlistId) ?? null,
@@ -80,7 +96,10 @@ export default function SetlistDetail() {
   )
   const actor = { id: profile?.uid ?? "", name: profile?.displayName || "An admin" }
 
-  const persistOrder = async (songIds: string[]): Promise<void> => {
+  const persistOrder = async (
+    songIds: string[],
+    songKeys: Record<string, string>,
+  ): Promise<void> => {
     if (!setlist) return
     try {
       await updateSetlist(
@@ -92,6 +111,7 @@ export default function SetlistDetail() {
           date: setlist.date,
           notes: setlist.notes,
           songIds,
+          songKeys,
         },
         songLibrary,
         actor,
@@ -108,24 +128,47 @@ export default function SetlistDetail() {
     if (target < 0 || target >= ids.length) return
     const [moved] = ids.splice(index, 1)
     ids.splice(target, 0, moved)
-    void persistOrder(ids)
+    void persistOrder(ids, setlistSongKeys(setlist.songs))
   }
 
   const removeSong = (songId: string): void => {
     if (!setlist) return
-    void persistOrder(setlist.songs.filter((entry) => entry.songId !== songId).map((entry) => entry.songId))
+    void persistOrder(
+      setlist.songs.filter((entry) => entry.songId !== songId).map((entry) => entry.songId),
+      setlistSongKeys(setlist.songs),
+    )
   }
 
-  const addSongs = (ids: string[]): void => {
+  const addSongs = (ids: string[], keys: Record<string, string> = {}): void => {
     if (!setlist || ids.length === 0) {
       setPickerOpen(false)
       return
     }
     const existing = setlist.songs.map((entry) => entry.songId)
-    void persistOrder([...existing, ...ids])
+    void persistOrder([...existing, ...ids], { ...setlistSongKeys(setlist.songs), ...keys })
     setPickerOpen(false)
     setSearch("")
     toast.showSuccess(t("setlists.songsAdded", { count: ids.length }))
+  }
+
+  const changeKey = async (songId: string, key: string): Promise<void> => {
+    if (!setlist) return
+    try {
+      await updateSetlistSongKey(organizationId ?? "", setlist.id, songId, key)
+    } catch (error) {
+      toast.showError(toFriendlyError(error, t("setlists.couldNotChangeKey")))
+    }
+  }
+
+  const pickKey = (key: string): void => {
+    if (!keyTarget) return
+    const target = keyTarget
+    setKeyTarget(null)
+    if (target.mode === "add") {
+      addSongs([target.songId], { [target.songId]: key })
+      return
+    }
+    void changeKey(target.songId, key)
   }
 
   const duplicate = async (): Promise<void> => {
@@ -272,14 +315,37 @@ export default function SetlistDetail() {
                         .join(" · ")}
                     </AppText>
                   </View>
-                  {entry.key ? (
+                </Pressable>
+
+                {editing ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t("setlists.changeKey")}
+                    hitSlop={Theme.hitSlop}
+                    onPress={() =>
+                      setKeyTarget({
+                        songId: entry.songId,
+                        title: entry.title,
+                        originalKey: song?.key ?? "",
+                        key: entry.key,
+                        mode: "edit",
+                      })
+                    }
+                    style={({ pressed }) => [pressed && styles.pressed]}
+                  >
                     <Badge
-                      label={displayKey(entry.key, notation)}
+                      label={entry.key ? displayKey(entry.key, notation) : "—"}
                       tone="accent"
                       style={styles.keyBadge}
                     />
-                  ) : null}
-                </Pressable>
+                  </Pressable>
+                ) : entry.key ? (
+                  <Badge
+                    label={displayKey(entry.key, notation)}
+                    tone="accent"
+                    style={styles.keyBadge}
+                  />
+                ) : null}
 
                 {editing ? (
                   <View style={styles.rowActions}>
@@ -424,7 +490,15 @@ export default function SetlistDetail() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("setlists.addSongA11y", { title: item.title })}
-              onPress={() => addSongs([item.id])}
+              onPress={() =>
+                setKeyTarget({
+                  songId: item.id,
+                  title: item.title,
+                  originalKey: item.key,
+                  key: item.key,
+                  mode: "add",
+                })
+              }
               style={({ pressed }) => [styles.pickerRow, pressed && styles.pressed]}
             >
               <View style={styles.flex}>
@@ -452,6 +526,15 @@ export default function SetlistDetail() {
         confirmLoading={busy}
         onConfirm={() => void remove()}
       />
+
+      <SetlistKeyDialog
+        visible={keyTarget !== null}
+        songTitle={keyTarget?.title ?? ""}
+        originalKey={keyTarget?.originalKey ?? ""}
+        value={keyTarget?.key ?? ""}
+        onClose={() => setKeyTarget(null)}
+        onSelect={pickKey}
+      />
     </ScreenContainer>
   )
 }
@@ -466,7 +549,7 @@ const createStyles = () =>
       paddingLeft: Theme.spacing.m,
     },
     listCard: { overflow: "hidden" },
-    songRow: { flexDirection: "row", alignItems: "center" },
+    songRow: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.xs },
     songDivider: { borderTopWidth: 1, borderTopColor: Theme.colors.borderSoft },
     songMain: {
       flex: 1,

@@ -94,6 +94,8 @@ export const fetchSetlists = async (organizationId: string): Promise<Setlist[]> 
 export const buildSetlistSongs = (
   songIds: string[],
   library: Map<string, Song>,
+  /** Key each song will be played in, keyed by song id (defaults to the song's). */
+  songKeys: Record<string, string> = {},
 ): SetlistSong[] =>
   songIds
     .map((songId, order) => {
@@ -102,11 +104,15 @@ export const buildSetlistSongs = (
         songId,
         title: song?.title ?? "Unknown song",
         artist: song?.artist ?? "",
-        key: song?.key ?? "",
+        key: songKeys[songId] ?? song?.key ?? "",
         order,
       }
     })
     .filter((entry) => library.has(entry.songId))
+
+/** Current play-key map of a setlist, ready to feed `buildSetlistSongs`. */
+export const setlistSongKeys = (songs: readonly SetlistSong[]): Record<string, string> =>
+  Object.fromEntries(songs.map((entry) => [entry.songId, entry.key]))
 
 /** Sum of known song durations, falling back to a lyric-length estimate. */
 export const estimateSetlistDuration = (songs: SetlistSong[], library: Map<string, Song>): number =>
@@ -121,12 +127,19 @@ const normalizeInput = (input: SetlistInput): SetlistInput => {
   const name = input.name.trim()
   if (name.length === 0) throw new ValidationError("Setlist name is required.", "name")
   if (name.length > 80) throw new ValidationError("Setlist name is too long.", "name")
+  const songIds = Array.from(new Set(input.songIds.filter((id) => id.length > 0)))
+  const songKeys: Record<string, string> = {}
+  for (const songId of songIds) {
+    const key = input.songKeys?.[songId]?.trim()
+    if (key) songKeys[songId] = key
+  }
   return {
     name,
     description: input.description.trim(),
     date: input.date,
     notes: input.notes,
-    songIds: Array.from(new Set(input.songIds.filter((id) => id.length > 0))),
+    songIds,
+    songKeys,
   }
 }
 
@@ -138,7 +151,7 @@ export const createSetlist = async (
 ): Promise<string> => {
   const uid = requireUserId()
   const normalized = normalizeInput(input)
-  const songs = buildSetlistSongs(normalized.songIds, library)
+  const songs = buildSetlistSongs(normalized.songIds, library, normalized.songKeys)
   const reference = doc(collection(firestore, paths.setlists(organizationId)))
   const now = serverTimestamp()
 
@@ -177,7 +190,7 @@ export const updateSetlist = async (
 ): Promise<void> => {
   const uid = requireUserId()
   const normalized = normalizeInput(input)
-  const songs = buildSetlistSongs(normalized.songIds, library)
+  const songs = buildSetlistSongs(normalized.songIds, library, normalized.songKeys)
 
   await updateDoc(doc(firestore, paths.setlist(organizationId, setlistId)), {
     name: normalized.name,
@@ -267,11 +280,34 @@ export const reorderSetlistSongs = async (
   setlistId: string,
   songIds: string[],
   library: Map<string, Song>,
+  songKeys: Record<string, string> = {},
 ): Promise<void> => {
-  const songs = buildSetlistSongs(songIds, library)
+  const songs = buildSetlistSongs(songIds, library, songKeys)
   await updateDoc(doc(firestore, paths.setlist(organizationId, setlistId)), {
     songs,
     estimatedDurationSec: estimateSetlistDuration(songs, library),
+    updatedAt: serverTimestamp(),
+  })
+}
+
+/**
+ * Sets the key one song will be played in inside a setlist (docs §20). Stored
+ * on the setlist entry only — the songbook keeps its original key — and synced
+ * to every member through the setlist listener.
+ */
+export const updateSetlistSongKey = async (
+  organizationId: string,
+  setlistId: string,
+  songId: string,
+  key: string,
+): Promise<void> => {
+  const setlist = await fetchSetlist(organizationId, setlistId)
+  if (!setlist) throw new ValidationError("That setlist no longer exists.")
+  const songs = setlist.songs.map((entry) =>
+    entry.songId === songId ? { ...entry, key: key.trim() } : entry,
+  )
+  await updateDoc(doc(firestore, paths.setlist(organizationId, setlistId)), {
+    songs,
     updatedAt: serverTimestamp(),
   })
 }
