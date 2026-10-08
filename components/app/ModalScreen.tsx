@@ -24,8 +24,9 @@ interface ModalScreenProps {
 
 /**
  * Shell for routes presented as modals (docs §21). It floats on a translucent
- * backdrop over the previous screen — a bottom sheet on phones, a dialog on
- * web/desktop — and uses the same spring entrance as `Dialog`.
+ * backdrop over the previous screen — a bottom sheet on phones (drag the
+ * handle at the top to dismiss), a dialog on web/desktop — and uses the same
+ * spring entrance as `Dialog`.
  */
 export function ModalScreen({
   title,

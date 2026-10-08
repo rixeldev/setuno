@@ -17,15 +17,14 @@ interface BottomSheetProps {
 
 /**
  * Cross-platform bottom sheet for short option pickers (language, theme).
- * Built on the same translucent, spring-animated surface as `Dialog`, so it
- * works identically on Android, iOS and web.
+ * It slides in from the bottom edge on every platform and can be dragged back
+ * down by its handle (`SheetSurface`).
  */
 export function BottomSheet({ visible, onClose, title, subtitle, children }: BottomSheetProps) {
   const styles = useThemedStyles(createStyles)
 
   return (
-    <SheetSurface visible={visible} onClose={onClose} placement="auto">
-      <View style={styles.grabber} />
+    <SheetSurface visible={visible} onClose={onClose} placement="bottom">
       <View style={styles.content}>
         <View style={styles.header}>
           <AppText variant="heading">{title}</AppText>
@@ -86,14 +85,6 @@ export function SheetOptionRow({
 
 const createStyles = () =>
   StyleSheet.create({
-    grabber: {
-      width: 44,
-      height: 5,
-      borderRadius: Theme.radii.pill,
-      backgroundColor: Theme.colors.border,
-      alignSelf: "center",
-      marginTop: Theme.spacing.s,
-    },
     content: {
       paddingHorizontal: Theme.spacing.xl,
       paddingTop: Theme.spacing.l,
