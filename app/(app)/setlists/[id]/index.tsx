@@ -29,7 +29,12 @@ import {
 import { toFriendlyError } from "@/services/errors"
 import { filterSongs, EMPTY_FILTERS } from "@/libs/songSearch"
 import type { RelativeDayLabels } from "@/libs/format"
-import { formatDateRange, formatDuration, formatDurationLong, formatRelativeDay } from "@/libs/format"
+import {
+  formatDateRange,
+  formatDuration,
+  formatDurationLong,
+  formatRelativeDay,
+} from "@/libs/format"
 import { parseIsoDate } from "@/libs/validation"
 import { estimateDurationSec } from "@/libs/songUtils"
 import { displayKey } from "@/libs/chords"
@@ -94,7 +99,10 @@ export default function SetlistDetail() {
             .sort((a, b) => b.date.localeCompare(a.date)),
     [performances, setlistId],
   )
-  const actor = { id: profile?.uid ?? "", name: profile?.displayName || "An admin" }
+  const actor = {
+    id: profile?.uid ?? "",
+    name: profile?.displayName || "An admin",
+  }
 
   const persistOrder = async (
     songIds: string[],
@@ -134,7 +142,9 @@ export default function SetlistDetail() {
   const removeSong = (songId: string): void => {
     if (!setlist) return
     void persistOrder(
-      setlist.songs.filter((entry) => entry.songId !== songId).map((entry) => entry.songId),
+      setlist.songs
+        .filter((entry) => entry.songId !== songId)
+        .map((entry) => entry.songId),
       setlistSongKeys(setlist.songs),
     )
   }
@@ -145,7 +155,10 @@ export default function SetlistDetail() {
       return
     }
     const existing = setlist.songs.map((entry) => entry.songId)
-    void persistOrder([...existing, ...ids], { ...setlistSongKeys(setlist.songs), ...keys })
+    void persistOrder([...existing, ...ids], {
+      ...setlistSongKeys(setlist.songs),
+      ...keys,
+    })
     setPickerOpen(false)
     setSearch("")
     toast.showSuccess(t("setlists.songsAdded", { count: ids.length }))
@@ -175,7 +188,12 @@ export default function SetlistDetail() {
     if (!setlist) return
     setBusy(true)
     try {
-      const id = await duplicateSetlist(organizationId ?? "", setlist.id, "copy", actor)
+      const id = await duplicateSetlist(
+        organizationId ?? "",
+        setlist.id,
+        "copy",
+        actor,
+      )
       toast.showSuccess(t("setlists.duplicated"))
       router.replace(`/setlists/${id}`)
     } catch (error) {
@@ -203,7 +221,10 @@ export default function SetlistDetail() {
   if (!setlistId) {
     return (
       <ScreenContainer back title={t("setlists.setlist")}>
-        <EmptyState title={t("setlists.setlistNotFound")} message={t("setlists.pickOne")} />
+        <EmptyState
+          title={t("setlists.setlistNotFound")}
+          message={t("setlists.pickOne")}
+        />
       </ScreenContainer>
     )
   }
@@ -228,8 +249,11 @@ export default function SetlistDetail() {
     count: setlist.songs.length,
     duration: formatDurationLong(setlist.estimatedDurationSec),
   })
-  const dateLabel = setlist.date ? formatRelativeDay(parseIsoDate(setlist.date), dayLabels) : ""
-  const hasNotes = setlist.description.trim().length > 0 || setlist.notes.trim().length > 0
+  const dateLabel = setlist.date
+    ? formatRelativeDay(parseIsoDate(setlist.date), dayLabels)
+    : ""
+  const hasNotes =
+    setlist.description.trim().length > 0 || setlist.notes.trim().length > 0
 
   return (
     <ScreenContainer
@@ -284,7 +308,9 @@ export default function SetlistDetail() {
         <Card padded={false} style={styles.listCard}>
           {setlist.songs.map((entry, index) => {
             const song = songLibrary.get(entry.songId)
-            const seconds = song ? (song.durationSec ?? estimateDurationSec(song.sections)) : null
+            const seconds = song
+              ? (song.durationSec ?? estimateDurationSec(song.sections))
+              : null
             return (
               <View
                 key={`${entry.songId}-${index}`}
@@ -292,7 +318,9 @@ export default function SetlistDetail() {
               >
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={t("setlists.openSong", { title: entry.title })}
+                  accessibilityLabel={t("setlists.openSong", {
+                    title: entry.title,
+                  })}
                   onPress={() =>
                     router.push(
                       relatedShows.length > 0
@@ -300,7 +328,10 @@ export default function SetlistDetail() {
                         : `/songs/${entry.songId}`,
                     )
                   }
-                  style={({ pressed }) => [styles.songMain, pressed && styles.pressed]}
+                  style={({ pressed }) => [
+                    styles.songMain,
+                    pressed && styles.pressed,
+                  ]}
                 >
                   <AppText variant="caption" tone="faint" style={styles.order}>
                     {index + 1}
@@ -310,7 +341,10 @@ export default function SetlistDetail() {
                       {entry.title}
                     </AppText>
                     <AppText variant="caption" tone="muted" numberOfLines={1}>
-                      {[entry.artist || t("common.unknownArtist"), formatDuration(seconds)]
+                      {[
+                        entry.artist || t("common.unknownArtist"),
+                        formatDuration(seconds),
+                      ]
                         .filter(Boolean)
                         .join(" · ")}
                     </AppText>
@@ -355,7 +389,10 @@ export default function SetlistDetail() {
                       disabled={index === 0}
                       onPress={() => move(index, -1)}
                       icon={
-                        <AppText variant="bodyStrong" tone={index === 0 ? "faint" : "muted"}>
+                        <AppText
+                          variant="bodyStrong"
+                          tone={index === 0 ? "faint" : "muted"}
+                        >
                           ↑
                         </AppText>
                       }
@@ -368,7 +405,11 @@ export default function SetlistDetail() {
                       icon={
                         <AppText
                           variant="bodyStrong"
-                          tone={index === setlist.songs.length - 1 ? "faint" : "muted"}
+                          tone={
+                            index === setlist.songs.length - 1
+                              ? "faint"
+                              : "muted"
+                          }
                         >
                           ↓
                         </AppText>
@@ -407,13 +448,25 @@ export default function SetlistDetail() {
               accessibilityRole="button"
               accessibilityLabel={performance.name}
               onPress={() => router.push(`/performances/${performance.id}`)}
-              style={({ pressed }) => [styles.showLine, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.showLine,
+                pressed && styles.pressed,
+              ]}
             >
-              <AppText variant="caption" tone="muted" numberOfLines={1} style={styles.flex}>
+              <AppText
+                variant="caption"
+                tone="muted"
+                numberOfLines={1}
+                style={styles.flex}
+              >
                 {performance.name}
               </AppText>
               <AppText variant="caption" tone="faint" numberOfLines={1}>
-                {formatDateRange(performance.date, performance.endDate, i18n.language)}
+                {formatDateRange(
+                  performance.date,
+                  performance.endDate,
+                  i18n.language,
+                )}
               </AppText>
             </Pressable>
           ))}
@@ -483,13 +536,17 @@ export default function SetlistDetail() {
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <AppText variant="caption" tone="faint">
-              {songs.length === 0 ? t("setlists.songbookEmpty") : t("setlists.noMoreSongs")}
+              {songs.length === 0
+                ? t("setlists.songbookEmpty")
+                : t("setlists.noMoreSongs")}
             </AppText>
           }
           renderItem={({ item }) => (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={t("setlists.addSongA11y", { title: item.title })}
+              accessibilityLabel={t("setlists.addSongA11y", {
+                title: item.title,
+              })}
               onPress={() =>
                 setKeyTarget({
                   songId: item.id,
@@ -499,7 +556,10 @@ export default function SetlistDetail() {
                   mode: "add",
                 })
               }
-              style={({ pressed }) => [styles.pickerRow, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.pickerRow,
+                pressed && styles.pressed,
+              ]}
             >
               <View style={styles.flex}>
                 <AppText variant="bodyStrong" numberOfLines={1}>
@@ -509,11 +569,18 @@ export default function SetlistDetail() {
                   {item.artist || t("common.unknownArtist")}
                 </AppText>
               </View>
-              <Badge label={item.key ? displayKey(item.key, notation) : "—"} tone="accent" />
+              <Badge
+                label={item.key ? displayKey(item.key, notation) : "—"}
+                tone="accent"
+              />
             </Pressable>
           )}
         />
-        <Button label={t("common.done")} variant="secondary" onPress={() => setPickerOpen(false)} />
+        <Button
+          label={t("common.done")}
+          variant="secondary"
+          onPress={() => setPickerOpen(false)}
+        />
       </Dialog>
 
       <Dialog
@@ -548,14 +615,20 @@ const createStyles = () =>
       borderLeftColor: Theme.colors.primary,
       paddingLeft: Theme.spacing.m,
     },
-    listCard: { overflow: "hidden" },
-    songRow: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.xs },
+    listCard: { overflow: "hidden", justifyContent: "center" },
+    songRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: Theme.spacing.xs,
+    },
     songDivider: { borderTopWidth: 1, borderTopColor: Theme.colors.borderSoft },
     songMain: {
       flex: 1,
       minHeight: 56,
       flexDirection: "row",
       alignItems: "center",
+      justifyContent: "center",
       gap: Theme.spacing.m,
       paddingVertical: Theme.spacing.m,
       paddingLeft: Theme.spacing.l,
@@ -567,10 +640,20 @@ const createStyles = () =>
       borderColor: Theme.colors.accent,
       paddingHorizontal: Theme.spacing.m,
       paddingVertical: 4,
+      alignSelf: "center",
+      marginRight: Theme.spacing.m,
     },
-    rowActions: { flexDirection: "row", alignItems: "center", paddingRight: Theme.spacing.xs },
+    rowActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingRight: Theme.spacing.xs,
+    },
     shows: { gap: Theme.spacing.xs },
-    showLine: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.m },
+    showLine: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.m,
+    },
     pressed: { opacity: 0.7 },
     pickerList: { maxHeight: 320, width: "100%", flexShrink: 1 },
     pickerRow: {
