@@ -154,7 +154,7 @@ pnpm start      # Expo dev server, pick a target from the menu
 | `pnpm deploy:rules` | Publish `firestore.rules` to the pinned Firebase project |
 | `pnpm deploy:indexes` | Publish `firestore.indexes.json` |
 | `pnpm deploy:storage` | Publish `storage.rules` |
-| `pnpm assets:generate` | Regenerate the launcher icons/splash from `scripts/generate-assets.mjs` |
+| `pnpm assets:generate` | Regenerate the launcher icons in `assets/icons` from the brand masters |
 | `pnpm assets:store [es\|en]` | Build the Play Store graphics (feature graphic + 5 screenshots) from the captures in `docs/images/` |
 
 > **Before declaring any task done:** `pnpm typecheck` and `pnpm lint` must both pass.
@@ -187,7 +187,7 @@ libs/                   Pure helpers: chords, chordShapes, songUtils, setlistNav
 interfaces/             Shared TypeScript domain models
 constants/              Theme.ts — Setuno design tokens
 locales/                en.json, es.json (kept structurally identical)
-scripts/                ensure-firebase-config.mjs (CI Firebase config), generate-assets.mjs (icons/splash)
+scripts/                ensure-firebase-config.mjs (CI Firebase config), generate-assets.mjs (assets/icons)
 shims/                  Web implementations for native-only modules
 firestore.rules         Production security rules
 storage.rules           Cloud Storage rules (avatars and band logos)
