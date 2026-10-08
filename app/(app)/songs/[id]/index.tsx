@@ -38,7 +38,7 @@ import { deleteSong, subscribeSong } from "@/services/songs"
 import { updatePreferences } from "@/services/users"
 import { updateCachedPreferences, usePreferences } from "@/services/prefs"
 import { toFriendlyError } from "@/services/errors"
-import { displayKey as spellKey, transposeKey } from "@/libs/chords"
+import { displayKey as spellKey, semitonesBetweenKeys, transposeKey } from "@/libs/chords"
 import { formatRelativeTime, formatDuration } from "@/libs/format"
 import { toDate } from "@/interfaces/timestamp"
 import type { UserPreferences } from "@/interfaces"
@@ -124,15 +124,20 @@ export default function SongScreen() {
     () => (setlistId ? (setlists.find((entry) => entry.id === setlistId) ?? null) : null),
     [setlistId, setlists],
   )
-  const step = useMemo(() => {
-    if (!song || !contextSetlist) return null
+  const eventSetlist = useMemo(() => {
+    if (!contextSetlist) return null
     const belongsToEvent = performances.some(
       (performance) =>
         performance.status !== "cancelled" &&
         performance.setlists.some((reference) => reference.id === contextSetlist.id),
     )
-    return belongsToEvent ? setlistStep(song.id, contextSetlist.songs) : null
-  }, [contextSetlist, performances, song])
+    return belongsToEvent ? contextSetlist : null
+  }, [contextSetlist, performances])
+
+  const step = useMemo(
+    () => (song && eventSetlist ? setlistStep(song.id, eventSetlist.songs) : null),
+    [eventSetlist, song],
+  )
 
   // Stepping opens the next reader screen and tells the stack which way to
   // animate: "pop" when walking back, "push" when walking forward.
@@ -142,12 +147,17 @@ export default function SongScreen() {
   }
 
   // Opening a different song resets the reader controls to their defaults
-  // (adjust state while rendering, as documented by React).
-  const [readerSongId, setReaderSongId] = useState<string | null>(song?.id ?? null)
-  if (song && song.id !== readerSongId) {
-    setReaderSongId(song.id)
-    setSemitones(0)
-    setCapoOverride(null)
+  // (adjust state while rendering, as documented by React). A song in an
+  // event's setlist additionally opens in the key the band chose for it, and a
+  // live change of that key re-applies while the reader is on screen.
+  const chosenPlayKey =
+    eventSetlist?.songs.find((entry) => entry.songId === song?.id)?.key ?? ""
+  const [appliedPlayKey, setAppliedPlayKey] = useState<{ songId: string; key: string } | null>(null)
+  if (song && (appliedPlayKey?.songId !== song.id || appliedPlayKey?.key !== chosenPlayKey)) {
+    const sameSong = appliedPlayKey?.songId === song.id
+    setAppliedPlayKey({ songId: song.id, key: chosenPlayKey })
+    setSemitones(chosenPlayKey ? semitonesBetweenKeys(song.key, chosenPlayKey) : 0)
+    if (!sameSong) setCapoOverride(null)
   }
 
   const capo = capoOverride ?? song?.capo ?? 0
