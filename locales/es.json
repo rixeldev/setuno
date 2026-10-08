@@ -826,6 +826,8 @@
     "notifications": "Notificaciones",
     "about": "Acerca de",
     "help": "Ayuda",
+    "terms": "Términos y condiciones",
+    "privacy": "Política de privacidad",
     "profileSettings": "Ajustes del perfil",
     "photo": "Foto de perfil",
     "preferences": "Preferencias",
@@ -1052,5 +1054,12 @@
       "venueRequired": "Añade el nombre del local.",
       "dateRequired": "Elige una fecha."
     }
+  },
+  "update": {
+    "title": "Actualización necesaria",
+    "description": "Esta versión de Setuno ya no es compatible. Actualiza para que la app siga funcionando.",
+    "cellular": "Estás con datos móviles, así que actualizar es opcional. Te recomendamos hacerlo pronto.",
+    "action": "Actualizar ahora",
+    "later": "Más tarde"
   }
 }

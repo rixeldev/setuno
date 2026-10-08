@@ -415,6 +415,15 @@ service cloud.firestore {
       }
     }
 
+    // ---------------------------------------------------------------- version
+    //
+    // Release marker: `AppUpdateGate` checks that the build's own record still
+    // exists to detect a forced update, so reads stay public. Writes are denied
+    // like everywhere else.
+    match /version/{versionId} {
+      allow read: if true;
+    }
+
     // Everything else is closed.
     match /{document=**} {
       allow read, write: if false;

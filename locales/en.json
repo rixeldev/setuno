@@ -897,6 +897,8 @@
     "notifications": "Notifications",
     "about": "About",
     "help": "Help",
+    "terms": "Terms & Conditions",
+    "privacy": "Privacy Policy",
     "signOut": "Sign out",
     "profileSettings": "Profile settings",
     "displayName": "Display name",
@@ -1052,5 +1054,12 @@
     "checkFields": "Check the highlighted fields.",
     "imagePicked": "Image selected",
     "uploadFailed": "Upload failed"
+  },
+  "update": {
+    "title": "Update required",
+    "description": "This version of Setuno is no longer supported. Update to keep the app working.",
+    "cellular": "You are on mobile data, so updating is optional. We recommend updating soon.",
+    "action": "Update now",
+    "later": "Later"
   }
 }

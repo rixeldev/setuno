@@ -15,6 +15,7 @@ import { AuthProvider } from "@/hooks/useAuth"
 import { OrganizationProvider } from "@/hooks/useOrganization"
 import { OrgDataProvider } from "@/hooks/useOrgData"
 import { ToastProvider } from "@/components/ui/Toast"
+import { AppUpdateGate } from "@/components/app/AppUpdateGate"
 import { StartupGate } from "@/components/app/StartupGate"
 import { SPLASH_BACKGROUND } from "@/components/app/StartupSplash"
 import { hydrateAppearance } from "@/services/themeManager"
@@ -110,6 +111,7 @@ export default function Layout() {
                     <Stack.Screen name="(app)" />
                   </Stack>
                 </StartupGate>
+                <AppUpdateGate />
               </OrgDataProvider>
             </OrganizationProvider>
           </AuthProvider>

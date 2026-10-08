@@ -38,6 +38,8 @@ interface DialogProps {
    * windowing (React Native warns about it) and nests two scrollers.
    */
   bodyScroll?: boolean
+  /** When false the dialog can only be dismissed by its own actions. */
+  dismissible?: boolean
 }
 
 /**
@@ -58,10 +60,12 @@ export function Dialog({
   tone = "default",
   hideActions = false,
   bodyScroll = true,
+  dismissible = true,
 }: DialogProps) {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
   const progress = useState(() => new Animated.Value(0))[0]
+  const requestClose = dismissible ? onClose : undefined
 
   useEffect(() => {
     Animated.spring(progress, {
@@ -80,13 +84,14 @@ export function Dialog({
       transparent
       animationType="fade"
       statusBarTranslucent
-      onRequestClose={onClose}
+      onRequestClose={requestClose}
     >
       <Pressable
         style={styles.backdrop}
         accessibilityLabel={t("common.close")}
         accessibilityRole="button"
-        onPress={onClose}
+        onPress={requestClose}
+        disabled={!dismissible}
       />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -104,15 +109,17 @@ export function Dialog({
                 </AppText>
               ) : null}
             </View>
-            <Pressable
-              onPress={onClose}
-              hitSlop={Theme.hitSlop}
-              accessibilityRole="button"
-              accessibilityLabel={t("common.close")}
-              style={styles.close}
-            >
-              <CloseIcon color={Theme.colors.textMuted} size={18} />
-            </Pressable>
+            {dismissible ? (
+              <Pressable
+                onPress={onClose}
+                hitSlop={Theme.hitSlop}
+                accessibilityRole="button"
+                accessibilityLabel={t("common.close")}
+                style={styles.close}
+              >
+                <CloseIcon color={Theme.colors.textMuted} size={18} />
+              </Pressable>
+            ) : null}
           </View>
 
           {children ? (
