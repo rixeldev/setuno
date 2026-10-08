@@ -6,12 +6,12 @@ import { useTranslation } from "react-i18next"
 import { Dialog } from "@/components/ui/Dialog"
 import { Button } from "@/components/ui/Button"
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/libs/appLinks"
-import { isRunningLatestVersion } from "@/services/version"
+import { hasNewerVersionAvailable } from "@/services/version"
 
 /**
- * Forces a store update when this build's `version` record no longer exists
- * in Firestore (see `services/version.ts`). It only applies to the native
- * apps — the web bundle always ships the latest code.
+ * Forces a store update when Firestore holds a newer version than the one
+ * installed (see `services/version.ts`). It only applies to the native apps —
+ * the web bundle always ships the latest code.
  *
  * On Wi-Fi the dialog cannot be dismissed; on mobile data updating is optional
  * so the user does not burn their data plan (docs §36).
@@ -25,9 +25,9 @@ export function AppUpdateGate() {
   useEffect(() => {
     if (Platform.OS === "web") return
     let active = true
-    void isRunningLatestVersion().then((latest) => {
+    void hasNewerVersionAvailable().then((newer) => {
       // `null` means "could not tell" (offline): keep the app usable.
-      if (active && latest === false) setOutdated(true)
+      if (active && newer === true) setOutdated(true)
     })
     return () => {
       active = false

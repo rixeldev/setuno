@@ -1,22 +1,33 @@
-import { appVersionId } from "@/db/firebaseConfig"
-import { collection, firestore, getDocsFromServer } from "@/db/Fire"
+import Constants from "expo-constants"
 
-/** Release marker collection: one document per supported app version. */
+import { collection, firestore, getDocsFromServer } from "@/db/Fire"
+import { compareVersions, maxVersion } from "@/libs/version"
+
+/**
+ * Release marker collection. Its `version` field is bumped by hand every time
+ * a new build is published; the highest value wins if older markers are kept
+ * around.
+ */
 const VERSION_COLLECTION = "version"
 
 /**
- * Whether this build's version record still exists in the `version`
- * collection.
+ * Whether the store now serves a newer build than the one installed.
  *
- * A release replaces the record (create the new document, delete the old one),
- * so a missing record means the installed build is outdated. Returns `null`
- * when the answer cannot be determined (offline, permissions…) — the caller
- * must never force an update on a guess.
+ * The newest `version` value in Firestore is compared with the installed build
+ * (`expo-constants`): a strictly higher value forces the update dialog, equal
+ * or lower does nothing. Returns `null` when the answer cannot be determined
+ * (offline, permissions, malformed data) — the caller must never force an
+ * update on a guess.
  */
-export const isRunningLatestVersion = async (): Promise<boolean | null> => {
+export const hasNewerVersionAvailable = async (): Promise<boolean | null> => {
   try {
     const snapshot = await getDocsFromServer(collection(firestore, VERSION_COLLECTION))
-    return snapshot.docs.some((item) => item.id === appVersionId)
+    const remote = maxVersion(
+      snapshot.docs.map((item) => String(item.get("version") ?? "")),
+    )
+    const installed = Constants.expoConfig?.version ?? ""
+    if (!remote || !installed) return null
+    return compareVersions(remote, installed) > 0
   } catch {
     return null
   }
