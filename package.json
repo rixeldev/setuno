@@ -47,6 +47,7 @@
     "expo-auth-session": "^57.0.13",
     "expo-build-properties": "~57.0.22",
     "expo-clipboard": "~57.0.2",
+    "expo-constants": "~57.0.21",
     "expo-font": "~57.0.4",
     "expo-gl": "^57.0.2",
     "expo-haptics": "~57.0.3",

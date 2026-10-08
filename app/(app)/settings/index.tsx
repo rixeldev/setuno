@@ -1,6 +1,7 @@
 import React, { useState } from "react"
-import { Pressable, StyleSheet, View } from "react-native"
+import { Linking, Pressable, StyleSheet, View } from "react-native"
 import { useRouter } from "expo-router"
+import Constants from "expo-constants"
 import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
@@ -14,9 +15,11 @@ import {
   ChevronRightIcon,
   GroupIcon,
   LanguageIcon,
+  LinkIcon,
   LogoutIcon,
   OrganizationIcon,
   PaletteIconNew,
+  ShieldIcon,
 } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { LanguageSheet } from "@/components/settings/LanguageSheet"
@@ -27,6 +30,7 @@ import { useOrgData } from "@/hooks/useOrgData"
 import { getAppearance } from "@/services/themeManager"
 import { useLanguagePreference } from "@/services/i18next"
 import { getDeviceLanguage } from "@/libs/deviceLanguage"
+import { PRIVACY_URL, TERMS_URL } from "@/libs/appLinks"
 import { LANGUAGE_NAMES, matchLanguage } from "@/libs/language"
 import { toFriendlyError } from "@/services/errors"
 import { pluralize } from "@/libs/format"
@@ -71,6 +75,8 @@ export default function SettingsScreen() {
     languagePreference === "device"
       ? `${t("settings.automatic")} · ${LANGUAGE_NAMES[matchLanguage(getDeviceLanguage())]}`
       : LANGUAGE_NAMES[languagePreference]
+
+  const appVersion = Constants.expoConfig?.version ?? ""
 
   const handleSignOut = async () => {
     setSigningOut(true)
@@ -169,6 +175,20 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
+      <Card style={styles.card}>
+        <Row
+          icon={LinkIcon}
+          title={t("settings.terms")}
+          onPress={() => void Linking.openURL(TERMS_URL).catch(() => undefined)}
+        />
+        <Divider />
+        <Row
+          icon={ShieldIcon}
+          title={t("settings.privacy")}
+          onPress={() => void Linking.openURL(PRIVACY_URL).catch(() => undefined)}
+        />
+      </Card>
+
       <Card padded={false}>
         <Row
           icon={LogoutIcon}
@@ -178,6 +198,10 @@ export default function SettingsScreen() {
           onPress={() => setConfirmSignOut(true)}
         />
       </Card>
+
+      <AppText variant="caption" tone="faint" style={styles.footer}>
+        {t("settings.version", { version: appVersion })}
+      </AppText>
 
       <Dialog
         visible={confirmSignOut}
@@ -312,5 +336,10 @@ const createStyles = () =>
     rowBody: {
       flex: 1,
       gap: 2,
+    },
+    footer: {
+      textAlign: "center",
+      marginTop: Theme.spacing.m,
+      marginBottom: Theme.spacing.l,
     },
   })
