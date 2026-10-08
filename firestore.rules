@@ -1,7 +1,7 @@
 rules_version = '2';
 
 /**
- * Stage Book — Firestore security rules (docs §23).
+ * Setuno — Firestore security rules (docs §23).
  *
  * Model recap:
  *   users/{uid}                                     profile + preferences
@@ -87,6 +87,17 @@ service cloud.firestore {
       return getAfter(invitationPath(organizationId)).data.status == 'accepted';
     }
 
+    /**
+     * True while the band's owner deletes the whole band in this batch. The
+     * delete flow removes the memberships and the activity feed in the same
+     * transaction that deletes the organization itself.
+     */
+    function ownerIsDeletingOrganization(organizationId) {
+      return signedIn()
+        && get(organizationPath(organizationId)).data.ownerId == request.auth.uid
+        && getAfter(organizationPath(organizationId)) == null;
+    }
+
     function validEmail(address) {
       return address is string && address.size() > 3 && address.size() <= 320
         && address.lower() == address
@@ -146,7 +157,12 @@ service cloud.firestore {
         allow create: if isSelf(uid)
           && request.resource.data.keys().hasOnly(['name', 'role', 'logoURL', 'joinedAt'])
           && request.resource.data.role in ['admin', 'member']
-          && acceptedOwnInvitationAfterBatch(organizationId);
+          && (
+            // the creator's own index entry for a band they just made
+            isBandOwnerAfterBatch(organizationId)
+            // an invitee's index entry while accepting an invitation
+            || acceptedOwnInvitationAfterBatch(organizationId)
+          );
         allow update: if (
             isSelf(uid)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'role', 'logoURL', 'joinedAt'])
@@ -251,9 +267,11 @@ service cloud.firestore {
                  .hasOnly(['displayName', 'photoURL', 'email'])
           );
 
-        // Nobody may remove themselves: they would lose the ability to leave
-        // cleanly and it lets an admin lock the owner out.
-        allow delete: if isAdmin(organizationId) && memberUid != request.auth.uid;
+        // Nobody may remove themselves (an admin could lock the owner out) —
+        // except the owner deleting the whole band, which removes every
+        // membership, including their own, in the same batch as the organization.
+        allow delete: if (isAdmin(organizationId) && memberUid != request.auth.uid)
+          || ownerIsDeletingOrganization(organizationId);
       }
 
       // ------------------------------------------------------------- invitations
@@ -391,7 +409,9 @@ service cloud.firestore {
         allow create: if isMember(organizationId)
           && request.resource.data.organizationId == organizationId
           && request.resource.data.actorId == request.auth.uid;
-        allow update, delete: if false;
+        allow update: if false;
+        // The feed stays append-only, except while the owner deletes the band.
+        allow delete: if ownerIsDeletingOrganization(organizationId);
       }
     }
 
