@@ -11,7 +11,6 @@ import { Badge, Card, Divider } from "@/components/ui/Card"
 import { Dialog } from "@/components/ui/Dialog"
 import { useToast } from "@/components/ui/Toast"
 import {
-  AccountIcon,
   ChevronRightIcon,
   GroupIcon,
   LanguageIcon,
@@ -93,9 +92,17 @@ export default function SettingsScreen() {
       large
       back
     >
-      <Card style={styles.card}>
+      <Card
+        style={styles.card}
+        onPress={() => router.push("/settings/profile")}
+        accessibilityLabel={t("settings.profile")}
+      >
         <View style={styles.profile}>
-          <Avatar name={displayName || email} size={56} />
+          <Avatar
+            name={displayName || email}
+            photoURL={profile?.photoURL ?? user?.photoURL ?? null}
+            size={56}
+          />
           <View style={styles.profileText}>
             <AppText variant="title" numberOfLines={1}>
               {displayName || email}
@@ -119,14 +126,8 @@ export default function SettingsScreen() {
               />
             ) : null}
           </View>
+          <ChevronRightIcon size={18} color={Theme.colors.textFaint} />
         </View>
-        <Divider />
-        <Row
-          icon={AccountIcon}
-          title={t("settings.profile")}
-          subtitle={displayName}
-          onPress={() => router.push("/settings/profile")}
-        />
       </Card>
 
       <Card style={styles.card}>

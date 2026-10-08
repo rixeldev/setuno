@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useState } from "react"
 import { Image, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 
 import { Theme } from "@/constants/Theme"
@@ -33,6 +33,11 @@ export function Avatar({
   const styles = useThemedStyles(createStyles)
   const diameter = size
   const fontSize = Math.max(10, Math.round(size * 0.38))
+  // A stored URL can outlive its file (for example, after a project move):
+  // fall back to the initials instead of an empty square, and retry whenever
+  // the URL changes.
+  const [failedURL, setFailedURL] = useState<string | null>(null)
+  const showImage = Boolean(photoURL) && failedURL !== photoURL
 
   const content = (
     <View
@@ -42,9 +47,10 @@ export function Avatar({
         style,
       ]}
     >
-      {photoURL ? (
+      {showImage ? (
         <Image
-          source={{ uri: photoURL }}
+          source={{ uri: photoURL ?? "" }}
+          onError={() => setFailedURL(photoURL ?? "")}
           style={{ width: diameter, height: diameter, borderRadius: diameter / 2 }}
           accessibilityIgnoresInvertColors
         />
