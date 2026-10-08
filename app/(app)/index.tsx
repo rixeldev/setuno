@@ -103,7 +103,7 @@ export default function Dashboard() {
     void seedDemoSongOnce({
       organizationId,
       uid: profile.uid,
-      authorName: profile.displayName || "Stage Book",
+      authorName: profile.displayName || "Setuno",
       alreadySeeded: false,
     })
       .then((created) => {

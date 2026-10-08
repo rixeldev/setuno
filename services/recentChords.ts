@@ -7,7 +7,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
  * A device-local shortcut (muscle memory, not band data), shown at the top of
  * the palette next to the diatonic chords of the song key.
  */
-const STORAGE_KEY = "stage-book:recent-chords:v1"
+const STORAGE_KEY = "setuno:recent-chords:v1"
 const MAX_RECENT = 10
 
 const listeners = new Set<() => void>()

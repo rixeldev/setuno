@@ -93,7 +93,7 @@ export const sendPasswordReset = async (email: string): Promise<void> => {
   }
 }
 
-/** Keeps the Firebase Auth display name in sync with the Stage Book profile. */
+/** Keeps the Firebase Auth display name in sync with the Setuno profile. */
 export const updateAuthDisplayName = async (displayName: string): Promise<void> => {
   const user = auth.currentUser
   if (!user) throw new Error("You need to be signed in to do that.")

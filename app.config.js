@@ -1,9 +1,9 @@
 export default {
   expo: {
     owner: "rikirilis",
-    name: "Stage Book",
-    slug: "stage-book",
-    scheme: "stagebook",
+    name: "Setuno",
+    slug: "setuno",
+    scheme: "setuno",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icons/mipmap-xxxhdpi/ic_launcher.png",
@@ -17,12 +17,12 @@ export default {
     },
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.rixeldev.stagebook",
+      bundleIdentifier: "com.rixeldev.setuno",
       googleServicesFile: "./GoogleService-Info.plist",
       buildNumber: "1",
     },
     android: {
-      package: "com.rixeldev.stagebook",
+      package: "com.rixeldev.setuno",
       versionCode: 1,
       version: "1.0.0",
       minSdkVersion: 24,
@@ -85,10 +85,10 @@ export default {
       [
         "react-native-google-mobile-ads",
         {
-          android_app_id: "ca-app-pub-5333671658707378~7040773765",
-          androidAppId: "ca-app-pub-5333671658707378~7040773765",
-          ios_app_id: "ca-app-pub-5333671658707378~6877122232",
-          iosAppId: "ca-app-pub-5333671658707378~6877122232",
+          android_app_id: "ca-app-pub-5333671658707378~1730333220",
+          androidAppId: "ca-app-pub-5333671658707378~1730333220",
+          ios_app_id: "ca-app-pub-5333671658707378~8729932405",
+          iosAppId: "ca-app-pub-5333671658707378~8729932405",
         },
       ],
     ],

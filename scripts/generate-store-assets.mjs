@@ -300,7 +300,7 @@ const feature = () => {
   ctx.textBaseline = "middle"
   ctx.font = `700 54px ${ONEST_BOLD}`
   ctx.fillStyle = CREAM
-  ctx.fillText("Stage Book", tileX + tile + 22, tileY + 44)
+  ctx.fillText("Setuno", tileX + tile + 22, tileY + 44)
 
   ctx.font = `400 25px ${ONEST}`
   ctx.fillStyle = MUTED
@@ -429,7 +429,7 @@ const screenshot = (index, { source, title, subtitle }) => {
   ctx.textAlign = "left"
   ctx.font = `700 30px ${ONEST_BOLD}`
   ctx.fillStyle = colorWithAlpha(CREAM, 0.9)
-  ctx.fillText("Stage Book", markX + mark + 16, markY + 1)
+  ctx.fillText("Setuno", markX + mark + 16, markY + 1)
 
   const file = `screenshot-${index + 1}-${source}-1080x1920.png`
   writeFileSync(join(outDir, file), canvas.toBuffer("image/png"))
@@ -479,7 +479,7 @@ const dualFrame = () => {
   ctx.textAlign = "left"
   ctx.font = `700 30px ${ONEST_BOLD}`
   ctx.fillStyle = colorWithAlpha(CREAM, 0.9)
-  ctx.fillText("Stage Book", markX + mark + 16, markY + 1)
+  ctx.fillText("Setuno", markX + mark + 16, markY + 1)
 
   writeFileSync(join(outDir, "screenshot-5-dual-1080x1920.png"), canvas.toBuffer("image/png"))
 }

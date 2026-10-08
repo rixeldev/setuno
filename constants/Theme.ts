@@ -23,7 +23,7 @@ export const breakpoints = {
 } as const
 
 /**
- * Stage Book design tokens.
+ * Setuno design tokens.
  *
  * `Theme.colors` is a mutable singleton so the appearance settings can switch
  * between light/dark and accents at runtime (see services/appearance.ts).

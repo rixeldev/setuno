@@ -6,7 +6,7 @@
  * white outline on top of the themed focus border (docs §21). The rule below
  * clears it once for the whole app instead of per component.
  */
-const STYLE_ID = "stagebook-document-styles"
+const STYLE_ID = "setuno-document-styles"
 
 const DOCUMENT_CSS = [
   // The field keeps its own focus treatment (border colour, pressed states);

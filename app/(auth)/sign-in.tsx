@@ -66,7 +66,7 @@ export default function SignIn() {
       footer={
         <View>
           <AppText variant="body" tone="muted">
-            {t("auth.newToStageBook")}{" "}
+            {t("auth.newToSetuno")}{" "}
             <Link href="/(auth)/sign-up" style={{ color: Theme.colors.primary, fontWeight: "700" }}>
               {t("auth.createAnAccount")}
             </Link>

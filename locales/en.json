@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Stage Book",
+    "appName": "Setuno",
     "cancel": "Cancel",
     "confirm": "Confirm",
     "delete": "Delete",
@@ -112,7 +112,7 @@
     "shortcuts": "Shortcuts"
   },
   "auth": {
-    "welcome": "Welcome to Stage Book",
+    "welcome": "Welcome to Setuno",
     "welcomeSubtitle": "Your band's songbook, setlists and events in one place.",
     "signIn": "Sign in",
     "continueWithGoogle": "Continue with Google",
@@ -146,14 +146,14 @@
     "enterValidEmail": "Enter a valid email address.",
     "welcomeBack": "Welcome back",
     "signInSubtitle": "Sign in to reach your band's chord book.",
-    "newToStageBook": "New to Stage Book?",
+    "newToSetuno": "New to Setuno?",
     "createAnAccount": "Create an account",
     "signUpSubtitle": "One account, as many bands as you like.",
     "createYourAccount": "Create your account",
     "alreadyHaveAccountQuestion": "Already have an account?",
     "resetTitle": "Reset your password",
     "checkInbox": "Check your inbox",
-    "checkInboxSubtitle": "If that address has a Stage Book account, a reset link is on its way.",
+    "checkInboxSubtitle": "If that address has a Setuno account, a reset link is on its way.",
     "resetSentTo": "We sent a password reset link to {{email}}.",
     "rememberedIt": "Remembered it?",
     "hiName": "Hi {{name}}, let's set you up",
@@ -893,7 +893,7 @@
     "language": "Language",
     "automatic": "Automatic (device)",
     "automaticHint": "Uses the language of this device",
-    "languageHint": "Stage Book starts with your device language. Your choice is saved on this device.",
+    "languageHint": "Setuno starts with your device language. Your choice is saved on this device.",
     "notifications": "Notifications",
     "about": "About",
     "help": "Help",

@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/icon.png" alt="Stage Book" width="96" height="96" />
+  <img src="assets/icon.png" alt="Setuno" width="96" height="96" />
 </p>
 
-<h1 align="center">Stage Book</h1>
+<h1 align="center">Setuno</h1>
 
 <p align="center">
   <strong>The band's songbook, setlists and gigs — in one place.</strong>
@@ -18,7 +18,7 @@
 
 ---
 
-Stage Book is a cross-platform app for musicians and bands: build a shared songbook with a
+Setuno is a cross-platform app for musicians and bands: build a shared songbook with a
 chord/lyric editor, arrange setlists, schedule performances, and manage who gets to edit what.
 Everything runs on a **real Firebase backend** — no mocks, no stubs.
 
@@ -183,7 +183,7 @@ services/               Firebase data layer (songs, setlists, performances, sugg
 db/                     Fire.ts (single Firebase entry point) + firebaseConfig.ts (generated on CI)
 libs/                   Pure helpers: chords, chordShapes, songUtils, setlistNavigation, validation, format, songSearch, navigation, username
 interfaces/             Shared TypeScript domain models
-constants/              Theme.ts — Stage Book design tokens
+constants/              Theme.ts — Setuno design tokens
 locales/                en.json, es.json (kept structurally identical)
 scripts/                ensure-firebase-config.mjs (CI Firebase config), generate-assets.mjs (icons/splash)
 shims/                  Web implementations for native-only modules
@@ -216,7 +216,7 @@ collection (songs, setlists, performances, suggestions, members, invitations, ac
 the snapshot with every screen through context. The snapshot is tagged with the active organization
 id, so switching bands never shows the previous band's data.
 
-**Design system.** `constants/Theme.ts` holds the Stage Book tokens (colors, spacing, radii).
+**Design system.** `constants/Theme.ts` holds the Setuno tokens (colors, spacing, radii).
 Styles are built with `useThemedStyles(createStyles)`, which rebuilds once per palette change — the
 theme follows dark, light or the device scheme (`"system"`). The palette is derived from six accents
 (`libs/appearance.ts`): dark surfaces get a subtle tint of the accent, and light mode darkens the

@@ -34,7 +34,7 @@ export const seedDemoSongOnce = async (options: DemoSeedOptions): Promise<boolea
     await setDoc(reference, {
       organizationId: options.organizationId,
       title: DEMO_SONG_TITLE,
-      artist: "Stage Book",
+      artist: "Setuno",
       key: "Em",
       originalKey: "Em",
       capo: 0,

@@ -59,7 +59,7 @@ export default function MoreScreen() {
           <View style={styles.heroTop}>
             <View style={styles.flex}>
               <AppText variant="label" style={styles.heroKicker}>
-                Stage Book
+                Setuno
               </AppText>
               <AppText variant="display" tone="inverse">
                 {t("nav.more")}

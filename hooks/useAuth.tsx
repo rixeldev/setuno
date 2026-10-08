@@ -32,7 +32,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 /**
- * Single source of truth for the signed-in user and their Stage Book profile.
+ * Single source of truth for the signed-in user and their Setuno profile.
  * Keeps Firebase Auth and `users/{uid}` in sync and exposes a stable API to
  * the rest of the app.
  */

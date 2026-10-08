@@ -20,7 +20,7 @@ const resources = {
 }
 
 /** Survives restarts: "device" (default) or an explicit language. */
-const STORAGE_KEY = "stage-book:language:v1"
+const STORAGE_KEY = "setuno:language:v1"
 
 i18n.use(initReactI18next).init({
   lng: "en",

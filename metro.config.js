@@ -1,4 +1,4 @@
-// Metro configuration for Stage Book.
+// Metro configuration for Setuno.
 //
 // db/firebaseConfig.ts imports @react-native-firebase/*, which only ships
 // native code. On the web platform we redirect those imports to lightweight

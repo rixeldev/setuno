@@ -17,7 +17,7 @@ export interface Appearance {
   accent: AccentId
 }
 
-const STORAGE_KEY = "stage-book:appearance:v1"
+const STORAGE_KEY = "setuno:appearance:v1"
 
 const listeners = new Set<Listener>()
 let appearance: Appearance = { mode: "dark", accent: DEFAULT_ACCENT }

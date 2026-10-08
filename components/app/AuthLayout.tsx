@@ -71,7 +71,7 @@ export function AuthLayout({ title, subtitle, children, footer, back = false }: 
               style={styles.logo}
               accessibilityIgnoresInvertColors
             />
-            <AppText variant="title">Stage Book</AppText>
+            <AppText variant="title">Setuno</AppText>
             <AppText variant="caption" tone="muted" style={styles.centered}>
               {t("auth.tagline")}
             </AppText>

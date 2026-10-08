@@ -9,7 +9,7 @@ import { DEFAULT_PREFERENCES, type UserPreferences } from "@/interfaces"
  * but this cache makes every setting available instantly at start-up — offline,
  * before the profile loads, or without an account at all (docs §32).
  */
-const STORAGE_KEY = "stage-book:user-preferences:v1"
+const STORAGE_KEY = "setuno:user-preferences:v1"
 
 const listeners = new Set<() => void>()
 let preferences: UserPreferences = DEFAULT_PREFERENCES

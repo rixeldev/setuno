@@ -2,7 +2,7 @@
  * Single low-level access point to Firestore for the whole app.
  *
  * Every feature service imports the Firebase primitives from here so there is
- * exactly one place that knows how Stage Book talks to the database.
+ * exactly one place that knows how Setuno talks to the database.
  *
  * On web, Metro swaps the underlying `@react-native-firebase/*` modules for the
  * Firebase JS SDK (see metro.config.js + shims/), so the same code runs on

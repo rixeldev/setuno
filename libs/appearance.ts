@@ -13,7 +13,7 @@ export interface AccentPalette {
 }
 
 /**
- * Stage Book accents. Every palette is tuned for the two modes:
+ * Setuno accents. Every palette is tuned for the two modes:
  * bright and luminous on the dark stage surfaces, and darkened by the palette
  * engine (`services/themeManager.ts`) when light mode renders it on white.
  * The `accent` of each entry is picked to contrast with its `primary`.

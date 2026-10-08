@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Stage Book",
+    "appName": "Setuno",
     "cancel": "Cancelar",
     "confirm": "Confirmar",
     "delete": "Eliminar",
@@ -112,7 +112,7 @@
     "shortcuts": "Accesos"
   },
   "auth": {
-    "welcome": "Bienvenido a Stage Book",
+    "welcome": "Bienvenido a Setuno",
     "welcomeSubtitle": "El cancionero, listas y eventos de tu banda en un solo lugar.",
     "signIn": "Iniciar sesión",
     "continueWithGoogle": "Continuar con Google",
@@ -146,14 +146,14 @@
     "enterValidEmail": "Introduce un correo válido.",
     "welcomeBack": "Bienvenido de nuevo",
     "signInSubtitle": "Entra para llegar al cancionero de tu banda.",
-    "newToStageBook": "¿Nuevo en Stage Book?",
+    "newToSetuno": "¿Nuevo en Setuno?",
     "createAnAccount": "Crea una cuenta",
     "signUpSubtitle": "Una cuenta, tantas bandas como quieras.",
     "createYourAccount": "Crea tu cuenta",
     "alreadyHaveAccountQuestion": "¿Ya tienes cuenta?",
     "resetTitle": "Restablece tu contraseña",
     "checkInbox": "Revisa tu correo",
-    "checkInboxSubtitle": "Si esa dirección tiene una cuenta de Stage Book, el enlace de restablecimiento va en camino.",
+    "checkInboxSubtitle": "Si esa dirección tiene una cuenta de Setuno, el enlace de restablecimiento va en camino.",
     "resetSentTo": "Enviamos un enlace de restablecimiento a {{email}}.",
     "rememberedIt": "¿La recordaste?",
     "hiName": "Hola {{name}}, vamos a prepararlo todo",
@@ -776,7 +776,7 @@
     "languageSettings": "Idioma",
     "automatic": "Automático (dispositivo)",
     "automaticHint": "Usa el idioma de este dispositivo",
-    "languageHint": "Stage Book arranca con el idioma de tu dispositivo. Tu elección se guarda en este dispositivo.",
+    "languageHint": "Setuno arranca con el idioma de tu dispositivo. Tu elección se guarda en este dispositivo.",
     "signOut": "Cerrar sesión",
     "emailNote": "Tu correo de inicio de sesión no se puede cambiar aquí.",
     "chordsVisible": "Mostrar acordes por defecto",

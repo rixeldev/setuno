@@ -401,7 +401,7 @@ export const BoostIcon = (props: any) => (
 )
 
 /* ------------------------------------------------------------------------- */
-/* Stage Book icons                                                          */
+/* Setuno icons                                                              */
 /* Musical, editorial and navigation symbols used across the product.        */
 /* ------------------------------------------------------------------------- */
 
