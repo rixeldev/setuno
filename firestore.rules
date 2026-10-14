@@ -6,6 +6,8 @@ rules_version = '2';
  * Model recap:
  *   users/{uid}                                     profile + preferences
  *   users/{uid}/organizations/{organizationId}      membership index (role)
+ *   users/{uid}/readerState/{songId}                private per-song reader state
+ *   users/{uid}/annotations/{songId}                private per-song annotations
  *   organizations/{organizationId}                  the band
  *   organizations/{organizationId}/members/{uid}
  *   organizations/{organizationId}/songs
@@ -104,6 +106,55 @@ service cloud.firestore {
         && address.matches('.*@.*');
     }
 
+    /**
+     * Personal reader state of one song (`users/{uid}/readerState/{songId}`):
+     * autoscroll settings plus the resume point (scroll position, transpose,
+     * capo and text size, roadmap #1/#4/#5). Add any new field to this list and
+     * to `validReaderState`, or the write is rejected.
+     */
+    function readerStateKeys() {
+      return ['autoscrollSpeed', 'autoscrollDelay', 'scrollRatio', 'semitones', 'capo', 'fontSize'];
+    }
+
+    function validReaderState() {
+      return request.resource.data.keys().hasOnly(readerStateKeys())
+        && request.resource.data.get('autoscrollSpeed', 0) is number
+        && request.resource.data.get('autoscrollDelay', 0) is number
+        && request.resource.data.get('scrollRatio', 0) is number
+        && request.resource.data.get('scrollRatio', 0) >= 0
+        && request.resource.data.get('scrollRatio', 0) <= 1
+        && request.resource.data.get('semitones', 0) is number
+        && request.resource.data.get('semitones', 0) >= -11
+        && request.resource.data.get('semitones', 0) <= 11
+        && request.resource.data.get('capo', 0) is number
+        && request.resource.data.get('capo', 0) >= 0
+        && request.resource.data.get('capo', 0) <= 12
+        && request.resource.data.get('fontSize', 13) is number
+        && request.resource.data.get('fontSize', 13) >= 13
+        && request.resource.data.get('fontSize', 13) <= 30;
+    }
+
+    /**
+     * Personal song annotations (`users/{uid}/annotations/{songId}`, roadmap
+     * #3). Owner-only, like the reader state: the band never reads another
+     * member's notes, and none of it is ever written to the shared song
+     * document. Markers are a list, so the rules pin the document-level shape
+     * (types, sizes, limits) and leave each entry's contents to the client —
+     * the rules language cannot iterate a list.
+     */
+    function annotationKeys() {
+      return ['notes', 'markers', 'updatedAt'];
+    }
+
+    function validAnnotation() {
+      return request.resource.data.keys().hasOnly(annotationKeys())
+        && request.resource.data.get('notes', '') is string
+        && request.resource.data.get('notes', '').size() <= 2000
+        && request.resource.data.get('markers', []) is list
+        && request.resource.data.get('markers', []).size() <= 50
+        && request.resource.data.get('updatedAt', null) is timestamp;
+    }
+
     // -------------------------------------------------------------------- users
 
     match /users/{uid} {
@@ -174,6 +225,29 @@ service cloud.firestore {
           );
         allow delete: if isSelf(uid)
           || (signedIn() && isAdmin(organizationId) && uid != request.auth.uid);
+      }
+
+      /**
+       * Private reading preferences per song: the autoscroll speed and start
+       * delay (roadmap #1), and later the scroll position and transpose (#4).
+       * Owner-only — the band never reads how another member reads a song, and
+       * none of it is ever written to the shared song document.
+       */
+      match /readerState/{songId} {
+        allow read: if isSelf(uid);
+        allow create, update: if isSelf(uid) && validReaderState();
+        allow delete: if isSelf(uid);
+      }
+
+      /**
+       * Private annotations of one song (roadmap #3): free-form notes plus
+       * inline markers anchored to lines. Owner-only — same trust model as the
+       * reader state, and the shared song document is never touched.
+       */
+      match /annotations/{songId} {
+        allow read: if isSelf(uid);
+        allow create, update: if isSelf(uid) && validAnnotation();
+        allow delete: if isSelf(uid);
       }
     }
 
@@ -322,7 +396,7 @@ service cloud.firestore {
           && request.resource.data.organizationId == organizationId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'title', 'artist', 'key', 'originalKey', 'capo', 'bpm', 'durationSec',
-            'genre', 'notes', 'tags', 'sections', 'authorId', 'authorName', 'updatedAt'
+            'genre', 'notes', 'tags', 'sections', 'links', 'authorId', 'authorName', 'updatedAt'
           ]);
         allow delete: if isAdmin(organizationId);
       }
