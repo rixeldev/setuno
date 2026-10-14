@@ -94,7 +94,9 @@ export function ReaderDock({
   // open, the full bar shows both, so repeating them would be the same
   // information twice on screen. The summary never carries the readout: it
   // must not truncate the tuning away on a narrow phone.
-  const trackFill =
+  // The template type matters: widened to `string` this no longer satisfies
+  // React Native's `DimensionValue`, and the style stops type-checking.
+  const trackFill: `${number}%` | null =
     !open && autoscrollProgress !== null
       ? `${Math.round(Math.min(1, Math.max(0, autoscrollProgress)) * 100)}%`
       : null
