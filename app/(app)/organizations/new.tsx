@@ -23,7 +23,7 @@ export default function NewOrganization() {
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
   const toast = useToast()
-  const { profile, user, updateProfile } = useAuth()
+  const { profile, user } = useAuth()
   const { switchOrganization } = useOrganization()
 
   const [name, setName] = useState("")
@@ -51,9 +51,11 @@ export default function NewOrganization() {
         ownerPhotoURL: profile?.photoURL ?? user?.photoURL ?? null,
       })
       await switchOrganization(id)
-      await updateProfile({ onboarded: true })
       toast.showSuccess(t("auth.bandReady", { name: name.trim() }))
-      close()
+      // A brand-new account goes through the welcome + guided tour (roadmap
+      // #65); that screen is what stamps `onboarded`, so it can never repeat.
+      if (profile?.onboarded === true) close()
+      else router.replace("/onboarding")
     } catch (err) {
       const message = toFriendlyError(err, t("auth.couldNotCreateBand"))
       setError(message)

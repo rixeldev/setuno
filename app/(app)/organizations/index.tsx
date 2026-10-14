@@ -67,7 +67,9 @@ export default function OrganizationsScreen() {
       setJoinOpen(false)
       toast.showSuccess(t("auth.welcomeToBand", { name: invitation.organizationName }))
       await switchOrganization(invitation.organizationId)
-      close()
+      // A new account also gets the welcome + guided tour once (roadmap #65).
+      if (profile?.onboarded === true) close()
+      else router.replace("/onboarding")
     } catch (error) {
       toast.showError(toFriendlyError(error, t("auth.couldNotJoinBand")))
     } finally {
