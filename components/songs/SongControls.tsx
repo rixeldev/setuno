@@ -1,11 +1,12 @@
 import React from "react"
-import { Pressable, StyleSheet, View } from "react-native"
+import { StyleSheet, View } from "react-native"
 import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { IconButton } from "@/components/ui/Button"
+import { Chip } from "@/components/ui/Card"
 import { useResponsive } from "@/hooks/useResponsive"
 import { MusicIcon, RefreshIcon } from "@/components/ui/Icons"
 import { READER_FONT_MAX, READER_FONT_MIN } from "@/libs/readerState"
@@ -99,20 +100,19 @@ export function SongControls({
             ) : null}
           </View>
 
-          <Pressable
-            onPress={() => onNotationChange(nextOf(NOTATION_ORDER, notation))}
-            accessibilityRole="button"
-            accessibilityLabel={t("songs.switchNotation")}
-            style={({ pressed }) => [styles.notationChip, pressed && styles.pressed]}
-          >
-            <AppText variant="caption" tone="primary" numberOfLines={1}>
-              {notation === "letters"
+          <Chip
+            label={
+              notation === "letters"
                 ? t("songs.notationLetters")
                 : notation === "solfege"
                   ? t("songs.notationSolfege")
-                  : t("songs.notationNashville")}
-            </AppText>
-          </Pressable>
+                  : t("songs.notationNashville")
+            }
+            tone="primary"
+            selected
+            onPress={() => onNotationChange(nextOf(NOTATION_ORDER, notation))}
+            accessibilityLabel={t("songs.switchNotation")}
+          />
         </View>
 
         <View style={styles.groups}>
@@ -197,20 +197,20 @@ export function SongControls({
               {t("songs.view")}
             </AppText>
             <View style={styles.stepper}>
-              <Pressable
-                onPress={() => onViewChange(nextOf(VIEW_ORDER, view))}
-                accessibilityRole="button"
-                accessibilityLabel={t("songs.switchView")}
-                style={({ pressed }) => [styles.viewChip, pressed && styles.pressed]}
-              >
-                <AppText variant="caption" tone="primary" numberOfLines={1}>
-                  {view === "both"
+              <Chip
+                label={
+                  view === "both"
                     ? t("songs.viewBoth")
                     : view === "lyrics"
                       ? t("songs.viewLyrics")
-                      : t("songs.viewChords")}
-                </AppText>
-              </Pressable>
+                      : t("songs.viewChords")
+                }
+                tone="primary"
+                selected
+                onPress={() => onViewChange(nextOf(VIEW_ORDER, view))}
+                accessibilityLabel={t("songs.switchView")}
+                style={styles.viewChip}
+              />
               <IconButton
                 label={t("songs.resetViewA11y")}
                 variant="secondary"
@@ -260,23 +260,6 @@ const createStyles = () =>
       gap: Theme.spacing.xs,
     },
     stepperValue: { minWidth: 16, textAlign: "center" },
-    notationChip: {
-      paddingHorizontal: Theme.spacing.m,
-      paddingVertical: 5,
-      borderRadius: Theme.radii.pill,
-      backgroundColor: Theme.colors.primarySoft,
-      borderWidth: 1,
-      borderColor: Theme.colors.primary,
-    },
-    viewChip: {
-      paddingHorizontal: Theme.spacing.m,
-      paddingVertical: 5,
-      borderRadius: Theme.radii.pill,
-      backgroundColor: Theme.colors.primarySoft,
-      borderWidth: 1,
-      borderColor: Theme.colors.primary,
-      minWidth: 76,
-      alignItems: "center",
-    },
-    pressed: { opacity: 0.7 },
+    /** Only the width: `Chip` already paints the pill and its primary tone. */
+    viewChip: { minWidth: 76, justifyContent: "center" },
   })
