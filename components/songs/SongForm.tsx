@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from "react-native"
+import * as Clipboard from "expo-clipboard"
 import { useRouter } from "expo-router"
 import { useTranslation } from "react-i18next"
 
@@ -7,7 +8,7 @@ import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { Button } from "@/components/ui/Button"
-import { Card, Chip } from "@/components/ui/Card"
+import { Badge, Card, Chip } from "@/components/ui/Card"
 import { Input } from "@/components/ui/Input"
 import { PageHeader } from "@/components/ui/PageHeader"
 import { Dialog } from "@/components/ui/Dialog"
@@ -15,19 +16,35 @@ import { useToast } from "@/components/ui/Toast"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { AppBackground } from "@/components/app/AppBackground"
 import { DiscardChangesDialog } from "@/components/app/DiscardChangesDialog"
+import { SongRow } from "@/components/app/SongRow"
 import { SongEditor } from "@/components/songs/editor/SongEditor"
-import { ChevronDownIcon, ChevronUpIcon, KeyIcon, MusicIcon } from "@/components/ui/Icons"
+import {
+  AppleMusicIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  ImportIcon,
+  KeyIcon,
+  MusicIcon,
+  SpotifyIcon,
+  YouTubeIcon,
+} from "@/components/ui/Icons"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
+import { useOrgData } from "@/hooks/useOrgData"
 import { useResponsive } from "@/hooks/useResponsive"
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges"
+import { useUndoRedo } from "@/hooks/useUndoRedo"
+import { useUndoRedoShortcuts } from "@/hooks/useUndoRedoShortcuts"
 import { createSong, updateSong } from "@/services/songs"
 import { toFriendlyError } from "@/services/errors"
-import { MAJOR_KEYS, MINOR_KEYS } from "@/libs/chords"
+import { MAJOR_KEYS, MINOR_KEYS, collectSongChords } from "@/libs/chords"
 import { createSection, emptyLine, sectionLabel } from "@/libs/songUtils"
 import { parseTags, validateBpm, validateCapo, validateDuration, validateRequired } from "@/libs/validation"
 import { parseDurationInput } from "@/libs/format"
-import type { SongInput, SongSection, Song } from "@/interfaces"
+import { parseChordPro } from "@/libs/chordpro"
+import { findDuplicateSongs, type SongDuplicate } from "@/libs/songSearch"
+import { EMPTY_SONG_LINKS } from "@/interfaces/song"
+import type { SongInput, SongLinks, SongSection, Song } from "@/interfaces"
 
 interface SongFormProps {
   /** Provided when editing an existing song. */
@@ -37,6 +54,8 @@ interface SongFormProps {
   title?: string
   subtitle?: string
   headerRight?: React.ReactNode
+  /** Extra block rendered above the form (used by the guided tour, #65). */
+  tourHint?: React.ReactNode
 }
 
 interface SongFormState {
@@ -49,6 +68,7 @@ interface SongFormState {
   genre: string
   tags: string
   notes: string
+  links: SongLinks
   sections: SongSection[]
 }
 
@@ -68,6 +88,7 @@ const formStateFrom = (
   genre: song?.genre ?? "",
   tags: song?.tags.join(", ") ?? "",
   notes: song?.notes ?? "",
+  links: song?.links ?? EMPTY_SONG_LINKS,
   sections: song?.sections ?? fallbackSections,
 })
 
@@ -80,10 +101,11 @@ const formStateFrom = (
  * “More details”. The primary action lives in a sticky footer so it is always
  * one tap away, no matter how long the lyrics are.
  */
-export function SongForm({ song, onSaved, title, subtitle, headerRight }: SongFormProps) {
+export function SongForm({ song, onSaved, title, subtitle, headerRight, tourHint }: SongFormProps) {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
   const router = useRouter()
+  const { songs } = useOrgData()
   const toast = useToast()
   const { profile } = useAuth()
   const { organizationId } = useOrganization()
@@ -98,17 +120,39 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight }: SongFo
   const [genre, setGenre] = useState(song?.genre ?? "")
   const [tags, setTags] = useState(song?.tags.join(", ") ?? "")
   const [notes, setNotes] = useState(song?.notes ?? "")
+  const [links, setLinks] = useState<SongLinks>(song?.links ?? EMPTY_SONG_LINKS)
   // A brand-new song opens with one blank line, so the editor is immediately
   // usable instead of showing an empty section with nothing to type into.
   const [sectionTemplate] = useState<SongSection[]>(() => [
     createSection("verse", sectionLabel("verse", 1), [emptyLine()]),
   ])
-  const [sections, setSections] = useState<SongSection[]>(song?.sections ?? sectionTemplate)
+  const sectionsHistory = useUndoRedo<SongSection[]>(song?.sections ?? sectionTemplate)
+  const sections = sectionsHistory.value
+  const setSections = sectionsHistory.set
   const [detailsOpen, setDetailsOpen] = useState(
-    Boolean(song && (song.genre || song.tags.length > 0 || song.bpm || song.durationSec || song.notes)),
+    Boolean(
+      song &&
+        (song.genre ||
+          song.tags.length > 0 ||
+          song.bpm ||
+          song.durationSec ||
+          song.notes ||
+          song.links.youtube ||
+          song.links.spotify ||
+          song.links.appleMusic),
+    ),
   )
 
   const [keyPicker, setKeyPicker] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importText, setImportText] = useState("")
+  // Chords the editor cannot read, surfaced before saving (roadmap #21).
+  const [chordWarning, setChordWarning] = useState<string[] | null>(null)
+  // Songs the band already has under this title (roadmap #39).
+  const [duplicates, setDuplicates] = useState<SongDuplicate[] | null>(null)
+  // Song the user chose to open instead of creating a duplicate; the navigation
+  // runs from an effect so the leave guard is already disabled by then.
+  const [openExisting, setOpenExisting] = useState<string | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -130,7 +174,8 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight }: SongFo
     setGenre(song.genre)
     setTags(song.tags.join(", "))
     setNotes(song.notes)
-    setSections(song.sections)
+    setLinks(song.links)
+    sectionsHistory.reset(song.sections)
     setErrors({})
     setFormError(null)
     setBaseline(serializeForm(formStateFrom(song, sectionTemplate)))
@@ -146,12 +191,22 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight }: SongFo
     genre,
     tags,
     notes,
+    links,
     sections,
   }
   // `saving` is included so the navigation that follows a successful save is
-  // never mistaken for abandoning the form.
-  const hasUnsavedChanges = serializeForm(currentState) !== baseline && !saving
+  // never mistaken for abandoning the form, and `openExisting` does the same for
+  // the "open the song already in the songbook" exit of the duplicate dialog.
+  const hasUnsavedChanges =
+    serializeForm(currentState) !== baseline && !saving && openExisting === null
   const leaveGuard = useUnsavedChanges(hasUnsavedChanges)
+  // Ctrl/Cmd + Z / Shift + Z on the desktop (roadmap #25).
+  useUndoRedoShortcuts(sectionsHistory.undo, sectionsHistory.redo)
+
+  // Opening an existing song abandons this draft on purpose (roadmap #39).
+  useEffect(() => {
+    if (openExisting) router.replace(`/songs/${openExisting}`)
+  }, [openExisting, router])
 
   const keyOptions = useMemo(
     () => [...MAJOR_KEYS.map((value) => ({ value, label: value })), ...MINOR_KEYS.map((value) => ({ value, label: value }))],
@@ -173,6 +228,33 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight }: SongFo
     else router.replace("/songs")
   }
 
+  /**
+   * Replaces the lyrics with a parsed ChordPro document (roadmap #18). Metadata
+   * only fills fields the user has left empty, so importing into an edit never
+   * clobbers a title/artist they already typed.
+   */
+  const applyImport = (): void => {
+    const doc = parseChordPro(importText)
+    const hasContent = importText.trim().length > 0 && doc.sections.some((section) => section.lines.length > 0)
+    if (!hasContent) {
+      toast.showError(t("songs.importEmpty"))
+      return
+    }
+    if (doc.title && songTitle.trim().length === 0) setSongTitle(doc.title)
+    if (doc.artist && artist.trim().length === 0) setArtist(doc.artist)
+    if (doc.key) setKey(doc.key)
+    if (doc.capo > 0) setCapo(String(doc.capo))
+    setSections(doc.sections)
+    setImportOpen(false)
+    setImportText("")
+    toast.showSuccess(t("songs.importDone"))
+  }
+
+  const pasteIntoImport = async (): Promise<void> => {
+    const value = await Clipboard.getStringAsync().catch(() => "")
+    if (value) setImportText(value)
+  }
+
   const validate = (): boolean => {
     const next: Record<string, string> = {}
     const titleError = validateRequired(songTitle, t("songs.titleRequired"), { max: 120 })
@@ -189,12 +271,41 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight }: SongFo
     return Object.keys(next).length === 0
   }
 
+  /**
+   * Save entry point (roadmap #21, #39): validates, then warns — without
+   * blocking — about a song the band already has under this title, and about
+   * chords the editor cannot read. Both warnings offer to carry on, so nothing
+   * is ever silently lost and nothing is ever silently duplicated.
+   */
   const save = async (): Promise<void> => {
     setFormError(null)
     if (!validate()) {
       toast.showError(t("songs.checkFields"))
       return
     }
+    // Only a new song can duplicate one the band already has.
+    if (!song) {
+      const matches = findDuplicateSongs(songs, { title: songTitle, artist })
+      if (matches.length > 0) {
+        setDuplicates(matches)
+        return
+      }
+    }
+    await continueSave()
+  }
+
+  /** Second warning gate: chords the editor cannot read (roadmap #21). */
+  const continueSave = async (): Promise<void> => {
+    const { unrecognized } = collectSongChords(sections)
+    if (unrecognized.length > 0) {
+      setChordWarning(unrecognized)
+      return
+    }
+    await persist()
+  }
+
+  const persist = async (): Promise<void> => {
+    setFormError(null)
     if (!organizationId) {
       const message = t("songs.noBand")
       setFormError(message)
@@ -216,6 +327,7 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight }: SongFo
         notes,
         tags: parseTags(tags),
         sections,
+        links,
       }
 
       const actor = { id: profile?.uid ?? "", name: profile?.displayName || "An admin" }
@@ -258,6 +370,7 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight }: SongFo
       />
 
       <ScreenContainer scroll style={styles.body}>
+        {tourHint}
         <Card style={styles.formCard}>
           <Input
             label={t("songs.songTitle")}
@@ -312,15 +425,36 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight }: SongFo
 
         <View style={styles.editorBlock}>
           <View style={styles.editorHeader}>
-            <AppText variant="label" tone="faint">
-              {t("songs.lyricsAndChords")}
-            </AppText>
-            <AppText variant="caption" tone="muted">
-              {t("songs.placeCursorHint")}
-            </AppText>
+            <View style={styles.flex}>
+              <AppText variant="label" tone="faint">
+                {t("songs.lyricsAndChords")}
+              </AppText>
+              <AppText variant="caption" tone="muted">
+                {t("songs.placeCursorHint")}
+              </AppText>
+            </View>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<ImportIcon size={16} color={Theme.colors.primary} />}
+              label={t("songs.importChordPro")}
+              onPress={() => {
+                setImportText("")
+                setImportOpen(true)
+              }}
+            />
           </View>
 
-          <SongEditor sections={sections} onChange={setSections} songKey={key} fontSize={16} />
+          <SongEditor
+            sections={sections}
+            onChange={setSections}
+            songKey={key}
+            fontSize={16}
+            onUndo={sectionsHistory.undo}
+            onRedo={sectionsHistory.redo}
+            canUndo={sectionsHistory.canUndo}
+            canRedo={sectionsHistory.canRedo}
+          />
 
           {errors.sections ? (
             <AppText variant="caption" tone="danger" accessibilityRole="alert">
@@ -399,6 +533,46 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight }: SongFo
                 multiline
                 placeholder={t("songs.notesPlaceholder")}
               />
+              <View style={styles.linksBlock}>
+                <View style={styles.linksHeader}>
+                  <AppText variant="label" tone="faint">
+                    {t("songs.links")}
+                  </AppText>
+                  <AppText variant="caption" tone="muted">
+                    {t("songs.linksHelp")}
+                  </AppText>
+                </View>
+                <Input
+                  label={t("songs.linkYoutube")}
+                  value={links.youtube}
+                  onChangeText={(value) => setLinks((current) => ({ ...current, youtube: value }))}
+                  placeholder="https://youtube.com/watch?v=…"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  icon={<YouTubeIcon size={16} color={Theme.colors.textFaint} />}
+                />
+                <Input
+                  label={t("songs.linkSpotify")}
+                  value={links.spotify}
+                  onChangeText={(value) => setLinks((current) => ({ ...current, spotify: value }))}
+                  placeholder="https://open.spotify.com/track/…"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  icon={<SpotifyIcon size={16} color={Theme.colors.textFaint} />}
+                />
+                <Input
+                  label={t("songs.linkAppleMusic")}
+                  value={links.appleMusic}
+                  onChangeText={(value) => setLinks((current) => ({ ...current, appleMusic: value }))}
+                  placeholder="https://music.apple.com/song/…"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  icon={<AppleMusicIcon size={16} color={Theme.colors.textFaint} />}
+                />
+              </View>
             </View>
           ) : null}
         </Card>
@@ -449,6 +623,80 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight }: SongFo
         </View>
       </Dialog>
 
+      <Dialog
+        visible={importOpen}
+        onClose={() => setImportOpen(false)}
+        title={t("songs.importChordPro")}
+        description={t("songs.importChordProDescription")}
+        confirmLabel={t("songs.importAction")}
+        onConfirm={applyImport}
+        confirmDisabled={importText.trim().length === 0}
+      >
+        <Input
+          label={t("songs.importChordProLabel")}
+          value={importText}
+          onChangeText={setImportText}
+          placeholder={"{title: …}\n[Am]Hello [G]world"}
+          multiline
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <Button
+          variant="secondary"
+          size="sm"
+          label={t("songs.pasteFromClipboard")}
+          onPress={() => void pasteIntoImport()}
+        />
+      </Dialog>
+
+      <Dialog
+        visible={duplicates !== null}
+        onClose={() => setDuplicates(null)}
+        title={t("songs.duplicateTitle")}
+        description={t("songs.duplicateBody", { count: duplicates?.length ?? 0 })}
+        confirmLabel={t("songs.createAnyway")}
+        cancelLabel={t("common.keepEditing")}
+        onConfirm={() => {
+          setDuplicates(null)
+          void continueSave()
+        }}
+      >
+        <View style={styles.duplicateList}>
+          {(duplicates ?? []).map((match) => (
+            <SongRow
+              key={match.song.id}
+              song={match.song}
+              dense
+              onPress={() => {
+                setDuplicates(null)
+                setOpenExisting(match.song.id)
+              }}
+            />
+          ))}
+        </View>
+      </Dialog>
+
+      <Dialog
+        visible={chordWarning !== null}
+        onClose={() => setChordWarning(null)}
+        title={t("songs.unrecognizedChordsTitle")}
+        description={t("songs.unrecognizedChordsBody", {
+          count: chordWarning?.length ?? 0,
+        })}
+        confirmLabel={t("songs.saveAnyway")}
+        cancelLabel={t("songs.reviewChords")}
+        onConfirm={() => {
+          setChordWarning(null)
+          void persist()
+        }}
+      >
+        <View style={styles.chordWarningList}>
+          {(chordWarning ?? []).map((chord) => (
+            <Badge key={chord} label={chord} tone="warning" />
+          ))}
+        </View>
+      </Dialog>
+
       <DiscardChangesDialog
         visible={leaveGuard.confirmVisible}
         what={t("songs.changesToThisSong")}
@@ -487,13 +735,20 @@ const createStyles = () =>
     },
     smallField: { flexGrow: 1, minWidth: 90 },
     editorBlock: { gap: Theme.spacing.m },
-    editorHeader: { gap: 2 },
+    editorHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: Theme.spacing.s,
+    },
     detailsHeader: {
       flexDirection: "row",
       alignItems: "center",
       gap: Theme.spacing.m,
     },
     detailsBody: { gap: Theme.spacing.m },
+    linksBlock: { gap: Theme.spacing.m },
+    linksHeader: { gap: 2 },
     footer: {
       paddingTop: Theme.spacing.m,
       paddingBottom: Theme.spacing.m,
@@ -503,6 +758,8 @@ const createStyles = () =>
     },
     footerInner: { width: "100%", alignSelf: "center", gap: Theme.spacing.s },
     keyOptions: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+    chordWarningList: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+    duplicateList: { gap: Theme.spacing.s },
     actions: { flexDirection: "row", gap: Theme.spacing.m },
     action: { flex: 1 },
     pressed: { opacity: 0.7 },

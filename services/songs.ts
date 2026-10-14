@@ -22,7 +22,8 @@ import {
 import type { LyricLine, Song, SongInput, SongSection } from "@/interfaces"
 import { logActivity } from "@/services/activity"
 import { ValidationError } from "@/services/errors"
-import { countSongChords, countSongLines, normalizeSectionLabels } from "@/libs/songUtils"
+import { countSongChords, countSongLines, clampSectionBars, normalizeSectionLabels } from "@/libs/songUtils"
+import { normalizeSongLinks } from "@/libs/songLinks"
 
 const mapChords = (raw: unknown): LyricLine["chords"] => {
   if (!Array.isArray(raw)) return []
@@ -43,10 +44,12 @@ const mapSections = (raw: unknown): SongSection[] => {
   return raw.map((entry, index) => {
     const section = (entry ?? {}) as Partial<SongSection>
     const lines = Array.isArray(section.lines) ? section.lines : []
+    const bars = typeof section.bars === "number" ? clampSectionBars(section.bars) : 0
     return {
       id: typeof section.id === "string" && section.id.length > 0 ? section.id : `sec_${index}`,
       type: (section.type ?? "verse") as SongSection["type"],
       label: typeof section.label === "string" && section.label.length > 0 ? section.label : "Section",
+      ...(bars > 0 ? { bars } : {}),
       lines: lines.map((line) => {
         const value = (line ?? {}) as Partial<LyricLine>
         return {
@@ -73,6 +76,7 @@ const mapSong = (data: Record<string, unknown>, id: string): Song =>
     notes: String(data.notes ?? ""),
     tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
     sections: mapSections(data.sections),
+    links: normalizeSongLinks(data.links),
     createdBy: String(data.createdBy ?? ""),
     createdByName: String(data.createdByName ?? ""),
     createdAt: data.createdAt as Song["createdAt"],
@@ -86,10 +90,11 @@ export const normalizeSongInput = (input: SongInput): SongInput => {
   if (title.length > 120) throw new ValidationError("Song title is too long.", "title")
 
   const sections = normalizeSectionLabels(
-    input.sections.map((section) => ({
+    input.sections.map(({ bars, ...section }) => ({
       ...section,
       id: section.id && section.id.length > 0 ? section.id : `sec_${Math.random().toString(36).slice(2, 9)}`,
       label: section.label.trim().length > 0 ? section.label.trim() : "Section",
+      ...(bars && bars > 0 ? { bars: clampSectionBars(bars) } : {}),
       lines: section.lines.map((line) => ({
         text: line.text,
         chords: line.chords
@@ -112,6 +117,7 @@ export const normalizeSongInput = (input: SongInput): SongInput => {
     notes: input.notes,
     tags: Array.from(new Set(input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean))).slice(0, 12),
     sections,
+    links: normalizeSongLinks(input.links),
   }
 }
 

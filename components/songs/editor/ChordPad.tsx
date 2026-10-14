@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button"
 import { Dialog } from "@/components/ui/Dialog"
 import { Input } from "@/components/ui/Input"
 import { AddIcon, CloseIcon, SearchIcon } from "@/components/ui/Icons"
-import { COMMON_CHORDS, diatonicChords, looksLikeChord, normalizeChordInput } from "@/libs/chords"
+import { COMMON_CHORDS, diatonicChords, isRecognizedChord, normalizeChordInput } from "@/libs/chords"
 import { rememberChord, useRecentChords } from "@/services/recentChords"
 
 interface ChordPadContentProps {
@@ -50,6 +50,23 @@ export function ChordPadContent({
     return palette.filter((chord) => chord.toLowerCase().includes(term))
   }, [diatonic, recent, search])
 
+  // Autocomplete for the custom field (roadmap #21): as the user types a chord,
+  // prefix matches come first, then any other chord containing what they typed.
+  const customSuggestions = useMemo(() => {
+    const term = normalizeChordInput(custom).toLowerCase()
+    if (term.length === 0) return []
+    const palette = Array.from(new Set([...diatonic, ...recent, ...COMMON_CHORDS]))
+    const prefix: string[] = []
+    const rest: string[] = []
+    for (const chord of palette) {
+      const lower = chord.toLowerCase()
+      if (lower === term) continue
+      if (lower.startsWith(term)) prefix.push(chord)
+      else if (lower.includes(term)) rest.push(chord)
+    }
+    return [...prefix, ...rest].slice(0, 8)
+  }, [custom, diatonic, recent])
+
   /** Every pick feeds the "recent" shortcut, wherever it comes from. */
   const pick = (chord: string): void => {
     rememberChord(chord)
@@ -58,7 +75,7 @@ export function ChordPadContent({
 
   const pickCustom = (): void => {
     const normalized = normalizeChordInput(custom)
-    if (!looksLikeChord(normalized)) {
+    if (!isRecognizedChord(normalized)) {
       setCustomError(t("songs.invalidChord"))
       return
     }
@@ -166,6 +183,26 @@ export function ChordPadContent({
         returnKeyType="done"
         onSubmitEditing={pickCustom}
       />
+
+      {customSuggestions.length > 0 ? (
+        <View style={styles.block}>
+          <AppText variant="label" tone="faint">
+            {t("songs.chordSuggestions")}
+          </AppText>
+          <View style={styles.wrap}>
+            {customSuggestions.map((chord) => (
+              <ChordKey
+                key={`suggest-${chord}`}
+                chord={chord}
+                highlighted
+                onPress={pick}
+                label={t("songs.useChordSuggestion", { chord })}
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
+
       <View style={styles.footer}>
         <Button
           label={t("songs.useCustomChord")}

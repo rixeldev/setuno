@@ -19,6 +19,7 @@ import {
   shiftChordToAnchor,
 } from "@/libs/songUtils"
 import type { ChordPosition, LyricLine } from "@/interfaces"
+import { isRecognizedChord } from "@/libs/chords"
 import { ChordPadContent } from "@/components/songs/editor/ChordPad"
 
 interface EditorLineProps {
@@ -204,6 +205,7 @@ export function EditorLine({
 
         {chords.map((chord) => {
           const word = wordAt(line.text, chord.position)
+          const recognized = isRecognizedChord(chord.chord)
           return (
             <Pressable
               key={`${chord.position}-${chord.chord}`}
@@ -216,18 +218,24 @@ export function EditorLine({
               }
               accessibilityRole="button"
               accessibilityLabel={
-                word
-                  ? t("songs.changeToWord", { chord: chord.chord, word })
-                  : t("songs.changeAtEnd", { chord: chord.chord })
+                recognized
+                  ? word
+                    ? t("songs.changeToWord", { chord: chord.chord, word })
+                    : t("songs.changeAtEnd", { chord: chord.chord })
+                  : t("songs.unrecognizedChordA11y", { chord: chord.chord })
               }
-              style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.chip,
+                !recognized && styles.chipInvalid,
+                pressed && styles.pressed,
+              ]}
             >
               <AppText
                 style={[
                   styles.chipText,
                   { fontSize: Math.max(11, fontSize - 6) },
                 ]}
-                tone="accent"
+                tone={recognized ? "accent" : "danger"}
               >
                 {chord.chord}
               </AppText>
@@ -382,6 +390,11 @@ const createStyles = () =>
       paddingVertical: 4,
       borderRadius: Theme.radii.pill,
       backgroundColor: Theme.colors.accentSoft,
+    },
+    chipInvalid: {
+      backgroundColor: Theme.colors.dangerSoft,
+      borderWidth: 1,
+      borderColor: Theme.colors.danger,
     },
     chipText: { fontFamily: Theme.fonts.mono },
     preview: {

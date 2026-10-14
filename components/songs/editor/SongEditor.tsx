@@ -12,15 +12,20 @@ import {
   AddIcon,
   ArrowDownIcon,
   ArrowUpwardIcon,
+  CopyIcon,
   MusicIcon,
+  RedoIcon,
   TrashIcon,
+  UndoIcon,
 } from "@/components/ui/Icons"
 import { EditorLine } from "@/components/songs/editor/EditorLine"
+import { SectionBarsDialog } from "@/components/songs/editor/SectionBarsDialog"
 import {
   SECTION_TYPES,
   countSongChords,
   countSongLines,
   createSection,
+  duplicateSection,
   emptyLine,
   normalizeSectionLabels,
   parseLyricBlock,
@@ -36,6 +41,11 @@ interface SongEditorProps {
   onChange: (sections: SongSection[]) => void
   songKey: string
   fontSize: number
+  /** Undo/redo history controls (roadmap #25). Omitted when unavailable. */
+  onUndo?: () => void
+  onRedo?: () => void
+  canUndo?: boolean
+  canRedo?: boolean
 }
 
 /**
@@ -50,23 +60,31 @@ export function SongEditor({
   onChange,
   songKey,
   fontSize,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
 }: SongEditorProps) {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
   const [sectionToDelete, setSectionToDelete] = useState<SongSection | null>(
     null,
   )
-  const [typePicker, setTypePicker] = useState<{ index: number } | null>(null)
+  const [typePicker, setTypePicker] = useState<{ index: number; insert?: boolean } | null>(null)
   const [pasteOpen, setPasteOpen] = useState(false)
   const [transposeOpen, setTransposeOpen] = useState(false)
   const [semitones, setSemitones] = useState(2)
   const [pasteText, setPasteText] = useState("")
   const [pasteMode, setPasteMode] = useState<"replace" | "append">("replace")
+  // Section whose optional bar counter is open for editing (roadmap #27).
+  const [barsTarget, setBarsTarget] = useState<number | null>(null)
   // Line that must take the focus after pressing Enter on the line above.
   const [focusTarget, setFocusTarget] = useState<{ sectionId: string; lineIndex: number } | null>(null)
 
   const lineCount = useMemo(() => countSongLines(sections), [sections])
   const chordCount = useMemo(() => countSongChords(sections), [sections])
+  // Live preview of what the paste will become, so the user commits knowingly (#19).
+  const pastePreview = useMemo(() => parseLyricBlock(pasteText), [pasteText])
 
   const updateSection = (index: number, next: SongSection): void => {
     onChange(
@@ -88,13 +106,41 @@ export function SongEditor({
     onChange(next)
   }
 
-  const addSection = (type: SongSectionType): void => {
+  const addSection = (type: SongSectionType, at?: number): void => {
     const sameType =
       sections.filter((section) => section.type === type).length + 1
-    onChange([
-      ...sections,
-      createSection(type, sectionLabel(type, sameType), [emptyLine()]),
-    ])
+    const created = createSection(type, sectionLabel(type, sameType), [emptyLine()])
+    if (at === undefined || at >= sections.length) {
+      onChange(normalizeSectionLabels([...sections, created]))
+      return
+    }
+    // Insert right after the reference section, then renumber so the labels of
+    // the sections below stay sequential.
+    const next = [...sections]
+    next.splice(at + 1, 0, created)
+    onChange(normalizeSectionLabels(next))
+  }
+
+  /** Copies a section (lyrics, chords and bar count) right below the original. */
+  const duplicate = (index: number): void => {
+    const section = sections[index]
+    if (!section) return
+    const next = [...sections]
+    next.splice(index + 1, 0, duplicateSection(section))
+    onChange(normalizeSectionLabels(next))
+  }
+
+  /** Sets or clears a section's optional bar count (0/undefined = unset). */
+  const setBars = (index: number, bars: number | undefined): void => {
+    const section = sections[index]
+    if (!section) return
+    if (bars && bars > 0) {
+      updateSection(index, { ...section, bars })
+      return
+    }
+    const cleared: SongSection = { ...section }
+    delete cleared.bars
+    updateSection(index, cleared)
   }
 
   /** Enter on a line: a fresh editable line appears right below it. */
@@ -135,6 +181,36 @@ export function SongEditor({
         <AppText variant="caption" tone="faint">
           {t("songs.summary", { sections: sections.length, lines: lineCount, chords: chordCount })}
         </AppText>
+        {onUndo || onRedo ? (
+          <View style={styles.summaryActions}>
+            <IconButton
+              label={t("songs.undo")}
+              size={30}
+              variant="ghost"
+              disabled={!canUndo}
+              onPress={onUndo}
+              icon={
+                <UndoIcon
+                  size={16}
+                  color={canUndo ? Theme.colors.text : Theme.colors.textFaint}
+                />
+              }
+            />
+            <IconButton
+              label={t("songs.redo")}
+              size={30}
+              variant="ghost"
+              disabled={!canRedo}
+              onPress={onRedo}
+              icon={
+                <RedoIcon
+                  size={16}
+                  color={canRedo ? Theme.colors.text : Theme.colors.textFaint}
+                />
+              }
+            />
+          </View>
+        ) : null}
       </View>
 
       {chordCount === 0 ? (
@@ -162,7 +238,48 @@ export function SongEditor({
               </AppText>
             </Pressable>
 
+            <Pressable
+              onPress={() => setBarsTarget(index)}
+              accessibilityRole="button"
+              accessibilityLabel={
+                section.bars
+                  ? t("songs.editBarsA11y", {
+                      section: sectionLabelFor(sections, index, t),
+                      count: section.bars,
+                    })
+                  : t("songs.addBarsA11y", {
+                      section: sectionLabelFor(sections, index, t),
+                    })
+              }
+              style={({ pressed }) => [
+                styles.barsChip,
+                !section.bars && styles.barsChipEmpty,
+                pressed && styles.pressed,
+              ]}
+            >
+              <AppText
+                variant="caption"
+                tone={section.bars ? "primary" : "faint"}
+              >
+                {section.bars
+                  ? t("songs.bars", { count: section.bars })
+                  : t("songs.barsAdd")}
+              </AppText>
+            </Pressable>
+
             <View style={styles.sectionActions}>
+              <IconButton
+                label={t("songs.insertSectionAfter", { section: sectionLabelFor(sections, index, t) })}
+                size={32}
+                onPress={() => setTypePicker({ index, insert: true })}
+                icon={<AddIcon size={15} color={Theme.colors.textMuted} />}
+              />
+              <IconButton
+                label={t("songs.duplicateSection", { section: sectionLabelFor(sections, index, t) })}
+                size={32}
+                onPress={() => duplicate(index)}
+                icon={<CopyIcon size={15} color={Theme.colors.textMuted} />}
+              />
               <IconButton
                 label={t("songs.moveSectionUp", { section: sectionLabelFor(sections, index, t) })}
                 size={32}
@@ -279,7 +396,11 @@ export function SongEditor({
         visible={typePicker !== null}
         onClose={() => setTypePicker(null)}
         title={
-          typePicker?.index === -1 ? t("songs.addSection") : t("songs.changeSectionType")
+          typePicker?.insert
+            ? t("songs.insertSection")
+            : typePicker?.index === -1
+              ? t("songs.addSection")
+              : t("songs.changeSectionType")
         }
         hideActions
       >
@@ -292,7 +413,9 @@ export function SongEditor({
                 accessibilityLabel={t(entry.i18n)}
                 onPress={() => {
                   const picker = typePicker
-                  if (picker?.index === -1) {
+                  if (picker?.insert) {
+                    addSection(entry.type, picker.index)
+                  } else if (picker?.index === -1) {
                     addSection(entry.type)
                   } else if (picker) {
                     const section = sections[picker.index]
@@ -361,6 +484,29 @@ export function SongEditor({
             </Pressable>
           ))}
         </View>
+
+        {pastePreview.length > 0 ? (
+          <View style={styles.preview} accessibilityLabel={t("songs.pastePreview")}>
+            <AppText variant="caption" tone="faint">
+              {t("songs.pastePreview")}
+            </AppText>
+            {pastePreview.map((section, index) => {
+              const lyrics = section.lines.filter(
+                (line) => line.text.trim().length > 0 || line.chords.length > 0,
+              ).length
+              return (
+                <View key={section.id} style={styles.previewRow}>
+                  <AppText variant="caption" tone="primary" numberOfLines={1}>
+                    {sectionLabelFor(pastePreview, index, t)}
+                  </AppText>
+                  <AppText variant="caption" tone="muted">
+                    {t("songs.pastePreviewLines", { count: lyrics })}
+                  </AppText>
+                </View>
+              )
+            })}
+          </View>
+        ) : null}
       </Dialog>
 
       <Dialog
@@ -431,6 +577,18 @@ export function SongEditor({
           setSectionToDelete(null)
         }}
       />
+
+      {barsTarget !== null && sections[barsTarget] ? (
+        <SectionBarsDialog
+          sectionLabel={sectionLabelFor(sections, barsTarget, t)}
+          bars={sections[barsTarget]?.bars}
+          onSave={(bars) => {
+            setBars(barsTarget, bars)
+            setBarsTarget(null)
+          }}
+          onCancel={() => setBarsTarget(null)}
+        />
+      ) : null}
     </View>
   )
 }
@@ -439,6 +597,7 @@ const createStyles = () =>
   StyleSheet.create({
     container: { gap: Theme.spacing.m },
     summary: { flexDirection: "row", alignItems: "center", gap: 6 },
+    summaryActions: { flexDirection: "row", alignItems: "center", gap: 2, marginLeft: "auto" },
     section: {
       gap: Theme.spacing.s,
       padding: Theme.spacing.m,
@@ -450,8 +609,20 @@ const createStyles = () =>
     sectionHeader: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
+      flexWrap: "wrap",
       gap: Theme.spacing.s,
+    },
+    barsChip: {
+      paddingHorizontal: Theme.spacing.s,
+      paddingVertical: 4,
+      borderRadius: Theme.radii.pill,
+      backgroundColor: Theme.colors.primarySoft,
+    },
+    barsChipEmpty: {
+      backgroundColor: Theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: Theme.colors.borderSoft,
+      borderStyle: "dashed",
     },
     typeButton: {
       paddingHorizontal: Theme.spacing.m,
@@ -459,7 +630,7 @@ const createStyles = () =>
       borderRadius: Theme.radii.pill,
       backgroundColor: Theme.colors.primarySoft,
     },
-    sectionActions: { flexDirection: "row", gap: 4 },
+    sectionActions: { flexDirection: "row", gap: 4, marginLeft: "auto", alignItems: "center" },
     lines: { gap: Theme.spacing.s },
     addLine: { alignSelf: "flex-start" },
     toolbar: { flexDirection: "row", flexWrap: "wrap", gap: Theme.spacing.s },
@@ -487,6 +658,20 @@ const createStyles = () =>
     modeChipActive: {
       backgroundColor: Theme.colors.primarySoft,
       borderColor: Theme.colors.primary,
+    },
+    preview: {
+      gap: 4,
+      padding: Theme.spacing.m,
+      borderRadius: Theme.radii.m,
+      borderWidth: 1,
+      borderColor: Theme.colors.borderSoft,
+      backgroundColor: Theme.colors.surfaceHigh,
+    },
+    previewRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: Theme.spacing.s,
     },
     transposeBox: { alignItems: "center", gap: 2 },
     transposeButtons: { flexDirection: "row", gap: Theme.spacing.m },
