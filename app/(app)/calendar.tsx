@@ -7,17 +7,20 @@ import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { Card, Section } from "@/components/ui/Card"
-import { Button } from "@/components/ui/Button"
+import { Button, IconButton } from "@/components/ui/Button"
 import { EmptyState, ErrorState } from "@/components/ui/States"
-import { CalendarIcon, PlusIcon } from "@/components/ui/Icons"
+import { useToast } from "@/components/ui/Toast"
+import { CalendarCheckIcon, CalendarIcon, PlusIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { CalendarMonth } from "@/components/performances/CalendarMonth"
 import { PerformanceListRow } from "@/components/performances/PerformanceCard"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
+import { exportPerformancesToIcs } from "@/libs/calendarExport"
 import type { RelativeDayLabels } from "@/libs/format"
 import { formatDateRange, formatRelativeDay } from "@/libs/format"
 import { parseIsoDate } from "@/libs/validation"
+import { toFriendlyError } from "@/services/errors"
 import { performanceDays, performanceLastDay, todayIsoDate } from "@/services/performances"
 
 /**
@@ -33,9 +36,11 @@ export default function CalendarScreen() {
   }
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
-  const { isAdmin } = useOrganization()
+  const toast = useToast()
+  const { isAdmin, organization, organizationId } = useOrganization()
   const { performances, error } = useOrgData()
 
+  const [exporting, setExporting] = useState(false)
   const [month, setMonth] = useState(() => {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1, 12)
@@ -71,8 +76,39 @@ export default function CalendarScreen() {
     [performances],
   )
 
+  const exportCalendar = async (): Promise<void> => {
+    setExporting(true)
+    try {
+      const shared = await exportPerformancesToIcs({
+        performances,
+        organizationId: organizationId ?? "",
+        calendarName: organization?.name ?? t("calendar.calendar"),
+        fileLabel: organization?.name ?? t("calendar.calendar"),
+        dialogTitle: t("calendar.exportAll"),
+      })
+      if (shared) toast.showSuccess(t("calendar.exported"))
+      else toast.showError(t("calendar.exportUnavailable"))
+    } catch (caught) {
+      toast.showError(toFriendlyError(caught, t("calendar.couldNotExport")))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
-    <ScreenContainer title={t("calendar.calendar")} subtitle={t("calendar.subtitle")} large>
+    <ScreenContainer
+      title={t("calendar.calendar")}
+      subtitle={t("calendar.subtitle")}
+      large
+      headerRight={
+        <IconButton
+          label={t("calendar.exportAll")}
+          disabled={exporting || performances.length === 0}
+          onPress={() => void exportCalendar()}
+          icon={<CalendarCheckIcon size={18} color={Theme.colors.textMuted} />}
+        />
+      }
+    >
       {error ? <ErrorState message={error} /> : null}
 
       <Card style={styles.calendar}>

@@ -12,6 +12,7 @@ import { Dialog } from "@/components/ui/Dialog"
 import { EmptyState, Skeleton } from "@/components/ui/States"
 import { useToast } from "@/components/ui/Toast"
 import {
+  CalendarCheckIcon,
   CheckCircleIcon,
   ChevronRightIcon,
   ClockIcon,
@@ -27,6 +28,7 @@ import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { deletePerformance, updatePerformance } from "@/services/performances"
 import { toFriendlyError } from "@/services/errors"
+import { exportPerformancesToIcs } from "@/libs/calendarExport"
 import type { RelativeDayLabels } from "@/libs/format"
 import { formatDateRange, formatDurationLong, formatRelativeDay, formatTime } from "@/libs/format"
 import { parseIsoDate } from "@/libs/validation"
@@ -53,11 +55,12 @@ export default function PerformanceDetail() {
   const performanceId = params.id ?? null
 
   const { profile } = useAuth()
-  const { organizationId, isAdmin } = useOrganization()
+  const { organization, organizationId, isAdmin } = useOrganization()
   const { performances, setlists, loading } = useOrgData()
 
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const performance = useMemo(
     () => performances.find((entry) => entry.id === performanceId) ?? null,
@@ -105,6 +108,26 @@ export default function PerformanceDetail() {
       toast.showError(toFriendlyError(error, t("performances.couldNotDelete")))
     } finally {
       setBusy(false)
+    }
+  }
+
+  const exportToCalendar = async (): Promise<void> => {
+    if (!performance) return
+    setExporting(true)
+    try {
+      const shared = await exportPerformancesToIcs({
+        performances: [performance],
+        organizationId: organizationId ?? "",
+        calendarName: organization?.name ?? performance.name,
+        fileLabel: performance.name,
+        dialogTitle: t("calendar.exportEvent"),
+      })
+      if (shared) toast.showSuccess(t("calendar.exported"))
+      else toast.showError(t("calendar.exportUnavailable"))
+    } catch (caught) {
+      toast.showError(toFriendlyError(caught, t("calendar.couldNotExport")))
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -289,6 +312,19 @@ export default function PerformanceDetail() {
           {t("performances.cancelledChip")}
         </AppText>
       ) : null}
+
+      {/* Anyone can drop the show into their own calendar (roadmap #50). */}
+      <View style={styles.actions}>
+        <Button
+          label={t("calendar.exportEvent")}
+          variant="secondary"
+          full
+          disabled={exporting}
+          loading={exporting}
+          icon={<CalendarCheckIcon size={16} color={Theme.colors.text} />}
+          onPress={() => void exportToCalendar()}
+        />
+      </View>
 
       {isAdmin && performance.status !== "completed" ? (
         // Stacked full-width actions: they can never overflow the viewport.
