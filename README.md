@@ -51,17 +51,37 @@ a sidebar layout on the web.
 | **Usernames** | Unique, case-insensitive username per account; one rename every 3 months |
 | **Bands (organizations)** | Create a band, rename it, set a logo, delete it, switch between bands |
 | **Members & roles** | Invite by email, accept/decline invitations, admins & members, promote/demote, remove; profiles stay in sync per band |
-| **Songbook** | Create, edit and delete songs with lyrics, chords, tags, genre, BPM, capo and duration; paste a lyric block and section headers are detected |
+| **Songbook** | Create, edit and delete songs with lyrics, chords, tags, genre, BPM, capo and duration; paste a lyric block (section headers, inline `[C]` chords and other apps' metadata are handled) with a live preview |
+| **Advanced search** | Instant search across title, artist, genre, tags and key, plus a filter panel: artist/genre/key/tag chips, tempo (slow / medium / fast / sprint) and length (short / standard / long) buckets, and a chord-progression search that matches `Am F C G` as a run of chords on one lyric line |
+| **Your last view, remembered** | The songbook reopens with the filters you left on and the order you chose — stored separately for every band and every member, offline included — and can sort by title, artist, recency, tempo or length, with anything unmeasured listed last |
 | **Chord editor** | Position chords freely over any lyric line, snap to words, move by character, custom section headers |
+| **Chord autocomplete & validation** | Suggest chords live while you type (key-aware, from your recents and the common palette); unrecognised or foreign-notation chords are flagged and warned about before saving |
+| **Undo/redo** | Undo and redo in the chord editor with toolbar buttons, plus Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z and Ctrl+Y on the desktop (in memory, per editing session) |
+| **Section blocks** | Insert a standard block (intro, verse, pre-chorus, chorus, bridge, outro, instrumental) after any section, duplicate or reorder sections, and tag a section with an optional bar count |
+| **Duplicate warning** | Creating a song whose title (and artist) the band already has opens a dialog first — open the existing song, or create yours anyway |
+| **Favourite voicings** | Pin a preferred guitar position per chord; the play guide opens on it from then on (stored on your profile, not the song) |
 | **Transposition** | Move any song up/down by semitones — the stored song is never mutated |
 | **Play guide** | Tap any chord while reading to see how to play it: every guitar position (capo-aware) or the piano keys |
-| **Stage mode** | Full-screen reading with adjustable font size and chord visibility that survives stepping to the next song |
+| **Chord notation & layout** | Spell chords as letters (C F#m), solfège (Do Fa#m) or Nashville numbers (1 4 5, relative to the song's key); show chords above the lyrics, lyrics only, or a chords-only chart |
+| **Stage mode** | Full-screen reading with adjustable font size and chord visibility that survives stepping to the next song; holds a screen wake lock (toggleable) so the display never sleeps mid-show |
+| **Autoscroll** | Hands-free reading with a start delay, a speed in lyric lines per minute and a resume button; manual scrolling pauses it, and each song remembers its own speed (per user) |
+| **Personal notes** | Private cues per song ("I come in here", "second chorus only") — a free-form notes block plus inline notes anchored to a section/line, visible only to you and synced across your devices |
+| **Resume where you left off** | Each song reopens at the spot, key and capo you left it in (per user, synced across devices); the refresh button is a one-tap reset to the top, original key and no capo |
+| **Per-song text size** | Pinch the lyrics to resize (or Ctrl/Cmd +/- on the desktop); each song remembers its own size, synced across your devices |
+| **Keyboard & pedal** | On web/desktop the reader answers the keyboard: arrows/space/PageUp/PageDown turn the page (Bluetooth page-turner pedals send these same keys), up/down transpose, `f` toggles stage mode, `p` autoscroll |
+| **Live show mode** | While reading from an event's setlist: position in the running order, elapsed vs estimated time, a peak at the next song and a break countdown — the clock survives stepping song to song (in memory only, nothing is written to Firebase) |
+| **Tablet & landscape** | On tablets, desktop and a phone in landscape the song flows down two balanced columns (sections are never split); phones stay single-column, and stage mode keeps working in landscape |
+| **Reference links** | Optional YouTube / Spotify / Apple Music links per song, edited under “More details” and opened in the matching app from the reader (no embedding) |
+| **ChordPro import/export** | Paste a ChordPro document into the song form to load its lyrics and chords, and export any song back to a `.cho` file from the reader |
+| **Print & PDF** | Print a song or a whole setlist — with chords or lyrics only, at three text sizes — and share it as a PDF or send it straight to a printer; a setlist prints each song in the key the band actually plays it in |
 | **Setlist running order** | Open a song from an event's setlist and step through it with corner arrows |
 | **Suggestions** | Members propose changes, admins accept/reject them with a note |
 | **Setlists** | Build running orders, reorder songs, estimate duration; lists live under their events |
 | **Performances** | Schedule gigs with venue, times, status and attached setlists |
 | **Calendar** | Month view of upcoming and past shows |
+| **Calendar export** | Save the band calendar or a single event as an `.ics` file — share sheet on mobile, download on web — with stable UIDs so re-imports update instead of duplicating |
 | **Dashboard** | Next show, quick actions, library stats, recent activity feed |
+| **Onboarding** | A four-slide welcome for brand-new accounts, then a step-by-step tour of the real reader and chord editor, with the sample song as the playground |
 | **Settings** | Profile, theme (dark/light/system), language (EN/ES), band settings, danger zone |
 | **Modals** | Members, suggestions, the band switcher, profile and the chord play guide open as modal sheets over the current screen |
 | **Ads** | Google Mobile Ads banner under the navigation (native builds; hidden when there is no fill) |
@@ -78,7 +98,7 @@ a sidebar layout on the web.
 - **TypeScript** (strict) — `any` is avoided throughout
 - **Firebase**: Firestore, Auth, Storage, Cloud Functions
 - **Google Sign-In** (native SDK on Android/iOS, Firebase popup on web) and **Google Mobile Ads** (native)
-- **Chord play guide**: guitar voicings from the open [chords-db](https://github.com/tombatossals/chords-db) dataset (MIT, bundled) plus piano notes derived from the chord spelling
+- **Chord play guide**: guitar voicings from the open [chords-db](https://github.com/tombatossals/chords-db) dataset (MIT, bundled) plus piano notes derived from the chord spelling; slash chords (`C/G`) resolve to their dedicated voicing, and when the dataset lacks it the plain shape is shown with a clear label
 - **Custom translucent overlays** (`SheetSurface`): dialog, bottom sheet and modal screens share one spring entrance
 - **i18next** + `react-i18next` for localization (EN/ES, parity guarded by tests)
 - **JetBrains Mono** bundled for the chord/lyric grids, **Onest** for the UI
