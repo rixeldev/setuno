@@ -1,3 +1,7 @@
+// `i18next`'s default export is the shared instance, and its named exports are
+// the same methods unbound: calling them off the default is exactly right here,
+// but `import/no-named-as-default-member` reads it as a mistake.
+/* eslint-disable import/no-named-as-default-member */
 import { useSyncExternalStore } from "react"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import i18n from "i18next"
