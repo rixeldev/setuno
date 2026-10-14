@@ -3,8 +3,13 @@ import { describe, expect, it } from "vitest"
 import {
   capoShapeChord,
   findGuitarShapes,
+  findGuitarVoicings,
   findPianoChord,
+  guitarVoicingId,
+  orderGuitarVoicings,
+  pianoBassName,
   pianoNoteNames,
+  voicingPrefKey,
 } from "@/libs/chordShapes"
 
 describe("guitar chord shapes", () => {
@@ -54,5 +59,75 @@ describe("piano chord shapes", () => {
   it("returns null for text that is not a chord", () => {
     expect(findPianoChord("N.C.")).toBeNull()
     expect(findPianoChord("hello")).toBeNull()
+  })
+
+  it("names the slash bass only when there is one", () => {
+    const g = findPianoChord("G/B")
+    expect(g ? pianoBassName(g) : null).toBe("B")
+    const c = findPianoChord("C")
+    expect(c ? pianoBassName(c) : null).toBeNull()
+  })
+})
+
+describe("slash voicings", () => {
+  it("uses the dataset's exact slash voicing when it exists", () => {
+    const result = findGuitarVoicings("G/B")
+    expect(result.slashBass).toBe("B")
+    expect(result.slashApplied).toBe(true)
+    expect(result.shapes.length).toBeGreaterThan(0)
+  })
+
+  it("falls back and flags the missing slash variant", () => {
+    const result = findGuitarVoicings("G7/B")
+    expect(result.slashBass).toBe("B")
+    expect(result.slashApplied).toBe(false)
+    expect(result.shapes.length).toBeGreaterThan(0)
+  })
+
+  it("has no slash bass for a plain chord", () => {
+    const result = findGuitarVoicings("C")
+    expect(result.slashBass).toBeNull()
+    expect(result.slashApplied).toBe(false)
+  })
+
+  it("returns nothing for text that is not a chord", () => {
+    expect(findGuitarVoicings("hello").shapes).toEqual([])
+  })
+})
+
+describe("preferred voicings", () => {
+  it("derives a stable id from the exact frets", () => {
+    const [shape] = findGuitarShapes("C")
+    expect(shape).toBeDefined()
+    if (!shape) return
+    expect(guitarVoicingId(shape)).toBe(`${shape.baseFret}:${shape.frets.join(",")}`)
+    // The same shape always yields the same id, whatever its position.
+    expect(guitarVoicingId(shape)).toBe(guitarVoicingId({ ...shape }))
+  })
+
+  it("moves the pinned voicing to the front, keeping the rest in order", () => {
+    const shapes = findGuitarShapes("C")
+    expect(shapes.length).toBeGreaterThan(1)
+    const target = shapes[2]
+    if (!target) return
+    const ordered = orderGuitarVoicings(shapes, guitarVoicingId(target))
+    expect(ordered[0]).toEqual(target)
+    expect(ordered).toHaveLength(shapes.length)
+    // Every original shape is still present exactly once.
+    expect(new Set(ordered.map(guitarVoicingId)).size).toBe(shapes.length)
+  })
+
+  it("leaves the list untouched without a pin or with an unknown id", () => {
+    const shapes = findGuitarShapes("C")
+    expect(orderGuitarVoicings(shapes, null)).toBe(shapes)
+    expect(orderGuitarVoicings(shapes, "no-such-id")).toBe(shapes)
+    // Pinning the shape that is already first is a no-op.
+    const first = shapes[0]
+    if (first) expect(orderGuitarVoicings(shapes, guitarVoicingId(first))).toBe(shapes)
+  })
+
+  it("keys the preference by instrument and chord", () => {
+    expect(voicingPrefKey("guitar", "C")).toBe("guitar:C")
+    expect(voicingPrefKey("piano", "G/B")).toBe("piano:G/B")
   })
 })

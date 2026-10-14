@@ -7,15 +7,18 @@ import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { IconButton } from "@/components/ui/Button"
 import { Chip } from "@/components/ui/Card"
-import { ChevronRightIcon } from "@/components/ui/Icons"
+import { ChevronRightIcon, StarFilledIcon, StarIcon } from "@/components/ui/Icons"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { FretboardDiagram } from "@/components/songs/FretboardDiagram"
 import { PianoChord } from "@/components/songs/PianoChord"
 import { displayChord, displayNote } from "@/libs/chords"
 import {
   capoShapeChord,
-  findGuitarShapes,
+  findGuitarVoicings,
   findPianoChord,
+  guitarVoicingId,
+  orderGuitarVoicings,
+  pianoBassName,
   pianoNoteNames,
 } from "@/libs/chordShapes"
 import type { ChordInstrument, ChordNotation } from "@/interfaces/user"
@@ -27,8 +30,14 @@ interface ChordShapeSheetProps {
   /** Capo in force: guitar shapes sit `capo` semitones below the chord. */
   capo: number
   notation: ChordNotation
+  /** Song key (post-transpose), needed to spell chords as Nashville numbers. */
+  keyName?: string
   instrument: ChordInstrument
   onInstrumentChange: (next: ChordInstrument) => void
+  /** Pinned guitar voicing id for this chord, if the user favourited one (#23). */
+  preferredVoicingId?: string | null
+  /** Pins or clears the favourite voicing for the current chord (#23). */
+  onPinVoicing?: (id: string | null) => void
   onClose: () => void
 }
 
@@ -43,8 +52,11 @@ export function ChordShapeSheet({
   chord,
   capo,
   notation,
+  keyName = "",
   instrument,
   onInstrumentChange,
+  preferredVoicingId = null,
+  onPinVoicing,
   onClose,
 }: ChordShapeSheetProps) {
   const styles = useThemedStyles(createStyles)
@@ -53,20 +65,26 @@ export function ChordShapeSheet({
   const [pageWidth, setPageWidth] = useState(0)
   const [index, setIndex] = useState(0)
 
-  const display = chord ? displayChord(chord, notation) : ""
+  const display = chord ? displayChord(chord, notation, keyName) : ""
   const shapeName = useMemo(() => (chord ? capoShapeChord(chord, capo) : ""), [capo, chord])
-  const shapes = useMemo(
-    () => (chord && instrument === "guitar" ? findGuitarShapes(shapeName) : []),
+  const voicings = useMemo(
+    () => (chord && instrument === "guitar" ? findGuitarVoicings(shapeName) : { shapes: [], slashBass: null, slashApplied: false }),
     [chord, instrument, shapeName],
   )
+  // The pinned voicing opens first (#23); everything else keeps dataset order.
+  const shapes = useMemo(
+    () => orderGuitarVoicings(voicings.shapes, preferredVoicingId),
+    [preferredVoicingId, voicings.shapes],
+  )
+  const pinned = preferredVoicingId !== null && preferredVoicingId !== undefined
   const piano = useMemo(
     () => (chord && instrument === "piano" ? findPianoChord(chord) : null),
     [chord, instrument],
   )
 
-  // A new chord (or instrument) starts at the first position again: the pager
-  // is keyed by both, so it remounts already scrolled to the start.
-  const pagerKey = `${chord ?? ""}|${instrument}`
+  // A new chord (or instrument, or pin) starts at the first position again: the
+  // pager is keyed by all three, so it remounts already scrolled to the start.
+  const pagerKey = `${chord ?? ""}|${instrument}|${preferredVoicingId ?? ""}`
   const [pagerState, setPagerState] = useState(pagerKey)
   if (pagerState !== pagerKey) {
     setPagerState(pagerKey)
@@ -90,7 +108,16 @@ export function ChordShapeSheet({
           <AppText variant="caption" tone="muted" style={styles.capoNote}>
             {t("songs.capoShapeNote", {
               capo,
-              shape: displayChord(shapeName, notation),
+              shape: displayChord(shapeName, notation, keyName),
+            })}
+          </AppText>
+        ) : null}
+
+        {voicings.slashBass && !voicings.slashApplied ? (
+          <AppText variant="caption" tone="muted" style={styles.capoNote}>
+            {t("songs.slashFallback", {
+              chord: displayChord(shapeName, notation, keyName),
+              fallback: displayChord(shapeName.split("/")[0] ?? shapeName, notation, keyName),
             })}
           </AppText>
         ) : null}
@@ -114,7 +141,7 @@ export function ChordShapeSheet({
                 <View key={`shape-${shapeIndex}`} style={[styles.page, { width: pageWidth }]}>
                   <FretboardDiagram
                     shape={shape}
-                    label={`${displayChord(shapeName, notation)} · ${shape.frets
+                    label={`${displayChord(shapeName, notation, keyName)} · ${shape.frets
                       .map((fret) => (fret < 0 ? "x" : fret))
                       .join("")}`}
                   />
@@ -153,11 +180,43 @@ export function ChordShapeSheet({
               />
             }
           />
+          {onPinVoicing ? (
+            <IconButton
+              label={
+                pinned
+                  ? t("songs.unpinVoicing")
+                  : t("songs.pinVoicing", { chord: displayChord(shapeName, notation, keyName) })
+              }
+              size={32}
+              onPress={() => {
+                const current = shapes[index]
+                if (!current) return
+                const id = guitarVoicingId(current)
+                // Tapping the already-pinned position clears the favourite.
+                onPinVoicing(pinned && preferredVoicingId === id ? null : id)
+              }}
+              icon={
+                pinned ? (
+                  <StarFilledIcon size={18} color={Theme.colors.warning} />
+                ) : (
+                  <StarIcon size={18} color={Theme.colors.textMuted} />
+                )
+              }
+            />
+          ) : null}
         </View>
+        {pinned ? (
+          <AppText variant="caption" tone="muted" style={styles.capoNote}>
+            {t("songs.pinnedVoicingNote")}
+          </AppText>
+        ) : null}
       </View>
     )
 
-  const notes = piano ? pianoNoteNames(piano).map((name) => displayNote(name, notation)) : []
+  const notes = piano
+    ? pianoNoteNames(piano).map((name) => displayNote(name, notation, keyName))
+    : []
+  const bass = piano ? pianoBassName(piano) : null
 
   const pianoView = piano ? (
     <View style={styles.pianoWrap}>
@@ -174,6 +233,11 @@ export function ChordShapeSheet({
       <AppText variant="caption" tone="muted">
         {t("songs.chordNotes", { notes: notes.join("  ") })}
       </AppText>
+      {bass ? (
+        <AppText variant="caption" tone="muted">
+          {t("songs.slashBassNote", { note: displayNote(bass, notation, keyName) })}
+        </AppText>
+      ) : null}
     </View>
   ) : (
     <AppText variant="body" tone="muted">

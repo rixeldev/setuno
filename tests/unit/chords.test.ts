@@ -2,11 +2,16 @@ import { describe, expect, it } from "vitest"
 
 import {
   COMMON_CHORDS,
+  collectSongChords,
   describeSemitones,
   diatonicChords,
   displayChord,
   displayKey,
+  displayNote,
+  isRecognizedChord,
   looksLikeChord,
+  nashvilleChord,
+  nashvilleDegree,
   nextWordStart,
   normalizeChordInput,
   noteName,
@@ -162,6 +167,7 @@ describe("COMMON_CHORDS", () => {
   it("only offers chords the parser accepts", () => {
     for (const chord of COMMON_CHORDS) {
       expect(looksLikeChord(chord), `"${chord}" should be a valid chord`).toBe(true)
+      expect(isRecognizedChord(chord), `"${chord}" should be recognised`).toBe(true)
     }
   })
 
@@ -219,6 +225,66 @@ describe("chord notation", () => {
   })
 })
 
+describe("nashville notation", () => {
+  it("numbers the diatonic scale 1..7", () => {
+    expect(nashvilleDegree(0)).toBe("1")
+    expect(nashvilleDegree(2)).toBe("2")
+    expect(nashvilleDegree(4)).toBe("3")
+    expect(nashvilleDegree(5)).toBe("4")
+    expect(nashvilleDegree(7)).toBe("5")
+    expect(nashvilleDegree(9)).toBe("6")
+    expect(nashvilleDegree(11)).toBe("7")
+  })
+
+  it("gives chromatic degrees a flat or sharp", () => {
+    expect(nashvilleDegree(1)).toBe("b2")
+    expect(nashvilleDegree(3)).toBe("b3")
+    expect(nashvilleDegree(6)).toBe("#4")
+    expect(nashvilleDegree(8)).toBe("b6")
+    expect(nashvilleDegree(10)).toBe("b7")
+    // Wraps in both directions.
+    expect(nashvilleDegree(12)).toBe("1")
+    expect(nashvilleDegree(-1)).toBe("7")
+  })
+
+  it("reads a chord as a degree relative to the key", () => {
+    expect(nashvilleChord("G", "G")).toBe("1")
+    expect(nashvilleChord("C", "G")).toBe("4")
+    expect(nashvilleChord("D", "G")).toBe("5")
+    expect(nashvilleChord("Em", "G")).toBe("6m")
+    expect(nashvilleChord("Am", "C")).toBe("6m")
+    expect(nashvilleChord("F", "G")).toBe("b7")
+    expect(nashvilleChord("F#m7b5", "G")).toBe("7m7b5")
+    expect(nashvilleChord("G/B", "G")).toBe("1/3")
+  })
+
+  it("keeps the minor key's own tonic as 1", () => {
+    expect(nashvilleChord("Am", "Am")).toBe("1m")
+    expect(nashvilleChord("C", "Am")).toBe("b3")
+    expect(nashvilleChord("Em", "Am")).toBe("5m")
+    expect(nashvilleChord("G", "Am")).toBe("b7")
+  })
+
+  it("falls back to letters without a key", () => {
+    expect(nashvilleChord("G", "")).toBeNull()
+    expect(nashvilleChord("G", "nonsense")).toBeNull()
+    expect(displayChord("G", "nashville")).toBe("G")
+    expect(displayChord("G", "nashville", "G")).toBe("1")
+    expect(displayChord("N.C.", "nashville", "G")).toBe("N.C.")
+  })
+
+  it("never renames a key", () => {
+    expect(displayKey("G", "nashville")).toBe("G")
+    expect(displayKey("Em", "nashville")).toBe("Em")
+  })
+
+  it("spells single notes as degrees when the key is known", () => {
+    expect(displayNote("B", "nashville", "G")).toBe("3")
+    expect(displayNote("F", "nashville", "G")).toBe("b7")
+    expect(displayNote("B", "nashville")).toBe("B")
+  })
+})
+
 describe("chord input normalisation", () => {
   it("tidies what the user typed", () => {
     expect(normalizeChordInput("eb")).toBe("Eb")
@@ -236,6 +302,45 @@ describe("chord input normalisation", () => {
     expect(looksLikeChord("Bbmaj7")).toBe(true)
     expect(looksLikeChord("")).toBe(false)
     expect(looksLikeChord("A".repeat(13))).toBe(false)
+  })
+})
+
+describe("isRecognizedChord", () => {
+  it("accepts the chord vocabulary", () => {
+    for (const chord of ["C", "F#m7", "Bbmaj7", "G/B", "Am7b5", "C7sus4", "Dadd9", "E6/9", "Csus2"]) {
+      expect(isRecognizedChord(chord), `"${chord}" should be recognised`).toBe(true)
+    }
+  })
+
+  it("rejects solfège, Nashville and German notation", () => {
+    expect(isRecognizedChord("Do")).toBe(false)
+    expect(isRecognizedChord("Lam")).toBe(false)
+    expect(isRecognizedChord("IV")).toBe(false)
+    expect(isRecognizedChord("Hm")).toBe(false)
+    expect(isRecognizedChord("Bla")).toBe(false)
+  })
+
+  it("rejects a slash chord whose bass is not a note", () => {
+    expect(isRecognizedChord("C/H")).toBe(false)
+    expect(isRecognizedChord("G/B")).toBe(true)
+  })
+})
+
+describe("collectSongChords", () => {
+  it("splits recognised and unrecognised chords", () => {
+    const line = (chords: string[]) => ({
+      text: "la",
+      chords: chords.map((chord, position) => ({ chord, position })),
+    })
+    const section = {
+      id: "sec",
+      type: "verse" as const,
+      label: "Verse 1",
+      lines: [line(["C", "Do"]), line(["G/B", "Hm"])],
+    }
+    const { recognized, unrecognized } = collectSongChords([section])
+    expect(recognized).toEqual(["C", "G/B"])
+    expect(unrecognized).toEqual(["Do", "Hm"])
   })
 })
 

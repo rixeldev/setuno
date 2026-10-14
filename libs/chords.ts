@@ -1,4 +1,5 @@
 import type { ChordNotation } from "@/interfaces/user"
+import type { SongSection } from "@/interfaces/song"
 
 /**
  * Chord + key utilities: parsing, transposition and helpers used by the
@@ -200,28 +201,85 @@ const SOLFEGE_NAMES: Record<string, string> = {
   B: "Si",
 }
 
+/**
+ * Nashville numbers for each semitone above the key's tonic. Diatonic degrees
+ * (0, 2, 4, 5, 7, 9, 11) read as 1..7, the rest carry a flat/sharp accidental,
+ * matching how bands write "1 4 5" and "b7".
+ */
+export const NASHVILLE_DEGREES = [
+  "1", "b2", "2", "b3", "3", "4", "#4", "5", "b6", "6", "b7", "7",
+] as const
+
+/** Scale degree of a semitone interval above the tonic, Nashville style. */
+export const nashvilleDegree = (interval: number): string => {
+  const normalised = ((Math.round(interval) % 12) + 12) % 12
+  return NASHVILLE_DEGREES[normalised] as string
+}
+
+/**
+ * Tonic semitone of a key label. Minor keys keep their own tonic (Am -> A), so
+ * numbering a minor song reads 1 2 b3 4 5 b6 b7 instead of the relative major
+ * scale.
+ */
+const keyTonic = (key: string): number | null => {
+  const parsed = parseKey(key)
+  if (!parsed.valid) return null
+  return parsed.minor ? parsed.rootIndex - 3 : parsed.rootIndex
+}
+
+/**
+ * Spells a chord as Nashville numbers relative to `key` ("G/B" in G -> "1/3",
+ * "F" in G -> "b7"). Returns null when the key is missing, so callers keep the
+ * letters rather than inventing degrees.
+ */
+export const nashvilleChord = (chord: string, key: string): string | null => {
+  const tonic = keyTonic(key)
+  if (tonic === null) return null
+  const parsed = parseChord(chord)
+  if (!parsed.valid) return null
+  const degree = nashvilleDegree(parsed.rootIndex - tonic)
+  const bass = parsed.bassIndex !== null ? `/${nashvilleDegree(parsed.bassIndex - tonic)}` : ""
+  return `${degree}${parsed.quality}${bass}`
+}
+
 /** Spells a single note ("C#", "Bb") in the chosen notation. */
-export const displayNote = (note: string, notation: ChordNotation): string => {
+export const displayNote = (note: string, notation: ChordNotation, key = ""): string => {
   if (notation === "letters") return note
+  if (notation === "nashville") {
+    const tonic = keyTonic(key)
+    if (tonic === null) return note
+    const parsed = parseChord(note.trim())
+    if (!parsed.valid || parsed.quality.length > 0) return note
+    return nashvilleDegree(parsed.rootIndex - tonic)
+  }
   const name = SOLFEGE_NAMES[note.charAt(0).toUpperCase()]
   return name ? `${name}${note.slice(1)}` : note
 }
 
 /**
  * Spells a chord in the chosen notation. Stored chords always use letters, so
- * this is a display-only conversion ("F#m7/C#" -> "Fa#m7/Do#").
+ * this is a display-only conversion ("F#m7/C#" -> "Fa#m7/Do#"). Nashville
+ * numbers need the song's key, passed as the third argument.
  */
-export const displayChord = (chord: string, notation: ChordNotation = "letters"): string => {
+export const displayChord = (
+  chord: string,
+  notation: ChordNotation = "letters",
+  key = "",
+): string => {
   if (notation === "letters") return chord
+  if (notation === "nashville") return nashvilleChord(chord, key) ?? chord
   const parsed = parseChord(chord)
   if (!parsed.valid) return chord
   const bass = parsed.bass ? `/${displayNote(parsed.bass, notation)}` : ""
   return `${displayNote(parsed.root, notation)}${parsed.quality}${bass}`
 }
 
-/** Spells a key label in the chosen notation ("Em" -> "Mim", "Bb" -> "Sib"). */
+/**
+ * Spells a key label in the chosen notation ("Em" -> "Mim", "Bb" -> "Sib").
+ * Nashville numbering never renames a key — the player needs the real one.
+ */
 export const displayKey = (key: string, notation: ChordNotation = "letters"): string => {
-  if (notation === "letters") return key
+  if (notation === "letters" || notation === "nashville") return key
   const match = /^([A-G][#♯b♭]{0,2})(m|min)?$/.exec(key.trim())
   if (!match) return key
   return `${displayNote(match[1] ?? "", notation)}${match[2] ? "m" : ""}`
@@ -300,6 +358,58 @@ export const looksLikeChord = (value: string): boolean => {
   const trimmed = value.trim()
   if (trimmed.length === 0 || trimmed.length > 12) return false
   return parseChord(trimmed).valid
+}
+
+/**
+ * Characters a chord *quality* may be built from (roadmap #21). `parseChord`
+ * only checks the root, so "Bla" parses as B + "la"; this whitelist keeps the
+ * editor's validation honest without listing every extension by hand.
+ */
+const QUALITY_PATTERN = /^(?:m|maj|min|aug|dim|sus|add|alt|no|omit|M|Δ|ø|°|\+|-|#|b|\d|\(|\))*$/
+
+/**
+ * True when a value is a chord written in the letters/spellings the songbook
+ * stores. Stricter than `looksLikeChord`: rejects solfège ("Do", "Lam"),
+ * Nashville degrees ("IV", "1") and German notation ("Hm"), and rejects a slash
+ * chord whose bass is not a real note ("C/H"). The editor always stores
+ * letters; the notation preference is only a display concern.
+ */
+export const isRecognizedChord = (value: string): boolean => {
+  const trimmed = value.trim()
+  if (trimmed.length === 0 || trimmed.length > 12) return false
+  const parsed = parseChord(trimmed)
+  if (!parsed.valid) return false
+  if (!QUALITY_PATTERN.test(parsed.quality)) return false
+  // A "/…" that did not parse as a note: "6/9" is a stacked extension and fine,
+  // but "C/H" names a bass the songbook cannot read.
+  if (parsed.bass === null) {
+    const slash = trimmed.indexOf("/")
+    if (slash !== -1 && !/^\d/.test(trimmed.slice(slash + 1))) return false
+  }
+  return true
+}
+
+/**
+ * Distinct chords used by a song, split into the ones written in letters and
+ * the ones the editor cannot read (roadmap #21), so the form can warn before
+ * saving instead of silently keeping an exotic spelling.
+ */
+export const collectSongChords = (
+  sections: SongSection[],
+): { recognized: string[]; unrecognized: string[] } => {
+  const recognized = new Set<string>()
+  const unrecognized = new Set<string>()
+  for (const section of sections) {
+    for (const line of section.lines) {
+      for (const chord of line.chords) {
+        const value = chord.chord.trim()
+        if (value.length === 0) continue
+        if (isRecognizedChord(value)) recognized.add(value)
+        else unrecognized.add(value)
+      }
+    }
+  }
+  return { recognized: [...recognized], unrecognized: [...unrecognized] }
 }
 
 /**

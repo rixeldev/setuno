@@ -1,6 +1,7 @@
 import guitarData from "@tombatossals/chords-db/lib/guitar.json"
 
 import { noteName, parseChord, transposeChord } from "@/libs/chords"
+import type { ChordInstrument } from "@/interfaces/user"
 
 /**
  * Chord shape lookups for the reader's “how to play” sheet (docs §11).
@@ -135,39 +136,95 @@ const CHORD_INTERVALS: Record<string, number[]> = {
   alt: [0, 4, 8, 10],
 }
 
+const pickShape = ({ frets, fingers, barres, baseFret }: GuitarShape): GuitarShape => ({
+  frets,
+  fingers,
+  barres,
+  baseFret,
+})
+
+export interface GuitarVoicings {
+  shapes: GuitarShape[]
+  /** Note name of the slash bass the chord asked for, or null for a plain chord. */
+  slashBass: string | null
+  /** True when `shapes` is the exact slash voicing; false when it fell back. */
+  slashApplied: boolean
+}
+
+/**
+ * Guitar voicings for a chord, resolving slash chords (`C/G`, `Am7/E`) to the
+ * dataset's dedicated voicing when it has one (roadmap #22). When the dataset
+ * lacks the slash variant for the chord's quality the plain voicing is returned
+ * with `slashApplied: false`, so the sheet can say so instead of quietly
+ * showing the wrong bass note.
+ */
+export const findGuitarVoicings = (chord: string): GuitarVoicings => {
+  const parsed = parseChord(chord)
+  if (!parsed.valid || parsed.rootIndex < 0) {
+    return { shapes: [], slashBass: null, slashApplied: false }
+  }
+  const entries = guitarChords[DB_ROOT[parsed.rootIndex]] ?? []
+  const mapped = ALIASES[parsed.quality] ?? parsed.quality
+  const slashBass = parsed.bassIndex === null ? null : noteName(parsed.bassIndex, parsed.usesFlats)
+
+  if (parsed.bassIndex !== null) {
+    const isMinor = mapped === "minor" || mapped === "m"
+    const isMajor = mapped === "major" || mapped === ""
+    const slashSuffix = isMinor ? "m" : isMajor ? "" : null
+    if (slashSuffix !== null) {
+      for (const name of new Set([DB_BASS_SHARP[parsed.bassIndex], DB_BASS_FLAT[parsed.bassIndex]])) {
+        const entry = entries.find((item) => item.suffix === `${slashSuffix}/${name}`)
+        if (entry) {
+          return { shapes: entry.positions.map(pickShape), slashBass, slashApplied: true }
+        }
+      }
+    }
+  }
+
+  for (const candidate of [mapped, simplifyQuality(parsed.quality), "major"]) {
+    if (candidate.length === 0) continue
+    const entry = entries.find((item) => item.suffix === candidate)
+    if (entry) {
+      return { shapes: entry.positions.map(pickShape), slashBass, slashApplied: false }
+    }
+  }
+  return { shapes: [], slashBass, slashApplied: false }
+}
+
 /**
  * Guitar voicings for a chord, in the dataset's order (open shapes first).
  * Returns an empty list for anything that is not a chord.
  */
-export const findGuitarShapes = (chord: string): GuitarShape[] => {
-  const parsed = parseChord(chord)
-  if (!parsed.valid || parsed.rootIndex < 0) return []
-  const entries = guitarChords[DB_ROOT[parsed.rootIndex]] ?? []
-  const mapped = ALIASES[parsed.quality] ?? parsed.quality
+export const findGuitarShapes = (chord: string): GuitarShape[] => findGuitarVoicings(chord).shapes
 
-  const candidates: string[] = []
-  if (parsed.bassIndex !== null && mapped.length > 0) {
-    for (const name of new Set([DB_BASS_SHARP[parsed.bassIndex], DB_BASS_FLAT[parsed.bassIndex]])) {
-      if (mapped === "minor" || mapped === "m") candidates.push(`m/${name}`)
-      else if (mapped === "major") candidates.push(`/${name}`)
-    }
-  }
-  candidates.push(mapped, simplifyQuality(parsed.quality), "major")
+/**
+ * Stable identity for a guitar voicing — the exact frets it holds (roadmap #23).
+ * Unlike the position in the paged list, this survives a dataset that grows or
+ * reorders its entries.
+ */
+export const guitarVoicingId = (shape: GuitarShape): string =>
+  `${shape.baseFret}:${shape.frets.join(",")}`
 
-  for (const candidate of candidates) {
-    if (candidate.length === 0) continue
-    const entry = entries.find((item) => item.suffix === candidate)
-    if (entry) {
-      return entry.positions.map(({ frets, fingers, barres, baseFret }) => ({
-        frets,
-        fingers,
-        barres,
-        baseFret,
-      }))
-    }
-  }
-  return []
+/**
+ * Moves the voicing matching `preferredId` to the front, leaving the rest in
+ * dataset order, so the sheet opens on the pinned position (roadmap #23). An
+ * absent or unknown id leaves the list untouched.
+ */
+export const orderGuitarVoicings = (
+  shapes: GuitarShape[],
+  preferredId?: string | null,
+): GuitarShape[] => {
+  if (!preferredId) return shapes
+  const at = shapes.findIndex((shape) => guitarVoicingId(shape) === preferredId)
+  if (at <= 0) return shapes
+  const preferred = shapes[at]
+  if (!preferred) return shapes
+  return [preferred, ...shapes.slice(0, at), ...shapes.slice(at + 1)]
 }
+
+/** Preference key for a pinned voicing (`guitar:C` — roadmap #23). */
+export const voicingPrefKey = (instrument: ChordInstrument, chord: string): string =>
+  `${instrument}:${chord}`
 
 export interface PianoChordShape {
   /** Semitone indices (0-11) of the notes, root first. */
@@ -194,6 +251,10 @@ export const findPianoChord = (chord: string): PianoChordShape | null => {
 /** Note names of a piano voicing (root first), before notation conversion. */
 export const pianoNoteNames = (shape: PianoChordShape): string[] =>
   shape.pitchClasses.map((index) => noteName(index, shape.usesFlats))
+
+/** Note name of a piano voicing's slash bass, or null when there is none. */
+export const pianoBassName = (shape: PianoChordShape): string | null =>
+  shape.bassIndex === null ? null : noteName(shape.bassIndex, shape.usesFlats)
 
 /**
  * Guitar shape to finger with the current capo: the displayed chord is what
