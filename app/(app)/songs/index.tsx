@@ -8,24 +8,33 @@ import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { Button, IconButton } from "@/components/ui/Button"
 import { Chip } from "@/components/ui/Card"
-import { SearchInput } from "@/components/ui/Input"
+import { Input, SearchInput } from "@/components/ui/Input"
 import { Dialog } from "@/components/ui/Dialog"
+import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
 import { EmptyState, ErrorState, SkeletonList } from "@/components/ui/States"
-import { FilterIcon, PlusIcon, SearchIcon } from "@/components/ui/Icons"
+import { FilterIcon, PlusIcon, SearchIcon, SortIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { SongRow } from "@/components/app/SongRow"
+import { useUserId } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
+import { useSongbookState } from "@/hooks/useSongbookState"
 import {
+  BPM_BUCKETS,
+  DURATION_BUCKETS,
   EMPTY_FILTERS,
   countActiveFilters,
   filterSongs,
   isFiltered,
-  type SongFilters,
+  type BpmBucket,
+  type DurationBucket,
 } from "@/libs/songSearch"
+import { SONG_SORTS, sortSongs, type SongSort } from "@/libs/songbookSort"
 import type { SongFacets } from "@/interfaces"
 
 type FacetKey = "artist" | "genre" | "key" | "tag"
+
+const FACET_KEYS: FacetKey[] = ["artist", "genre", "key", "tag"]
 
 /** Facet labels are i18n keys, resolved where they are rendered. */
 const FACET_LABELS: Record<FacetKey, string> = {
@@ -42,21 +51,58 @@ const FACET_SOURCES: Record<FacetKey, (facets: SongFacets) => string[]> = {
   tag: (facets) => facets.tags,
 }
 
-/** Songbook with instant search and facet filters (docs §33, §34). */
+/** Advanced-search buckets (roadmap #36), labelled where they are rendered. */
+const BPM_LABELS: Record<BpmBucket, string> = {
+  slow: "songs.bpmSlow",
+  medium: "songs.bpmMedium",
+  fast: "songs.bpmFast",
+  sprint: "songs.bpmSprint",
+}
+
+const DURATION_LABELS: Record<DurationBucket, string> = {
+  short: "songs.durationShort",
+  standard: "songs.durationStandard",
+  long: "songs.durationLong",
+}
+
+/** Sort labels are i18n keys, resolved where they are rendered. */
+const SORT_LABELS: Record<SongSort, string> = {
+  title: "songs.sortTitle",
+  titleDesc: "songs.sortTitleDesc",
+  artist: "songs.sortArtist",
+  added: "songs.sortAdded",
+  tempo: "songs.sortTempo",
+  length: "songs.sortLength",
+}
+
+/** Songbook with instant search, facets and chord-progression search (§33, §34, #36). */
 export default function SongsScreen() {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
   const router = useRouter()
-  const { isAdmin } = useOrganization()
+  const { isAdmin, organizationId } = useOrganization()
+  const uid = useUserId()
   const { songs, facets, loading, error } = useOrgData()
-  const [filters, setFilters] = useState<SongFilters>(EMPTY_FILTERS)
+  // Filters and order are remembered per band and per user (roadmap #37), so a
+  // member's facets never follow them into another band's library.
+  const { filters, setFilters, sort, setSort } = useSongbookState(organizationId, uid)
   const [facet, setFacet] = useState<FacetKey | null>(null)
+  const [sortOpen, setSortOpen] = useState(false)
 
-  const results = useMemo(() => filterSongs(songs, filters), [songs, filters])
+  const results = useMemo(() => sortSongs(filterSongs(songs, filters), sort), [songs, filters, sort])
   const activeCount = countActiveFilters(filters)
+  const progression = filters.progression.trim()
 
   const setFacetValue = (key: FacetKey, value: string | null): void => {
     setFilters((current) => ({ ...current, [key]: current[key] === value ? null : value }))
+  }
+
+  const toggleBpm = (value: BpmBucket): void => {
+    setFilters((current) => ({ ...current, bpm: current.bpm === value ? null : value }))
+  }
+
+  const toggleDuration = (value: DurationBucket): void => {
+    setFilters((current) => ({ ...current, duration: current.duration === value ? null : value }))
   }
 
   const facetOptions: string[] = facet ? FACET_SOURCES[facet](facets) : []
@@ -98,22 +144,53 @@ export default function SongsScreen() {
               icon={<FilterIcon size={15} color={activeCount > 0 ? Theme.colors.onPrimary : Theme.colors.text} />}
               onPress={() => setFacet(facet ?? "key")}
             />
+            <IconButton
+              label={t("songs.sortA11y", { order: t(SORT_LABELS[sort]) })}
+              variant="secondary"
+              onPress={() => setSortOpen(true)}
+              icon={<SortIcon size={16} color={Theme.colors.text} />}
+            />
           </View>
 
           {activeCount > 0 ? (
             <View style={styles.activeFilters}>
-              {(["artist", "genre", "key", "tag"] as FacetKey[])
-                .filter((key) => filters[key] !== null)
-                .map((key) => (
-                  <Chip
-                    key={key}
-                    label={`${t(FACET_LABELS[key])}: ${filters[key] ?? ""}`}
-                    tone="primary"
-                    size="sm"
-                    onPress={() => setFacetValue(key, null)}
-                    accessibilityLabel={t("songs.removeFilter", { filter: t(FACET_LABELS[key]) })}
-                  />
-                ))}
+              {FACET_KEYS.filter((key) => filters[key] !== null).map((key) => (
+                <Chip
+                  key={key}
+                  label={`${t(FACET_LABELS[key])}: ${filters[key] ?? ""}`}
+                  tone="primary"
+                  size="sm"
+                  onPress={() => setFacetValue(key, null)}
+                  accessibilityLabel={t("songs.removeFilter", { filter: t(FACET_LABELS[key]) })}
+                />
+              ))}
+              {filters.bpm !== null ? (
+                <Chip
+                  label={`${t("songs.bpm")}: ${t(BPM_LABELS[filters.bpm])}`}
+                  tone="primary"
+                  size="sm"
+                  onPress={() => setFilters((current) => ({ ...current, bpm: null }))}
+                  accessibilityLabel={t("songs.removeFilter", { filter: t("songs.bpm") })}
+                />
+              ) : null}
+              {filters.duration !== null ? (
+                <Chip
+                  label={`${t("songs.duration")}: ${t(DURATION_LABELS[filters.duration])}`}
+                  tone="primary"
+                  size="sm"
+                  onPress={() => setFilters((current) => ({ ...current, duration: null }))}
+                  accessibilityLabel={t("songs.removeFilter", { filter: t("songs.duration") })}
+                />
+              ) : null}
+              {progression.length > 0 ? (
+                <Chip
+                  label={`${t("songs.chords")}: ${progression}`}
+                  tone="primary"
+                  size="sm"
+                  onPress={() => setFilters((current) => ({ ...current, progression: "" }))}
+                  accessibilityLabel={t("songs.removeFilter", { filter: t("songs.progression") })}
+                />
+              ) : null}
               <Chip
                 label={t("songs.clearFilters")}
                 size="sm"
@@ -156,14 +233,42 @@ export default function SongsScreen() {
         </View>
       )}
 
+      <BottomSheet
+        visible={sortOpen}
+        onClose={() => setSortOpen(false)}
+        title={t("songs.sortSheetTitle")}
+      >
+        {SONG_SORTS.map((option) => (
+          <SheetOptionRow
+            key={option}
+            label={t(SORT_LABELS[option])}
+            selected={sort === option}
+            onPress={() => {
+              setSort(option)
+              setSortOpen(false)
+            }}
+          />
+        ))}
+      </BottomSheet>
+
       <Dialog
         visible={facet !== null}
         onClose={() => setFacet(null)}
         title={t("songs.filterTitle")}
         description={t("songs.filterDescription")}
       >
+        <Input
+          label={t("songs.progression")}
+          hint={t("songs.progressionHint")}
+          placeholder={t("songs.progressionPlaceholder")}
+          value={filters.progression}
+          onChangeText={(value) => setFilters((current) => ({ ...current, progression: value }))}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+
         <View style={styles.facetTabs}>
-          {(["artist", "genre", "key", "tag"] as FacetKey[]).map((key) => (
+          {FACET_KEYS.map((key) => (
             <Chip
               key={key}
               label={t(FACET_LABELS[key])}
@@ -190,19 +295,52 @@ export default function SongsScreen() {
             ))
           )}
         </View>
+
+        <View style={styles.facetGroup}>
+          <AppText variant="label" tone="muted">
+            {t("songs.bpm")}
+          </AppText>
+          <View style={styles.facetOptions}>
+            {BPM_BUCKETS.map((bucket) => (
+              <Chip
+                key={bucket}
+                label={t(BPM_LABELS[bucket])}
+                selected={filters.bpm === bucket}
+                onPress={() => toggleBpm(bucket)}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.facetGroup}>
+          <AppText variant="label" tone="muted">
+            {t("songs.duration")}
+          </AppText>
+          <View style={styles.facetOptions}>
+            {DURATION_BUCKETS.map((bucket) => (
+              <Chip
+                key={bucket}
+                label={t(DURATION_LABELS[bucket])}
+                selected={filters.duration === bucket}
+                onPress={() => toggleDuration(bucket)}
+              />
+            ))}
+          </View>
+        </View>
       </Dialog>
     </ScreenContainer>
   )
 }
 
-/** Screen-reader friendly name of a facet key. */
+/** Layout of the toolbar, the filter dialog and the result list. */
 const createStyles = () =>
   StyleSheet.create({
     toolbar: { gap: Theme.spacing.s },
     searchRow: { flexDirection: "row", alignItems: "flex-end", gap: Theme.spacing.s },
     search: { flex: 1 },
-    activeFilters: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+    activeFilters: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: Theme.spacing.xs },
+    facetTabs: { flexDirection: "row", flexWrap: "wrap", gap: Theme.spacing.xs },
+    facetOptions: { flexDirection: "row", flexWrap: "wrap", gap: Theme.spacing.xs },
+    facetGroup: { gap: Theme.spacing.xs },
     list: { gap: Theme.spacing.m },
-    facetTabs: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-    facetOptions: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   })
