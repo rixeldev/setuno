@@ -7,8 +7,9 @@ import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { IconButton } from "@/components/ui/Button"
 import { useResponsive } from "@/hooks/useResponsive"
-import { CollapseIcon, ExpandIcon, MusicIcon, RefreshIcon } from "@/components/ui/Icons"
-import type { ChordNotation } from "@/interfaces"
+import { MusicIcon, RefreshIcon } from "@/components/ui/Icons"
+import { READER_FONT_MAX, READER_FONT_MIN } from "@/libs/readerState"
+import type { ChordNotation, ChordView } from "@/interfaces"
 
 interface SongControlsProps {
   /** Semitone shift currently applied to the displayed chords. */
@@ -21,21 +22,36 @@ interface SongControlsProps {
   onCapoChange: (capo: number) => void
   fontSize: number
   onFontSizeChange: (fontSize: number) => void
-  showChords: boolean
-  onToggleChords: () => void
-  /** Chord spelling preference: letters (C, F#m) or solfège (Do, Fa#m). */
+  /** Reader layout: chords above the lyrics ("both"), lyrics only or a chart. */
+  view: ChordView
+  onViewChange: (view: ChordView) => void
+  /** Chord spelling: letters (C), solfège (Do) or Nashville (1 4 5). */
   notation: ChordNotation
   onNotationChange: (notation: ChordNotation) => void
+  /** True while there is something to undo: a transposition, capo or resume point. */
+  canResetView: boolean
+  /** One tap back to the song's own key, no capo and the top of the lyrics. */
+  onResetView: () => void
 }
 
-const MIN_FONT = 13
-const MAX_FONT = 30
+const MIN_FONT = READER_FONT_MIN
+const MAX_FONT = READER_FONT_MAX
 /** Touch-friendly size that still lets four groups share one phone row. */
 const STEP_SIZE = 28
 
+/** The three notations a tap on the chip cycles through, in order. */
+const NOTATION_ORDER: ChordNotation[] = ["letters", "solfege", "nashville"]
+/** The three reader layouts a tap on the view chip cycles through, in order. */
+const VIEW_ORDER: ChordView[] = ["both", "lyrics", "chords"]
+
+const nextOf = <T,>(order: readonly T[], current: T): T => {
+  const index = order.indexOf(current)
+  return order[(index + 1) % order.length] as T
+}
+
 /**
- * Performance controls of the song reader: transpose, capo, text size and chord
- * visibility, with the notation toggle sitting next to the key it affects.
+ * Performance controls of the song reader: transpose, capo, text size and the
+ * chord layout, with the notation toggle sitting next to the key it affects.
  * Transposition is display-only, the saved song never changes.
  *
  * The four groups lay out in a compact grid that always fits the screen — on
@@ -51,10 +67,12 @@ export function SongControls({
   onCapoChange,
   fontSize,
   onFontSizeChange,
-  showChords,
-  onToggleChords,
+  view,
+  onViewChange,
   notation,
   onNotationChange,
+  canResetView,
+  onResetView,
 }: SongControlsProps) {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
@@ -82,14 +100,17 @@ export function SongControls({
           </View>
 
           <Pressable
-            onPress={() => onNotationChange(notation === "letters" ? "solfege" : "letters")}
+            onPress={() => onNotationChange(nextOf(NOTATION_ORDER, notation))}
             accessibilityRole="button"
             accessibilityLabel={t("songs.switchNotation")}
-            accessibilityState={{ selected: notation === "solfege" }}
             style={({ pressed }) => [styles.notationChip, pressed && styles.pressed]}
           >
             <AppText variant="caption" tone="primary" numberOfLines={1}>
-              {notation === "letters" ? t("songs.notationLetters") : t("songs.notationSolfege")}
+              {notation === "letters"
+                ? t("songs.notationLetters")
+                : notation === "solfege"
+                  ? t("songs.notationSolfege")
+                  : t("songs.notationNashville")}
             </AppText>
           </Pressable>
         </View>
@@ -173,31 +194,29 @@ export function SongControls({
 
           <View style={styles.group}>
             <AppText variant="caption" tone="faint" style={styles.groupLabel}>
-              {t("songs.chords")}
+              {t("songs.view")}
             </AppText>
             <View style={styles.stepper}>
+              <Pressable
+                onPress={() => onViewChange(nextOf(VIEW_ORDER, view))}
+                accessibilityRole="button"
+                accessibilityLabel={t("songs.switchView")}
+                style={({ pressed }) => [styles.viewChip, pressed && styles.pressed]}
+              >
+                <AppText variant="caption" tone="primary" numberOfLines={1}>
+                  {view === "both"
+                    ? t("songs.viewBoth")
+                    : view === "lyrics"
+                      ? t("songs.viewLyrics")
+                      : t("songs.viewChords")}
+                </AppText>
+              </Pressable>
               <IconButton
-                label={showChords ? t("songs.hideChords") : t("songs.showChords")}
-                variant={showChords ? "secondary" : "ghost"}
-                size={STEP_SIZE}
-                onPress={onToggleChords}
-                icon={
-                  showChords ? (
-                    <CollapseIcon size={15} color={Theme.colors.primary} />
-                  ) : (
-                    <ExpandIcon size={15} color={Theme.colors.textMuted} />
-                  )
-                }
-              />
-              <IconButton
-                label={t("songs.resetTransposeA11y")}
+                label={t("songs.resetViewA11y")}
                 variant="secondary"
                 size={STEP_SIZE}
-                disabled={semitones === 0 && capo === 0}
-                onPress={() => {
-                  onSemitonesChange(0)
-                  onCapoChange(0)
-                }}
+                disabled={!canResetView}
+                onPress={onResetView}
                 icon={<RefreshIcon size={15} color={Theme.colors.text} />}
               />
             </View>
@@ -213,13 +232,10 @@ const clampSemitones = (value: number): number => Math.max(-11, Math.min(11, val
 
 const createStyles = () =>
   StyleSheet.create({
-    host: {
-      paddingVertical: Theme.spacing.s,
-      backgroundColor: Theme.colors.background,
-      borderBottomWidth: 1,
-      borderBottomColor: Theme.colors.borderSoft,
-    },
-    inner: { width: "100%", alignSelf: "center", gap: Theme.spacing.m },
+    // No surface and no rules of its own: it renders inside the reader's bottom
+    // tray, which paints the chrome and the divider.
+    host: { paddingVertical: Theme.spacing.xs },
+    inner: { width: "100%", alignSelf: "center", gap: Theme.spacing.s },
     keyRow: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.s },
     keyInfo: {
       flex: 1,
@@ -251,6 +267,16 @@ const createStyles = () =>
       backgroundColor: Theme.colors.primarySoft,
       borderWidth: 1,
       borderColor: Theme.colors.primary,
+    },
+    viewChip: {
+      paddingHorizontal: Theme.spacing.m,
+      paddingVertical: 5,
+      borderRadius: Theme.radii.pill,
+      backgroundColor: Theme.colors.primarySoft,
+      borderWidth: 1,
+      borderColor: Theme.colors.primary,
+      minWidth: 76,
+      alignItems: "center",
     },
     pressed: { opacity: 0.7 },
   })

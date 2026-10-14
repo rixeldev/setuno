@@ -13,6 +13,11 @@ interface SongNavArrowsProps {
   /** Next song in the running order (null at the end). */
   nextId: string | null
   onNavigate: (songId: string) => void
+  /**
+   * Extra lift above the bottom edge — the reader passes the control tray's
+   * height so the arrows never sit on top of it.
+   */
+  bottomOffset?: number
 }
 
 /**
@@ -20,11 +25,16 @@ interface SongNavArrowsProps {
  * that belongs to an event's setlist. Floating over the content, away from the
  * chords, and each one only appears when there is somewhere to go.
  */
-export function SongNavArrows({ previousId, nextId, onNavigate }: SongNavArrowsProps) {
+export function SongNavArrows({
+  previousId,
+  nextId,
+  onNavigate,
+  bottomOffset = 0,
+}: SongNavArrowsProps) {
   const styles = useThemedStyles(createStyles)
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
-  const bottom = insets.bottom + Theme.spacing.l
+  const bottom = insets.bottom + Theme.spacing.l + bottomOffset
 
   return (
     <>

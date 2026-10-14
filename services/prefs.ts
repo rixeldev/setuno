@@ -13,10 +13,8 @@ const STORAGE_KEY = "setuno:user-preferences:v1"
 
 const listeners = new Set<() => void>()
 let preferences: UserPreferences = DEFAULT_PREFERENCES
-let snapshot = 0
 
 const notify = (): void => {
-  snapshot += 1
   listeners.forEach((listener) => listener())
 }
 
@@ -26,8 +24,6 @@ const subscribe = (listener: () => void): (() => void) => {
     listeners.delete(listener)
   }
 }
-
-const getSnapshot = (): number => snapshot
 
 /** Current preferences (defaults until the cache is hydrated). */
 export const getCachedPreferences = (): UserPreferences => preferences

@@ -6,34 +6,35 @@ import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { displayChord } from "@/libs/chords"
 import { buildChordSegments } from "@/libs/songUtils"
-import type { ChordNotation, LyricLine } from "@/interfaces"
+import type { ChordNotation, ChordView, LyricLine } from "@/interfaces"
 
 interface ChordLineProps {
   line: LyricLine
   fontSize: number
-  showChords: boolean
-  /** Chord spelling: letters (C) or solfège (Do). Display-only. */
+  /** Chords above the lyrics ("both"), lyrics only, or a chord chart (#6). */
+  view?: ChordView
+  /** Song key, needed to spell chords as Nashville numbers. */
+  songKey?: string
+  /** Chord spelling: letters (C), solfège (Do) or Nashville (1 4 5). Display-only. */
   notation?: ChordNotation
-  /** Dims lyric lines without chords so structure stays readable. */
-  dimEmpty?: boolean
   /** Makes every chord tappable (the reader opens its “how to play” sheet). */
   onChordPress?: (chord: string) => void
 }
 
 /**
- * Renders a lyric line with its chords in a monospace pair of rows, so every
- * chord sits exactly above the character it belongs to (docs §11, §39).
- *
- * Chords are anchored to a character offset (`ChordPosition.position`) which
- * makes the alignment deterministic on both Android and Web. The row is built
- * as segments so each chord can be pressed without altering the grid.
+ * Renders a lyric line with its chords. In the default layout the chords sit in
+ * a monospace row exactly above the character they belong to (docs §11, §39),
+ * anchored to a character offset (`ChordPosition.position`) so alignment is
+ * deterministic on Android and Web alike. Chords-only mode drops the lyrics and
+ * lays the progression out as pills instead, and any line without lyrics
+ * (intro, instrumental, riff) is always a progression.
  */
 export function ChordLine({
   line,
   fontSize,
-  showChords,
+  view = "both",
+  songKey = "",
   notation = "letters",
-  dimEmpty = true,
   onChordPress,
 }: ChordLineProps) {
   const styles = useThemedStyles(createStyles)
@@ -45,37 +46,53 @@ export function ChordLine({
         .sort((a, b) => a.position - b.position),
     [line.chords],
   )
+  const labels = useMemo(
+    () => chords.map((chord) => displayChord(chord.chord, notation, songKey)),
+    [chords, notation, songKey],
+  )
   const segments = useMemo(
     () =>
       buildChordSegments(
-        chords.map((chord) => ({ ...chord, label: displayChord(chord.chord, notation) })),
+        chords.map((chord, index) => ({ ...chord, label: labels[index] ?? chord.chord })),
         line.text,
       ),
-    [chords, line.text, notation],
+    [chords, labels, line.text],
   )
   const lineHeight = Math.round(fontSize * 1.65)
-  const hasContent = line.text.trim().length > 0 || chords.length > 0
+  const hasLyrics = line.text.trim().length > 0
+  const chordList = labels.join(", ")
+
+  // Blank lines are paragraph spacing: keep a small gap.
+  if (!hasLyrics && chords.length === 0) {
+    return <View style={{ height: Math.round(fontSize * 0.6) }} />
+  }
+
+  // Lyrics-only (#6): hide every chord, keep the song's shape.
+  if (view === "lyrics") {
+    if (!hasLyrics) return <View style={{ height: Math.round(fontSize * 0.6) }} />
+    return (
+      <View style={styles.line}>
+        <Text selectable style={[styles.lyrics, { fontSize, lineHeight }]}>
+          {line.text}
+        </Text>
+      </View>
+    )
+  }
 
   // A line without lyrics (intro, instrumental, riff) is a chord progression:
   // the chords are the content, so they get the full row as modern pills
-  // instead of a monospace grid followed by an empty lyric line.
-  if (line.text.trim().length === 0) {
-    if (!showChords || chords.length === 0) {
-      // Blank lyric lines are paragraph spacing: keep a small gap.
-      return <View style={{ height: Math.round(fontSize * 0.6) }} />
-    }
+  // instead of a monospace grid followed by an empty lyric line. Chords-only
+  // mode shows every line this way.
+  if (!hasLyrics || view === "chords") {
+    if (chords.length === 0) return <View style={{ height: Math.round(fontSize * 0.6) }} />
     return (
       <View
         style={styles.progression}
         accessible={!onChordPress}
-        accessibilityLabel={
-          onChordPress
-            ? undefined
-            : `Chords: ${chords.map((chord) => displayChord(chord.chord, notation)).join(", ")}`
-        }
+        accessibilityLabel={onChordPress ? undefined : t("songs.chordListA11y", { chords: chordList })}
       >
         {chords.map((chord, index) => {
-          const label = displayChord(chord.chord, notation)
+          const label = labels[index] ?? chord.chord
           return (
             <Pressable
               key={`${chord.chord}-${index}`}
@@ -100,14 +117,10 @@ export function ChordLine({
 
   return (
     <View style={styles.line}>
-      {showChords && segments.length > 0 ? (
+      {segments.length > 0 ? (
         <Text
           selectable={false}
-          accessibilityLabel={
-            onChordPress
-              ? undefined
-              : `Chords: ${chords.map((chord) => displayChord(chord.chord, notation)).join(", ")}`
-          }
+          accessibilityLabel={onChordPress ? undefined : t("songs.chordListA11y", { chords: chordList })}
           style={[styles.chords, { fontSize, lineHeight: Math.round(fontSize * 1.25) }]}
         >
           {segments.map((segment, segmentIndex) => {
@@ -128,17 +141,9 @@ export function ChordLine({
           })}
         </Text>
       ) : null}
-      <Text
-        selectable
-        style={[
-          styles.lyrics,
-          { fontSize, lineHeight },
-          dimEmpty && line.text.trim().length === 0 && styles.emptyLyric,
-        ]}
-      >
-        {line.text.length > 0 ? line.text : " "}
+      <Text selectable style={[styles.lyrics, { fontSize, lineHeight }]}>
+        {line.text}
       </Text>
-      {!hasContent ? <View style={{ height: fontSize * 0.5 }} /> : null}
     </View>
   )
 }
@@ -161,9 +166,6 @@ const createStyles = () =>
       color: Theme.colors.text,
       fontFamily: Theme.fonts.mono,
       includeFontPadding: false,
-    },
-    emptyLyric: {
-      color: Theme.colors.textFaint,
     },
     progression: {
       flexDirection: "row",
