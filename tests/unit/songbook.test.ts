@@ -3,7 +3,18 @@ import { describe, expect, it } from "vitest"
 import { EMPTY_SONG_LINKS, type Song } from "@/interfaces/song"
 import type { TimestampLike } from "@/interfaces/timestamp"
 import { DEFAULT_SORT, SONG_SORTS, sortSongs, type SongSort } from "@/libs/songbookSort"
-import { EMPTY_SONGBOOK, sanitizeSongbook, songbookKey } from "@/libs/songbookState"
+import { EMPTY_FILTERS } from "@/libs/songSearch"
+import {
+  EMPTY_SONGBOOK,
+  MAX_SONGBOOK_VIEWS,
+  nextSongbookViewId,
+  removeSongbookView,
+  sanitizeSongbook,
+  sanitizeSongbookViews,
+  songbookKey,
+  upsertSongbookView,
+  type SongbookView,
+} from "@/libs/songbookState"
 
 /** A timestamp `seconds` into the epoch, shaped like a Firestore one. */
 const timestamp = (seconds: number): TimestampLike => ({
@@ -144,6 +155,7 @@ describe("sanitizeSongbook", () => {
         duration: "long" as const,
       },
       sort: "artist" as const,
+      views: [],
     }
     expect(sanitizeSongbook(saved)).toEqual(saved)
   })
@@ -186,6 +198,114 @@ describe("sanitizeSongbook", () => {
   it("ignores fields it does not know about", () => {
     const result = sanitizeSongbook({ sort: "tempo", futureField: { nested: true } })
     expect(result.sort).toBe("tempo")
-    expect(Object.keys(result)).toEqual(["filters", "sort"])
+    expect(Object.keys(result)).toEqual(["filters", "sort", "views"])
+  })
+
+  it("keeps a stored view out of the live filters", () => {
+    const entry = sanitizeSongbook({
+      filters: { search: "" },
+      sort: "title",
+      views: [{ id: "v1", name: "Slow", filters: { bpm: "slow" }, sort: "tempo" }],
+    })
+    expect(entry.views).toHaveLength(1)
+    expect(entry.views[0]?.filters.bpm).toBe("slow")
+    // Saving a view must not apply it: the list you are looking at is unchanged.
+    expect(entry.filters.bpm).toBeNull()
+  })
+})
+
+describe("songbook views (roadmap #37 part B)", () => {
+  const view = (id: string, name: string, overrides: Partial<SongbookView> = {}): SongbookView => ({
+    id,
+    name,
+    filters: EMPTY_FILTERS,
+    sort: "title",
+    ...overrides,
+  })
+
+  it("rebuilds a stored view, trimming the name and re-sanitizing both halves", () => {
+    const [stored] = sanitizeSongbookViews([
+      {
+        id: "v1",
+        name: "  Sunday acoustic ",
+        filters: { artist: "Radiohead", bpm: "glacial", progression: "Am F" },
+        sort: "byMood",
+      },
+    ])
+    expect(stored?.name).toBe("Sunday acoustic")
+    expect(stored?.filters.artist).toBe("Radiohead")
+    expect(stored?.filters.progression).toBe("Am F")
+    // A bucket and an order the app no longer offers cannot survive inside a view.
+    expect(stored?.filters.bpm).toBeNull()
+    expect(stored?.sort).toBe(DEFAULT_SORT)
+  })
+
+  it("drops anything that is not a named entry", () => {
+    expect(sanitizeSongbookViews(null)).toEqual([])
+    expect(sanitizeSongbookViews({})).toEqual([])
+    expect(sanitizeSongbookViews(["x", 7, null, []])).toEqual([])
+    expect(sanitizeSongbookViews([{ id: "v1" }, { name: "   " }, { name: "No id", filters: {}, sort: "tempo" }])).toEqual([
+      view("v1", "No id", { sort: "tempo" }),
+    ])
+  })
+
+  it("renumbers a repeated id, since deleting one of two would be ambiguous", () => {
+    const views = sanitizeSongbookViews([
+      { id: "v1", name: "One", filters: {}, sort: "title" },
+      { id: "v1", name: "Two", filters: {}, sort: "title" },
+    ])
+    expect(views.map((entry) => entry.id)).toEqual(["v1", "v2"])
+    expect(views.map((entry) => entry.name)).toEqual(["One", "Two"])
+  })
+
+  it("caps the list, so a corrupted cache cannot grow without limit", () => {
+    const many = Array.from({ length: MAX_SONGBOOK_VIEWS + 5 }, (_, index) => ({
+      id: `v${index}`,
+      name: `View ${index}`,
+      filters: {},
+      sort: "title",
+    }))
+    expect(sanitizeSongbookViews(many)).toHaveLength(MAX_SONGBOOK_VIEWS)
+  })
+
+  it("numbers the next view after the ones already saved, reusing a gap", () => {
+    expect(nextSongbookViewId([])).toBe("v1")
+    expect(nextSongbookViewId([view("v1", "a")])).toBe("v2")
+    expect(nextSongbookViewId([view("v1", "a"), view("v3", "b")])).toBe("v2")
+  })
+
+  it("updates a view when the name matches instead of adding a near-duplicate", () => {
+    const saved = upsertSongbookView(
+      [view("v1", "Sunday"), view("v2", "Other", { sort: "artist" })],
+      view("v9", "  sunday ", { filters: { ...EMPTY_FILTERS, artist: "Radiohead" }, sort: "tempo" }),
+    )
+    expect(saved).toHaveLength(2)
+    // Same id, same position: re-saving is how a view is edited.
+    expect(saved[0]?.id).toBe("v1")
+    // The name you just typed is the name it keeps, trimmed.
+    expect(saved[0]?.name).toBe("sunday")
+    expect(saved[0]?.filters.artist).toBe("Radiohead")
+    expect(saved[0]?.sort).toBe("tempo")
+    expect(saved[1]?.id).toBe("v2")
+  })
+
+  it("appends a new name and drops the oldest once the cap is reached", () => {
+    let saved: SongbookView[] = []
+    for (let n = 1; n <= MAX_SONGBOOK_VIEWS; n += 1) {
+      saved = upsertSongbookView(saved, view(nextSongbookViewId(saved), `View ${n}`))
+    }
+    expect(saved).toHaveLength(MAX_SONGBOOK_VIEWS)
+
+    const overflow = upsertSongbookView(saved, view("vX", "One more", { sort: "artist" }))
+    expect(overflow).toHaveLength(MAX_SONGBOOK_VIEWS)
+    expect(overflow[0]?.name).toBe("View 2")
+    expect(overflow[overflow.length - 1]?.name).toBe("One more")
+  })
+
+  it("removes one view and leaves the rest in order", () => {
+    const saved = [view("v1", "a"), view("v2", "b"), view("v3", "c")]
+    expect(removeSongbookView(saved, "v2").map((entry) => entry.id)).toEqual(["v1", "v3"])
+    // An unknown id is a no-op, never a wipe.
+    expect(removeSongbookView(saved, "nope")).toHaveLength(3)
   })
 })

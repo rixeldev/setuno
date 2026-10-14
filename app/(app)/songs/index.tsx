@@ -12,9 +12,10 @@ import { Input, SearchInput } from "@/components/ui/Input"
 import { Dialog } from "@/components/ui/Dialog"
 import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
 import { EmptyState, ErrorState, SkeletonList } from "@/components/ui/States"
-import { FilterIcon, PlusIcon, SearchIcon, SortIcon } from "@/components/ui/Icons"
+import { FilterIcon, PlusIcon, SaveIcon, SearchIcon, SortIcon, TrashIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { SongRow } from "@/components/app/SongRow"
+import { useToast } from "@/components/ui/Toast"
 import { useUserId } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
@@ -30,6 +31,7 @@ import {
   type DurationBucket,
 } from "@/libs/songSearch"
 import { SONG_SORTS, sortSongs, type SongSort } from "@/libs/songbookSort"
+import { MAX_SONGBOOK_VIEWS } from "@/libs/songbookState"
 import type { SongFacets } from "@/interfaces"
 
 type FacetKey = "artist" | "genre" | "key" | "tag"
@@ -79,15 +81,19 @@ const SORT_LABELS: Record<SongSort, string> = {
 export default function SongsScreen() {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
+  const toast = useToast()
   const router = useRouter()
   const { isAdmin, organizationId } = useOrganization()
   const uid = useUserId()
   const { songs, facets, loading, error } = useOrgData()
   // Filters and order are remembered per band and per user (roadmap #37), so a
   // member's facets never follow them into another band's library.
-  const { filters, setFilters, sort, setSort } = useSongbookState(organizationId, uid)
+  const { filters, setFilters, sort, setSort, views, saveView, applyView, deleteView } =
+    useSongbookState(organizationId, uid)
   const [facet, setFacet] = useState<FacetKey | null>(null)
   const [sortOpen, setSortOpen] = useState(false)
+  const [savingView, setSavingView] = useState(false)
+  const [viewName, setViewName] = useState("")
 
   const results = useMemo(() => sortSongs(filterSongs(songs, filters), sort), [songs, filters, sort])
   const activeCount = countActiveFilters(filters)
@@ -236,8 +242,44 @@ export default function SongsScreen() {
       <BottomSheet
         visible={sortOpen}
         onClose={() => setSortOpen(false)}
-        title={t("songs.sortSheetTitle")}
+        title={t("songs.viewsSheetTitle")}
       >
+        {views.map((view) => (
+          <SheetOptionRow
+            key={view.id}
+            label={view.name}
+            hint={t(SORT_LABELS[view.sort])}
+            onPress={() => {
+              applyView(view.id)
+              setSortOpen(false)
+            }}
+            trailing={
+              <IconButton
+                label={t("songs.deleteView", { name: view.name })}
+                size={32}
+                onPress={() => deleteView(view.id)}
+                icon={<TrashIcon size={16} color={Theme.colors.textMuted} />}
+              />
+            }
+          />
+        ))}
+        {views.length === 0 ? (
+          <AppText variant="caption" tone="faint">
+            {t("songs.noViews")}
+          </AppText>
+        ) : null}
+        <SheetOptionRow
+          label={t("songs.saveCurrentView")}
+          onPress={() => {
+            setSortOpen(false)
+            setSavingView(true)
+          }}
+          trailing={<SaveIcon size={18} color={Theme.colors.textMuted} />}
+        />
+
+        <AppText variant="caption" tone="muted" style={styles.orderLabel}>
+          {t("songs.orderSection")}
+        </AppText>
         {SONG_SORTS.map((option) => (
           <SheetOptionRow
             key={option}
@@ -250,6 +292,32 @@ export default function SongsScreen() {
           />
         ))}
       </BottomSheet>
+
+      <Dialog
+        visible={savingView}
+        onClose={() => setSavingView(false)}
+        title={t("songs.saveViewTitle")}
+        description={views.length >= MAX_SONGBOOK_VIEWS ? t("songs.viewsLimitHint") : undefined}
+        confirmLabel={t("common.save")}
+        confirmDisabled={!viewName.trim()}
+        onConfirm={() => {
+          const name = viewName.trim()
+          saveView(name)
+          setSavingView(false)
+          setViewName("")
+          // Saving is instant and silent otherwise; the toast is the only proof
+          // the view is there the next time the sheet is opened.
+          toast.showSuccess(t("songs.viewSaved", { name }))
+        }}
+      >
+        <Input
+          label={t("songs.viewName")}
+          placeholder={t("songs.viewNamePlaceholder")}
+          value={viewName}
+          onChangeText={setViewName}
+          autoFocus
+        />
+      </Dialog>
 
       <Dialog
         visible={facet !== null}
@@ -341,6 +409,8 @@ const createStyles = () =>
     activeFilters: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: Theme.spacing.xs },
     facetTabs: { flexDirection: "row", flexWrap: "wrap", gap: Theme.spacing.xs },
     facetOptions: { flexDirection: "row", flexWrap: "wrap", gap: Theme.spacing.xs },
+    /** Separates the sheet's two sections: saved views, then the order list. */
+    orderLabel: { marginTop: Theme.spacing.m },
     facetGroup: { gap: Theme.spacing.xs },
     list: { gap: Theme.spacing.m },
   })

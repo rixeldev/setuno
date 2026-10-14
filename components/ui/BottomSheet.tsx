@@ -1,5 +1,5 @@
 import React from "react"
-import { Pressable, StyleSheet, View } from "react-native"
+import { Pressable, ScrollView, StyleSheet, View } from "react-native"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -19,6 +19,12 @@ interface BottomSheetProps {
  * Cross-platform bottom sheet for short option pickers (language, theme).
  * It slides in from the bottom edge on every platform and can be dragged back
  * down by its handle (`SheetSurface`).
+ *
+ * The options area scrolls when the list outgrows the sheet: the surface caps
+ * at 92% of the screen and clips (`overflow: hidden`), so a sheet that grew a
+ * section — the songbook's saved views plus its order list — would otherwise
+ * lose its last rows off the bottom with no way to reach them. `flexShrink`
+ * keeps short lists laid out exactly as before.
  */
 export function BottomSheet({ visible, onClose, title, subtitle, children }: BottomSheetProps) {
   const styles = useThemedStyles(createStyles)
@@ -34,7 +40,13 @@ export function BottomSheet({ visible, onClose, title, subtitle, children }: Bot
             </AppText>
           ) : null}
         </View>
-        <View style={styles.options}>{children}</View>
+        <ScrollView
+          style={styles.optionsScroll}
+          contentContainerStyle={styles.options}
+          showsVerticalScrollIndicator={false}
+        >
+          {children}
+        </ScrollView>
       </View>
     </SheetSurface>
   )
@@ -45,6 +57,13 @@ interface SheetOptionRowProps {
   hint?: string
   selected?: boolean
   onPress: () => void
+  /**
+   * Control rendered at the row's trailing edge, after the selection tick —
+   * the songbook's saved views put a delete button there. Being its own
+   * `Pressable`, it wins the touch over the row it sits in, so tapping it never
+   * applies the view.
+   */
+  trailing?: React.ReactNode
 }
 
 /** Single selectable row inside a bottom sheet. */
@@ -53,6 +72,7 @@ export function SheetOptionRow({
   hint,
   selected = false,
   onPress,
+  trailing,
 }: SheetOptionRowProps) {
   const styles = useThemedStyles(createStyles)
 
@@ -79,6 +99,7 @@ export function SheetOptionRow({
         ) : null}
       </View>
       {selected ? <CheckIcon size={18} color={Theme.colors.primary} /> : null}
+      {trailing}
     </Pressable>
   )
 }
@@ -92,6 +113,8 @@ const createStyles = () =>
       gap: Theme.spacing.l,
     },
     header: { gap: 2 },
+    /** Shrinks to the sheet's 92% cap and then scrolls its content. */
+    optionsScroll: { flexShrink: 1 },
     options: { gap: Theme.spacing.s },
     option: {
       flexDirection: "row",

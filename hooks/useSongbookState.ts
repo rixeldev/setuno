@@ -2,7 +2,15 @@ import { useEffect, useState } from "react"
 
 import type { SongFilters } from "@/libs/songSearch"
 import type { SongSort } from "@/libs/songbookSort"
-import { EMPTY_SONGBOOK, songbookKey, type SongbookState } from "@/libs/songbookState"
+import {
+  EMPTY_SONGBOOK,
+  nextSongbookViewId,
+  removeSongbookView,
+  songbookKey,
+  upsertSongbookView,
+  type SongbookState,
+  type SongbookView,
+} from "@/libs/songbookState"
 import { readSongbook, subscribeSongbook, writeSongbook } from "@/services/songbookState"
 
 /** The saved state, tagged with the band/user it came from. */
@@ -17,6 +25,11 @@ export type SongFiltersUpdate = SongFilters | ((current: SongFilters) => SongFil
 export interface UseSongbookState extends SongbookState {
   setFilters: (next: SongFiltersUpdate) => void
   setSort: (sort: SongSort) => void
+  /** Captures the filters and order now on screen under `name` (roadmap #37B). */
+  saveView: (name: string) => void
+  /** Restores a view's filters **and** order in one write. */
+  applyView: (id: string) => void
+  deleteView: (id: string) => void
 }
 
 /**
@@ -50,5 +63,40 @@ export const useSongbookState = (organizationId: string | null, uid: string | nu
     setEntry({ key, value: writeSongbook(key, { sort }) })
   }
 
-  return { filters: value.filters, sort: value.sort, setFilters, setSort }
+  // Saving a view is a snapshot of what is on screen right now, so it closes
+  // over `value` the same way `setFilters`'s updater does — one write, one
+  // notification, and the sheet re-renders with the new entry.
+  const saveView = (name: string): void => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    const view: SongbookView = {
+      id: nextSongbookViewId(value.views),
+      name: trimmed,
+      filters: value.filters,
+      sort: value.sort,
+    }
+    setEntry({ key, value: writeSongbook(key, { views: upsertSongbookView(value.views, view) }) })
+  }
+
+  const applyView = (id: string): void => {
+    const view = value.views.find((candidate) => candidate.id === id)
+    if (!view) return
+    // Filters and order move together: a view is one decision, not two.
+    setEntry({ key, value: writeSongbook(key, { filters: view.filters, sort: view.sort }) })
+  }
+
+  const deleteView = (id: string): void => {
+    setEntry({ key, value: writeSongbook(key, { views: removeSongbookView(value.views, id) }) })
+  }
+
+  return {
+    filters: value.filters,
+    sort: value.sort,
+    views: value.views,
+    setFilters,
+    setSort,
+    saveView,
+    applyView,
+    deleteView,
+  }
 }
