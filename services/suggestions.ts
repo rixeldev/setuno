@@ -29,7 +29,7 @@ import { logActivity } from "@/services/activity"
 import { ValidationError } from "@/services/errors"
 import { createSong, fetchSong, updateSong } from "@/services/songs"
 import { createSection, emptyLine, normalizeSectionLabels, sectionLabel } from "@/libs/songUtils"
-import type { SongSection } from "@/interfaces/song"
+import { EMPTY_SONG_LINKS, type SongSection } from "@/interfaces/song"
 
 const mapSuggestion = (data: Record<string, unknown>, id: string): SongSuggestion =>
   ({
@@ -262,6 +262,7 @@ export const acceptSuggestion = async (
         notes: "",
         tags: [],
         sections: sectionsFromLyrics(change.lyrics),
+        links: EMPTY_SONG_LINKS,
       },
       { id: uid, name: reviewer.name },
     )
@@ -310,6 +311,7 @@ export const acceptSuggestion = async (
       notes: next.notes,
       tags: next.tags,
       sections: next.sections,
+      links: next.links,
     }, reviewer)
 
     await updateDoc(doc(firestore, paths.suggestion(organizationId, suggestionId)), {
