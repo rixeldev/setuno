@@ -16,6 +16,7 @@ import { useToast } from "@/components/ui/Toast"
 import { CloseIcon, DotsIcon, MusicIcon, PlusIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { SetlistKeyDialog } from "@/components/setlists/SetlistKeyDialog"
+import { PrintSheet } from "@/components/songs/PrintSheet"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
@@ -28,6 +29,7 @@ import {
 } from "@/services/setlists"
 import { toFriendlyError } from "@/services/errors"
 import { filterSongs, EMPTY_FILTERS } from "@/libs/songSearch"
+import { setlistPrintHtml } from "@/libs/songPrint"
 import type { RelativeDayLabels } from "@/libs/format"
 import {
   formatDateRange,
@@ -70,6 +72,7 @@ export default function SetlistDetail() {
   const [search, setSearch] = useState("")
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [printOpen, setPrintOpen] = useState(false)
   // Song whose play key is being chosen, and whether it is being added from
   // the picker or changed from the running order.
   const [keyTarget, setKeyTarget] = useState<{
@@ -83,6 +86,17 @@ export default function SetlistDetail() {
   const setlist = useMemo(
     () => setlists.find((entry) => entry.id === setlistId) ?? null,
     [setlists, setlistId],
+  )
+  // Full documents for the printed sheet: each entry carries the key the band
+  // plays that song in. A song deleted since the list was built drops out
+  // instead of blanking its page.
+  const printableSongs = useMemo(
+    () =>
+      (setlist?.songs ?? []).flatMap((entry) => {
+        const song = songLibrary.get(entry.songId)
+        return song ? [{ song, key: entry.key }] : []
+      }),
+    [setlist?.songs, songLibrary],
   )
   // Shows that have this setlist attached, newest first (reverse of the link
   // the performance form creates).
@@ -507,6 +521,13 @@ export default function SetlistDetail() {
           }}
         />
         <SheetOptionRow
+          label={t("setlists.print")}
+          onPress={() => {
+            setMenuOpen(false)
+            setPrintOpen(true)
+          }}
+        />
+        <SheetOptionRow
           label={t("setlists.deleteSetlist")}
           onPress={() => {
             setMenuOpen(false)
@@ -514,6 +535,13 @@ export default function SetlistDetail() {
           }}
         />
       </BottomSheet>
+
+      <PrintSheet
+        visible={printOpen}
+        onClose={() => setPrintOpen(false)}
+        title={setlist.name}
+        render={(options) => setlistPrintHtml(setlist.name, printableSongs, options)}
+      />
 
       <Dialog
         visible={pickerOpen}
