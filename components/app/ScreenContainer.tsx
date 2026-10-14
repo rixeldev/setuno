@@ -7,6 +7,7 @@ import {
   View,
   type StyleProp,
   type ViewStyle,
+  type ScrollViewProps,
 } from "react-native"
 
 import { Theme } from "@/constants/Theme"
@@ -41,6 +42,10 @@ interface ScreenContainerProps {
   style?: StyleProp<ViewStyle>
   /** Sticky page padding for screens without a header. */
   padded?: boolean
+  /** Ref for the inner `ScrollView` (the reader drives autoscroll through it). */
+  scrollRef?: React.Ref<ScrollView>
+  /** Extra `ScrollView` handlers, merged over the defaults. */
+  scrollProps?: ScrollViewProps
 }
 
 /**
@@ -65,6 +70,8 @@ export function ScreenContainer({
   gap = Theme.spacing.xl,
   style,
   padded = true,
+  scrollRef,
+  scrollProps,
 }: ScreenContainerProps) {
   const styles = useThemedStyles(createStyles)
   const { gutter, contentMaxWidth } = useResponsive()
@@ -115,12 +122,14 @@ export function ScreenContainer({
     <View style={styles.host}>
       <AppBackground />
       <ScrollView
+        ref={scrollRef}
         style={styles.flex}
         contentContainerStyle={[
           styles.scrollContent,
           Platform.OS === "web" ? styles.webScroll : null,
         ]}
         keyboardShouldPersistTaps="handled"
+        {...scrollProps}
         showsVerticalScrollIndicator={false}
         refreshControl={
           onRefresh ? (

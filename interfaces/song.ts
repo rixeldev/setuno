@@ -33,6 +33,8 @@ export interface SongSection {
   /** Display label ("Verse 1", "Chorus", custom text...). */
   label: string
   lines: LyricLine[]
+  /** Optional bar count for the section ("8 bars"), used as a rehearsal cue. */
+  bars?: number
 }
 
 export interface Song {
@@ -51,11 +53,24 @@ export interface Song {
   notes: string
   tags: string[]
   sections: SongSection[]
+  /** Optional external references (roadmap #16). */
+  links: SongLinks
   createdBy: string
   createdByName: string
   createdAt: TimestampLike
   updatedAt: TimestampLike
 }
+
+/** Streaming/listening services a song can point at (roadmap #16). */
+export type SongLinkProvider = "youtube" | "spotify" | "appleMusic"
+
+/**
+ * Optional external links for a song. Every provider is always present; an
+ * empty string means "not set". Stored as a map so a new provider is one key.
+ */
+export type SongLinks = Record<SongLinkProvider, string>
+
+export const EMPTY_SONG_LINKS: SongLinks = { youtube: "", spotify: "", appleMusic: "" }
 
 /** Fields an admin can edit; identity/audit fields are managed by the service. */
 export interface SongInput {
@@ -70,6 +85,7 @@ export interface SongInput {
   notes: string
   tags: string[]
   sections: SongSection[]
+  links: SongLinks
 }
 
 /** Chips used by the song filters. */

@@ -126,6 +126,11 @@ export const StarIcon = (props: any) => (
   <Octicons name="star" color={Theme.colors.text} size={24} {...props} />
 )
 
+/** Filled star: a pinned favourite (roadmap #23). */
+export const StarFilledIcon = (props: any) => (
+  <Octicons name="star-fill" color={Theme.colors.text} size={24} {...props} />
+)
+
 export const QuestionIcon = (props: any) => (
   <Octicons name="question" color={Theme.colors.text} size={24} {...props} />
 )
@@ -410,6 +415,10 @@ export interface IconProps {
   color?: string
 }
 
+export const KeepAwakeIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="sleep-off" size={size} color={color} {...rest} />
+)
+
 export const MusicIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
   <Ionicons name="musical-notes" size={size} color={color} {...rest} />
 )
@@ -614,4 +623,59 @@ export const SuggestIcon = ({ size = 24, color = Theme.colors.text, ...rest }: I
 /** Band / organization mark used in settings and navigation. */
 export const OrganizationIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
   <Ionicons name="business-outline" size={size} color={color} {...rest} />
+)
+
+export const PauseIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="pause" size={size} color={color} {...rest} />
+)
+
+export const PlayFilledIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Ionicons name="play" size={size} color={color} {...rest} />
+)
+
+/** Song reader autoscroll (roadmap #1). */
+export const AutoscrollIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="arrow-down-bold-box-outline" size={size} color={color} {...rest} />
+)
+
+/** External reference links per song (roadmap #16). */
+export const YouTubeIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <FontAwesome5 name="youtube" size={size} color={color} {...rest} />
+)
+
+export const SpotifyIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <FontAwesome5 name="spotify" size={size} color={color} {...rest} />
+)
+
+export const AppleMusicIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <FontAwesome5 name="itunes" size={size} color={color} {...rest} />
+)
+
+/** “Open in a new tab/window” affordance for external links. */
+export const OpenExternalIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <Octicons name="link-external" size={size} color={color} {...rest} />
+)
+
+/** Importing a paste in the song editor (roadmap #18). */
+export const ImportIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="import" size={size} color={color} {...rest} />
+)
+
+/** Exporting a file (roadmap #18/#20). */
+export const ExportIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="export-variant" size={size} color={color} {...rest} />
+)
+
+/** Printing or exporting a PDF (roadmap #20). */
+export const PrintIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="printer" size={size} color={color} {...rest} />
+)
+
+/** Undo/redo affordances in the editor (roadmap #25). */
+export const UndoIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="undo-variant" size={size} color={color} {...rest} />
+)
+
+export const RedoIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="redo-variant" size={size} color={color} {...rest} />
 )

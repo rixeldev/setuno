@@ -85,6 +85,10 @@ export const paths = {
   username: (name: string) => `usernames/${name}`,
   userOrganizations: (uid: string) => `users/${uid}/organizations`,
   userOrganization: (uid: string, orgId: string) => `users/${uid}/organizations/${orgId}`,
+  /** Private per-song reader state (autoscroll today, scroll position later). */
+  userReaderState: (uid: string, songId: string) => `users/${uid}/readerState/${songId}`,
+  /** Private per-song personal notes (roadmap #3), owner-only. */
+  userAnnotation: (uid: string, songId: string) => `users/${uid}/annotations/${songId}`,
   organizations: "organizations",
   organization: (orgId: string) => `organizations/${orgId}`,
   members: (orgId: string) => `organizations/${orgId}/members`,

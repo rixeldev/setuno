@@ -33,6 +33,8 @@ export default function AppLayout() {
         {/* Tab roots swap instantly (docs §18); pushes inside a tab keep the
             native stack transition. */}
         <Stack.Screen name="index" options={{ animation: "none" }} />
+        {/* First-run welcome + guided tour (roadmap #65); hides the shell. */}
+        <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
         <Stack.Screen name="songs/index" options={{ animation: "none" }} />
         <Stack.Screen name="songs/new" />
         {/* Stepping through an event's setlist replaces this screen; the
@@ -43,6 +45,8 @@ export default function AppLayout() {
         />
         <Stack.Screen name="songs/[id]/edit" />
         <Stack.Screen name="songs/[id]/suggest" />
+        {/* Personal notes of one song (roadmap #3). */}
+        <Stack.Screen name="annotations/[id]" options={modalOptions} />
         <Stack.Screen name="setlists/index" options={{ animation: "none" }} />
         <Stack.Screen name="setlists/new" options={modalOptions} />
         <Stack.Screen name="setlists/[id]/index" />

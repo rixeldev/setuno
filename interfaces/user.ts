@@ -3,10 +3,15 @@ import type { MaybeTimestamp, TimestampLike } from "./timestamp"
 /** "system" follows the device/browser colour scheme. */
 export type AppearanceMode = "dark" | "light" | "system"
 export type AccentId = "ember" | "ocean" | "emerald" | "sunset" | "magenta" | "indigo"
-/** How chords are spelled: american letters (C D E) or solfège (Do Re Mi). */
-export type ChordNotation = "letters" | "solfege"
+/**
+ * How chords are spelled: american letters (C D E), solfège (Do Re Mi) or
+ * Nashville numbers (1 4 5). Notes are always *stored* in letters.
+ */
+export type ChordNotation = "letters" | "solfege" | "nashville"
 /** Instrument the reader shows shapes for when a chord is tapped. */
 export type ChordInstrument = "guitar" | "piano"
+/** Reader layout: chords above the lyrics, lyrics only, or a chord chart. */
+export type ChordView = "both" | "lyrics" | "chords"
 
 /** Song reader defaults + display preferences stored on the user profile. */
 export interface UserPreferences {
@@ -14,14 +19,22 @@ export interface UserPreferences {
   accent: AccentId
   /** Base font size for the song reader. */
   songFontSize: number
-  /** Show chords by default when opening a song. */
-  chordsVisible: boolean
-  /** Spell chords with letters (C, F#m) or solfège (Do, Fa#m). */
+  /** Reader layout opened by default: both, lyrics only or chords only. */
+  chordView: ChordView
+  /** Spell chords with letters (C, F#m), solfège (Do, Fa#m) or numbers (1, 4, 5). */
   chordNotation: ChordNotation
   /** Preferred instrument for the “how to play” chord sheet. */
   chordInstrument: ChordInstrument
   /** Reduce motion / subtle animation preference. */
   reduceMotion: boolean
+  /** Keep the screen awake while the reader is in stage mode. */
+  keepAwake: boolean
+  /**
+   * Pinned voicing per chord and instrument (`${instrument}:${chord}` →
+   * voicing id), chosen from the “how to play” sheet (roadmap #23). It lives on
+   * the profile, never on the song, so it follows the user everywhere.
+   */
+  voicings?: Record<string, string>
   /**
    * Internal one-shot flag: the sample song was published for this account.
    * It lives on the profile (not on the song) so deleting the sample never
@@ -69,10 +82,11 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   appearance: "dark",
   accent: "ember",
   songFontSize: 18,
-  chordsVisible: true,
+  chordView: "both",
   chordNotation: "letters",
   chordInstrument: "guitar",
   reduceMotion: false,
+  keepAwake: true,
 }
 
 export type MaybeUserProfile = UserProfile | null

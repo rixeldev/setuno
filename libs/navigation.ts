@@ -102,6 +102,8 @@ export const isTabActive = (href: string, pathname: string): boolean =>
  * song reader does the same: reading a song is a focused, full-width task.
  */
 const FOCUS_ROUTES: RegExp[] = [
+  // The first-run tour owns the whole screen, like an editing flow.
+  /^\/onboarding$/,
   /^\/songs\/new$/,
   /^\/songs\/[^/]+$/,
   /^\/songs\/[^/]+\/edit$/,

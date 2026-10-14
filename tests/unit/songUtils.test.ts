@@ -2,15 +2,19 @@ import { describe, expect, it } from "vitest"
 
 import type { SongSection } from "@/interfaces/song"
 import {
+  MAX_SECTION_BARS,
+  balanceColumns,
   buildChordRow,
   buildChordSegments,
   chordAnchors,
   chordPositionLimit,
+  clampSectionBars,
   cloneSections,
   countSongChords,
   countSongLines,
   createSection,
   detectSectionHeader,
+  duplicateSection,
   emptyLine,
   estimateDurationSec,
   insertLineAfter,
@@ -108,6 +112,41 @@ describe("parseLyricBlock", () => {
   it("normalises Windows line endings", () => {
     const sections = parseLyricBlock("Verse 1\r\nHello")
     expect(sections[0]?.lines).toHaveLength(1)
+  })
+
+  it("turns inline [Chord] markers into the chord grid", () => {
+    const sections = parseLyricBlock("Verse 1\n[Am]Hello [G]world")
+    expect(sections[0]?.lines[0]).toEqual({
+      text: "Hello world",
+      chords: [
+        { chord: "Am", position: 0 },
+        { chord: "G", position: 6 },
+      ],
+    })
+  })
+
+  it("strips other apps' metadata headers and repeat markers", () => {
+    const sections = parseLyricBlock(
+      ["Capo: 2", "Tuning: Standard", "132 bpm", "x2", "https://example.com", "Hello world"].join("\n"),
+    )
+    expect(sections).toHaveLength(1)
+    expect(sections[0]?.lines.map((line) => line.text)).toEqual(["Hello world"])
+  })
+
+  it("collapses runs of blank lines into one stanza break", () => {
+    const sections = parseLyricBlock("Verse 1\nHello\n\n\n\nGoodbye")
+    expect(sections[0]?.lines.map((line) => line.text)).toEqual(["Hello", "", "Goodbye"])
+  })
+
+  it("keeps a chord-only progression section", () => {
+    const sections = parseLyricBlock("Intro\n[Am] [G] [F]")
+    expect(sections[0]?.type).toBe("intro")
+    expect(sections[0]?.lines[0]?.chords.map((chord) => chord.chord)).toEqual(["Am", "G", "F"])
+  })
+
+  it("replaces non-breaking spaces with normal ones", () => {
+    const sections = parseLyricBlock("Hello\u00A0world")
+    expect(sections[0]?.lines[0]?.text).toBe("Hello world")
   })
 })
 
@@ -479,5 +518,92 @@ describe("createSection", () => {
     const first = createSection("verse", "Verse 1", [emptyLine("x")])
     const second = createSection("verse", "Verse 2", [emptyLine("y")])
     expect(first.id).not.toBe(second.id)
+  })
+
+  it("keeps an optional bar count and omits it when unset", () => {
+    expect(createSection("chorus", "Chorus", [emptyLine()]).bars).toBeUndefined()
+    expect(createSection("chorus", "Chorus", [emptyLine()], 8).bars).toBe(8)
+    // Zero/negative counts are treated as "no counter".
+    expect(createSection("chorus", "Chorus", [emptyLine()], 0).bars).toBeUndefined()
+  })
+})
+
+describe("clampSectionBars", () => {
+  it("rounds and clamps into the supported range", () => {
+    expect(clampSectionBars(8.4)).toBe(8)
+    expect(clampSectionBars(8.6)).toBe(9)
+    expect(clampSectionBars(-4)).toBe(0)
+    expect(clampSectionBars(5000)).toBe(MAX_SECTION_BARS)
+    expect(clampSectionBars(Number.NaN)).toBe(0)
+  })
+})
+
+describe("duplicateSection", () => {
+  it("copies the lines, chords and bar count under a new id", () => {
+    const source = createSection(
+      "chorus",
+      "Chorus",
+      [{ text: "Hello", chords: [{ chord: "C", position: 0 }] }],
+      8,
+    )
+    const copy = duplicateSection(source)
+    expect(copy.id).not.toBe(source.id)
+    expect(copy.bars).toBe(8)
+    expect(copy.label).toBe(source.label)
+    expect(copy.lines).toEqual(source.lines)
+    // Deep copy: editing the duplicate never touches the original.
+    copy.lines[0]!.chords[0]!.chord = "G"
+    expect(source.lines[0]?.chords[0]?.chord).toBe("C")
+  })
+})
+
+describe("balanceColumns", () => {
+  const weight = (value: number): number => value
+
+  it("keeps a single column for one column or a single item", () => {
+    expect(balanceColumns([1, 2, 3], weight, 1)).toEqual([[1, 2, 3]])
+    expect(balanceColumns([1], weight, 2)).toEqual([[1]])
+    expect(balanceColumns([], weight, 2)).toEqual([[]])
+  })
+
+  it("splits equally weighted items down the middle", () => {
+    expect(balanceColumns([1, 1, 1, 1], weight, 2)).toEqual([
+      [1, 1],
+      [1, 1],
+    ])
+  })
+
+  it("preserves order and never splits an item", () => {
+    const groups = balanceColumns(["a", "b", "c", "d"], () => 1, 2)
+    expect(groups.flat()).toEqual(["a", "b", "c", "d"])
+  })
+
+  it("balances by weight so the columns end up about the same length", () => {
+    // 5 + 1 = 6 on the left, 1 + 1 + 1 = 3 on the right: the heavy first
+    // section must not drag the whole song into one column.
+    expect(balanceColumns([5, 1, 1, 1], weight, 2)).toEqual([
+      [5],
+      [1, 1, 1],
+    ])
+  })
+
+  it("never starts a column it cannot fill", () => {
+    // Two items for two columns: the first is heavy but there is nothing left
+    // to fill a second column evenly, so the split still happens (1 item each).
+    expect(balanceColumns([9, 1], weight, 2)).toEqual([[9], [1]])
+    // Fewer items than columns: one column, never an empty one.
+    expect(balanceColumns([1, 2], weight, 3)).toEqual([[1, 2]])
+  })
+
+  it("treats a weightless item as a spot that still occupies space", () => {
+    const sections: SongSection[] = [
+      { id: "a", type: "intro", label: "", lines: [] },
+      { id: "b", type: "verse", label: "Verse 1", lines: [emptyLine("x"), emptyLine("y")] },
+      { id: "c", type: "chorus", label: "Chorus 1", lines: [emptyLine("z"), emptyLine("w")] },
+      { id: "d", type: "verse", label: "Verse 2", lines: [emptyLine("q"), emptyLine("r")] },
+    ]
+    const groups = balanceColumns(sections, (section) => section.lines.length + 1, 2)
+    expect(groups.flat()).toHaveLength(4)
+    expect(groups.every((group) => group.length > 0)).toBe(true)
   })
 })

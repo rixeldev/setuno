@@ -1,5 +1,6 @@
 import type { ChordPosition, LyricLine, SongSection, SongSectionType } from "@/interfaces/song"
 import { transposeChord, wordStarts } from "@/libs/chords"
+import { parseChordLine } from "@/libs/chordLine"
 
 /** Short, collision-resistant id for locally created sections. */
 export const createId = (prefix = "id"): string =>
@@ -84,11 +85,37 @@ export const sectionLabelFor = (
 
 export const emptyLine = (text = ""): LyricLine => ({ text, chords: [] })
 
+/** Upper bound for a section's optional bar count (roadmap #27). */
+export const MAX_SECTION_BARS = 999
+
+/** Rounds and clamps a bar count into `0..MAX_SECTION_BARS` (0 = unset). */
+export const clampSectionBars = (value: number): number => {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(MAX_SECTION_BARS, Math.round(value)))
+}
+
 export const createSection = (
   type: SongSectionType,
   label: string,
   lines: LyricLine[] = [],
-): SongSection => ({ id: createId("sec"), type, label, lines })
+  bars?: number,
+): SongSection => ({
+  id: createId("sec"),
+  type,
+  label,
+  lines,
+  ...(bars && bars > 0 ? { bars: clampSectionBars(bars) } : {}),
+})
+
+/** Deep copy of a section with a fresh id, ready to insert next to its source. */
+export const duplicateSection = (section: SongSection): SongSection => ({
+  ...section,
+  id: createId("sec"),
+  lines: section.lines.map((line) => ({
+    text: line.text,
+    chords: line.chords.map((chord) => ({ ...chord })),
+  })),
+})
 
 export const cloneSections = (sections: SongSection[]): SongSection[] =>
   sections.map((section) => ({
@@ -142,32 +169,71 @@ export const detectSectionHeader = (
 }
 
 /**
- * Converts a pasted/plain lyric block into structured sections.
+ * Metadata lines pasted from tab/lyric apps that are not lyrics (roadmap #19):
+ * `Capo 2`, `Tuning: Standard`, `132 bpm`, `Key: Am`, a source URL… Recognising
+ * them keeps them out of the song instead of turning them into a verse line.
+ */
+const PASTE_NOISE =
+  /^(?:capo\b|tuning\b|\d+\s?bpm\b|(?:tempo|bpm|key|time\s?signature|album|year|artist|title|difficulty|recorded|arranged)\s*[:\-–]|https?:\/\/|www\.)/i
+
+/** A repeat marker on its own line (`x2`, `×3`, `(x2)`) carries no lyric. */
+const REPEAT_ONLY = /^[([]?\s*[x×]\s?\d+\s*[)\]]?$/i
+
+/** True when the line has neither lyrics nor chords (blank spacing). */
+const isEmptyLine = (line: LyricLine): boolean =>
+  line.text.trim().length === 0 && line.chords.length === 0
+
+/**
+ * Converts a pasted/plain lyric block into structured sections (roadmap #19).
+ *
  * Recognised headers (`Chorus`, `[Verse 2]`, `BRIDGE:`...) start a new section;
- * everything else becomes lyric lines.
+ * inline `[C]` chords become the app's chord grid; other apps' metadata headers
+ * (capo, tuning, bpm, URLs…) and bare repeat markers are dropped; and runs of
+ * blank lines collapse to a single stanza break. Everything else is a lyric line.
  */
 export const parseLyricBlock = (text: string): SongSection[] => {
   const sections: SongSection[] = []
   let current: SongSection | null = null
 
+  const endsBlank = (): boolean => {
+    const lines = current?.lines ?? []
+    return lines.length > 0 && isEmptyLine(lines[lines.length - 1]!)
+  }
+
   for (const rawLine of text.replace(/\r\n?/g, "\n").split("\n")) {
-    const header = detectSectionHeader(rawLine)
+    // Normalize whitespace: non-breaking spaces from the web become spaces and
+    // trailing whitespace is trimmed (it never affects chord positions).
+    const line = rawLine.replace(/\u00A0/g, " ").replace(/\s+$/, "")
+    const trimmed = line.trim()
+    if (PASTE_NOISE.test(trimmed) || REPEAT_ONLY.test(trimmed)) continue
+
+    const header = detectSectionHeader(line)
     if (header) {
       current = createSection(header.type, header.label)
       sections.push(current)
       continue
     }
+
+    if (trimmed.length === 0) {
+      // Keep one blank line as a stanza break, but never lead with one.
+      if (!current || endsBlank()) continue
+      current.lines.push(emptyLine(""))
+      continue
+    }
+
     if (!current) {
       current = createSection("verse", sectionLabel("verse", 1))
       sections.push(current)
     }
-    current.lines.push(emptyLine(rawLine))
+    current.lines.push(parseChordLine(line))
   }
 
   // A header that was never followed by a lyric line is dropped: pasting a
   // block with blank lines between sections should not create empty sections.
   return normalizeSectionLabels(
-    sections.filter((section) => section.lines.some((line) => line.text.trim().length > 0)),
+    sections.filter((section) =>
+      section.lines.some((line) => line.text.trim().length > 0 || line.chords.length > 0),
+    ),
   )
 }
 
@@ -440,4 +506,46 @@ export const insertLineAfter = (
   const next = [...lines]
   next.splice(lineIndex + 1, 0, emptyLine())
   return next
+}
+
+/**
+ * Splits a list into `columns` contiguous, roughly height-balanced groups so a
+ * song can flow across two columns on a wide screen (roadmap #9).
+ *
+ * `weightOf` estimates each item's rendered height (a section's line count), so
+ * the break lands where the columns end up about the same length. Order is
+ * preserved — the first column is read top to bottom, then the next — and a new
+ * column is only started while the remaining items can still fill the columns
+ * that follow, so a two-column song never leaves one side empty.
+ */
+export const balanceColumns = <T>(
+  items: T[],
+  weightOf: (item: T) => number,
+  columns: number,
+): T[][] => {
+  const count = Math.max(1, Math.floor(columns))
+  if (count <= 1 || items.length <= 1) return [items]
+  const weights = items.map((item) => Math.max(1, weightOf(item)))
+  const target = weights.reduce((sum, weight) => sum + weight, 0) / count
+  const groups: T[][] = []
+  let current: T[] = []
+  let currentWeight = 0
+  items.forEach((item, index) => {
+    const columnsLeft = count - groups.length
+    const itemsLeft = items.length - index
+    if (
+      current.length > 0 &&
+      currentWeight >= target &&
+      columnsLeft > 1 &&
+      itemsLeft >= columnsLeft - 1
+    ) {
+      groups.push(current)
+      current = []
+      currentWeight = 0
+    }
+    current.push(item)
+    currentWeight += weights[index]
+  })
+  if (current.length > 0) groups.push(current)
+  return groups
 }

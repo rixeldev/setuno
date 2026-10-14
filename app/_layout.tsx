@@ -22,6 +22,7 @@ import { hydrateAppearance } from "@/services/themeManager"
 import { hydrateLanguage } from "@/services/i18next"
 import { hydratePreferences } from "@/services/prefs"
 import { hydrateRecentChords } from "@/services/recentChords"
+import { hydrateSongbookState } from "@/services/songbookState"
 import { initializeAds } from "@/services/ads"
 import { startSyncWatcher } from "@/services/sync"
 import { installWebDocumentStyles } from "@/libs/webStyles"
@@ -58,6 +59,7 @@ export default function Layout() {
       hydrateLanguage(),
       hydratePreferences(),
       hydrateRecentChords(),
+      hydrateSongbookState(),
     ])
       .catch(() => undefined)
       .finally(() => {
