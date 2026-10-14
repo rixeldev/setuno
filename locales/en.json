@@ -453,6 +453,8 @@
     "startOfLine": "Start of the line",
     "howToPlayChord": "How to play {{chord}}",
     "instrumentGuitar": "Guitar",
+    "instrumentUkulele": "Ukulele",
+    "instrumentBass": "Bass",
     "instrumentPiano": "Piano",
     "capoShapeNote": "Capo {{capo}} · shape of {{shape}}",
     "shapePosition": "Shape {{current}} of {{total}}",

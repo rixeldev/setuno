@@ -9,7 +9,12 @@ export type AccentId = "ember" | "ocean" | "emerald" | "sunset" | "magenta" | "i
  */
 export type ChordNotation = "letters" | "solfege" | "nashville"
 /** Instrument the reader shows shapes for when a chord is tapped. */
-export type ChordInstrument = "guitar" | "piano"
+/**
+ * The reader's "how to play" sheet. Guitar and ukulele come from the bundled
+ * `chords-db` dataset, bass is derived from the chord spelling (roadmap #24),
+ * piano is derived too.
+ */
+export type ChordInstrument = "guitar" | "ukulele" | "bass" | "piano"
 /** Reader layout: chords above the lyrics, lyrics only, or a chord chart. */
 export type ChordView = "both" | "lyrics" | "chords"
 

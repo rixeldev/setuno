@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest"
 
 import {
   capoShapeChord,
+  findBassChord,
   findGuitarShapes,
   findGuitarVoicings,
   findPianoChord,
+  findUkuleleShapes,
+  findUkuleleVoicings,
   guitarVoicingId,
   orderGuitarVoicings,
   pianoBassName,
@@ -35,6 +38,78 @@ describe("guitar chord shapes", () => {
     expect(capoShapeChord("D", 2)).toBe("C")
     expect(capoShapeChord("G", 0)).toBe("G")
     expect(capoShapeChord("Am", 3)).toBe("F#m")
+  })
+})
+
+describe("ukulele chord shapes", () => {
+  it("draws four strings, not six", () => {
+    const shape = findUkuleleShapes("C")[0]
+    expect(shape?.frets).toHaveLength(4)
+    expect(shape?.frets).toEqual([0, 0, 0, 3])
+  })
+
+  it("finds voicings for chords guitar shapes differently", () => {
+    expect(findUkuleleShapes("G").length).toBeGreaterThan(0)
+    expect(findUkuleleShapes("Am").length).toBeGreaterThan(0)
+    // The dataset is smaller than guitar's, so it can miss an exotic suffix —
+    // it must fall back rather than come back empty.
+    expect(findUkuleleShapes("C7b13").length).toBeGreaterThan(0)
+  })
+
+  it("falls back to the plain voicing when the dataset has no slash entry", () => {
+    // chords-db ships no slash suffixes for ukulele at all, so the bass note is
+    // still reported — the sheet is expected to say so — over the plain shape.
+    const voicings = findUkuleleVoicings("C/G")
+    expect(voicings.slashBass).toBe("G")
+    expect(voicings.slashApplied).toBe(false)
+    expect(voicings.shapes.length).toBeGreaterThan(0)
+  })
+
+  it("returns nothing for text that is not a chord", () => {
+    expect(findUkuleleShapes("hello")).toEqual([])
+  })
+})
+
+describe("bass positions", () => {
+  it("puts the root under the fifth, on the lowest string that reaches it", () => {
+    // C is not on the low E within five frets, so it moves up to the A string,
+    // and G lands beside it rather than on the open high string.
+    expect(findBassChord("C")?.frets).toEqual([3, 3, -1, -1])
+    expect(findBassChord("G")?.frets).toEqual([3, 5, -1, -1])
+    expect(findBassChord("E")?.frets).toEqual([0, 2, -1, -1])
+  })
+
+  it("plays the bass note of a slash chord as the root", () => {
+    expect(findBassChord("C/G")?.frets).toEqual(findBassChord("G")?.frets)
+  })
+
+  it("drops the fifth for a chord that has none", () => {
+    // C sits on the A string (its low-E position is fret 8, out of reach), and
+    // a dim has no fifth, so nothing lands beside it.
+    expect(findBassChord("Cdim")?.frets).toEqual([-1, 3, -1, -1])
+  })
+
+  it("never asks for a fret the diagram cannot draw", () => {
+    for (let pitch = 0; pitch < 12; pitch += 1) {
+      const root = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"][pitch]
+      const shape = findBassChord(`${root}m7`)
+      expect(shape).not.toBeNull()
+      expect(shape?.frets).toHaveLength(4)
+      for (const fret of shape?.frets ?? []) {
+        expect(fret).toBeGreaterThanOrEqual(-1)
+        expect(fret).toBeLessThanOrEqual(5)
+      }
+    }
+  })
+
+  it("marks every string the shape does not use", () => {
+    const frets = findBassChord("C")?.frets ?? []
+    expect(frets.filter((fret) => fret === -1).length).toBe(2)
+  })
+
+  it("returns nothing for text that is not a chord", () => {
+    expect(findBassChord("hello")).toBeNull()
+    expect(findBassChord("N.C.")).toBeNull()
   })
 })
 

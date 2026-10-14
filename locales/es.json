@@ -358,6 +358,8 @@
     "startOfLine": "Inicio de la línea",
     "howToPlayChord": "Cómo tocar {{chord}}",
     "instrumentGuitar": "Guitarra",
+    "instrumentUkulele": "Ukelele",
+    "instrumentBass": "Bajo",
     "instrumentPiano": "Piano",
     "capoShapeNote": "Cejilla {{capo}} · forma de {{shape}}",
     "shapePosition": "Forma {{current}} de {{total}}",

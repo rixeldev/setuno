@@ -1,4 +1,5 @@
 import guitarData from "@tombatossals/chords-db/lib/guitar.json"
+import ukuleleData from "@tombatossals/chords-db/lib/ukulele.json"
 
 import { noteName, parseChord, transposeChord } from "@/libs/chords"
 import type { ChordInstrument } from "@/interfaces/user"
@@ -6,9 +7,11 @@ import type { ChordInstrument } from "@/interfaces/user"
 /**
  * Chord shape lookups for the reader's “how to play” sheet (docs §11).
  *
- * Guitar voicings come from the open `chords-db` dataset (MIT, bundled and
- * offline, several positions per chord); piano voicings are derived from the
- * chord spelling itself. Everything here is pure so the sheet can render on
+ * Fretted voicings — guitar and ukulele — come from the open `chords-db`
+ * dataset (MIT, bundled and offline, several positions per chord) through the
+ * same lookup, since both ship the same JSON shape. Bass has no entry in that
+ * dataset, so its positions are derived from the chord spelling; piano is
+ * derived the same way. Everything here is pure so the sheet can render on
  * every platform without extra native modules.
  */
 
@@ -29,6 +32,23 @@ interface GuitarDbEntry {
 }
 
 const guitarChords = guitarData.chords as unknown as Record<string, GuitarDbEntry[]>
+const ukuleleChords = ukuleleData.chords as unknown as Record<string, GuitarDbEntry[]>
+
+/** Fretted instruments backed by the bundled dataset (roadmap #24). */
+export type FrettedInstrument = "guitar" | "ukulele"
+
+/**
+ * Both instruments ship in `@tombatossals/chords-db` with the same JSON shape
+ * — one entry per root, several positions each — so they share one lookup.
+ */
+const FRETTED_DATA: Record<FrettedInstrument, Record<string, GuitarDbEntry[]>> = {
+  guitar: guitarChords,
+  ukulele: ukuleleChords,
+}
+
+/** Narrowing guard for the dataset-backed instruments. */
+export const isFrettedInstrument = (value: ChordInstrument): value is FrettedInstrument =>
+  value === "guitar" || value === "ukulele"
 
 /** The 12 root spellings the dataset is keyed by. */
 const DB_ROOT = ["C", "Csharp", "D", "Eb", "E", "F", "Fsharp", "G", "Ab", "A", "Bb", "B"] as const
@@ -152,18 +172,21 @@ export interface GuitarVoicings {
 }
 
 /**
- * Guitar voicings for a chord, resolving slash chords (`C/G`, `Am7/E`) to the
+ * Fretted voicings for a chord, resolving slash chords (`C/G`, `Am7/E`) to the
  * dataset's dedicated voicing when it has one (roadmap #22). When the dataset
  * lacks the slash variant for the chord's quality the plain voicing is returned
  * with `slashApplied: false`, so the sheet can say so instead of quietly
  * showing the wrong bass note.
  */
-export const findGuitarVoicings = (chord: string): GuitarVoicings => {
+export const findFrettedVoicings = (
+  chord: string,
+  instrument: FrettedInstrument,
+): GuitarVoicings => {
   const parsed = parseChord(chord)
   if (!parsed.valid || parsed.rootIndex < 0) {
     return { shapes: [], slashBass: null, slashApplied: false }
   }
-  const entries = guitarChords[DB_ROOT[parsed.rootIndex]] ?? []
+  const entries = FRETTED_DATA[instrument][DB_ROOT[parsed.rootIndex]] ?? []
   const mapped = ALIASES[parsed.quality] ?? parsed.quality
   const slashBass = parsed.bassIndex === null ? null : noteName(parsed.bassIndex, parsed.usesFlats)
 
@@ -191,11 +214,27 @@ export const findGuitarVoicings = (chord: string): GuitarVoicings => {
   return { shapes: [], slashBass, slashApplied: false }
 }
 
+/** Guitar voicings for a chord, in the dataset's order (open shapes first). */
+export const findGuitarVoicings = (chord: string): GuitarVoicings =>
+  findFrettedVoicings(chord, "guitar")
+
+/** Ukulele voicings for a chord, in the dataset's order (roadmap #24). */
+export const findUkuleleVoicings = (chord: string): GuitarVoicings =>
+  findFrettedVoicings(chord, "ukulele")
+
 /**
- * Guitar voicings for a chord, in the dataset's order (open shapes first).
+ * Fretted voicings for a chord, in the dataset's order (open shapes first).
  * Returns an empty list for anything that is not a chord.
  */
-export const findGuitarShapes = (chord: string): GuitarShape[] => findGuitarVoicings(chord).shapes
+export const findFrettedShapes = (chord: string, instrument: FrettedInstrument): GuitarShape[] =>
+  findFrettedVoicings(chord, instrument).shapes
+
+/** Guitar voicings for a chord, in the dataset's order (open shapes first). */
+export const findGuitarShapes = (chord: string): GuitarShape[] => findFrettedShapes(chord, "guitar")
+
+/** Ukulele voicings for a chord, in the dataset's order (open shapes first). */
+export const findUkuleleShapes = (chord: string): GuitarShape[] =>
+  findFrettedShapes(chord, "ukulele")
 
 /**
  * Stable identity for a guitar voicing — the exact frets it holds (roadmap #23).
@@ -255,6 +294,87 @@ export const pianoNoteNames = (shape: PianoChordShape): string[] =>
 /** Note name of a piano voicing's slash bass, or null when there is none. */
 export const pianoBassName = (shape: PianoChordShape): string | null =>
   shape.bassIndex === null ? null : noteName(shape.bassIndex, shape.usesFlats)
+
+export interface BassShape {
+  /** Four strings, low E first: -1 muted, 0 open, 1+ the fret to hold. */
+  frets: number[]
+  /** Finger per string: 1 for anything held, 0 for an open or muted string. */
+  fingers: number[]
+  barres: number[]
+  baseFret: number
+}
+
+/** Open pitch classes of a standard 4-string bass, low E first. */
+const BASS_OPEN = [4, 9, 2, 7]
+const BASS_STRINGS = 4
+/**
+ * The furthest fret worth showing. The four open strings sit five semitones
+ * apart, so for any root one of them is always within three frets of it — this
+ * cap is therefore never what makes a chord unreachable, it just keeps every
+ * derived shape inside the five frets the diagram draws (roadmap #24).
+ */
+const BASS_MAX_FRET = 5
+
+/** Fret at which `pitch` sits on `string`, or null when it is out of reach. */
+const bassFret = (pitch: number, string: number): number | null => {
+  const fret = (pitch - BASS_OPEN[string] + 12) % 12
+  return fret <= BASS_MAX_FRET ? fret : null
+}
+
+/**
+ * Bass position for a chord, derived from its spelling — `chords-db` carries
+ * no bass dataset, and inventing one would mean shipping shapes nobody verified.
+ *
+ * What a bassist actually needs is where the root lives in one position and
+ * which neighbouring string carries the fifth under it, so that is exactly what
+ * this returns: the root on the lowest string that can reach it within
+ * `BASS_MAX_FRET` — the register matters more than staying near the nut, which
+ * is why a G is played on the low E rather than as the open high string — and
+ * the fifth on an adjacent string when it lands within two frets of it, the
+ * dyad played under a triad. A slash chord takes its bass note as the root,
+ * which is what the slash means on this instrument.
+ */
+export const findBassChord = (chord: string): BassShape | null => {
+  const parsed = parseChord(chord)
+  if (!parsed.valid || parsed.rootIndex < 0) return null
+
+  const root = parsed.bassIndex ?? parsed.rootIndex
+  const intervals = CHORD_INTERVALS[simplifyQuality(parsed.quality)] ?? CHORD_INTERVALS.major
+  const frets = new Array<number>(BASS_STRINGS).fill(-1)
+
+  // Low string first: the root belongs under everything else.
+  let rootString = -1
+  let rootFret = 0
+  for (let string = 0; string < BASS_STRINGS; string += 1) {
+    const fret = bassFret(root, string)
+    if (fret !== null) {
+      rootString = string
+      rootFret = fret
+      break
+    }
+  }
+  if (rootString < 0) return null
+  frets[rootString] = rootFret
+
+  if (intervals.includes(7)) {
+    const fifth = (root + 7) % 12
+    for (const string of [rootString - 1, rootString + 1]) {
+      if (string < 0 || string >= BASS_STRINGS) continue
+      const fret = bassFret(fifth, string)
+      if (fret !== null && Math.abs(fret - rootFret) <= 2) {
+        frets[string] = fret
+        break
+      }
+    }
+  }
+
+  return {
+    frets,
+    fingers: frets.map((fret) => (fret > 0 ? 1 : 0)),
+    barres: [],
+    baseFret: 1,
+  }
+}
 
 /**
  * Guitar shape to finger with the current capo: the displayed chord is what

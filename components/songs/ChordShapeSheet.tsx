@@ -14,9 +14,11 @@ import { PianoChord } from "@/components/songs/PianoChord"
 import { displayChord, displayNote } from "@/libs/chords"
 import {
   capoShapeChord,
-  findGuitarVoicings,
+  findBassChord,
+  findFrettedVoicings,
   findPianoChord,
   guitarVoicingId,
+  isFrettedInstrument,
   orderGuitarVoicings,
   pianoBassName,
   pianoNoteNames,
@@ -40,6 +42,14 @@ interface ChordShapeSheetProps {
   onPinVoicing?: (id: string | null) => void
   onClose: () => void
 }
+
+/** The four instruments the sheet can draw, in the order they are offered. */
+const INSTRUMENT_TABS: { value: ChordInstrument; labelKey: string }[] = [
+  { value: "guitar", labelKey: "songs.instrumentGuitar" },
+  { value: "ukulele", labelKey: "songs.instrumentUkulele" },
+  { value: "bass", labelKey: "songs.instrumentBass" },
+  { value: "piano", labelKey: "songs.instrumentPiano" },
+]
 
 /**
  * “How to play” sheet for a tapped chord (docs §11): piano keys or every
@@ -67,9 +77,13 @@ export function ChordShapeSheet({
 
   const display = chord ? displayChord(chord, notation, keyName) : ""
   const shapeName = useMemo(() => (chord ? capoShapeChord(chord, capo) : ""), [capo, chord])
+  const fretted = isFrettedInstrument(instrument)
   const voicings = useMemo(
-    () => (chord && instrument === "guitar" ? findGuitarVoicings(shapeName) : { shapes: [], slashBass: null, slashApplied: false }),
-    [chord, instrument, shapeName],
+    () =>
+      chord && fretted
+        ? findFrettedVoicings(shapeName, instrument)
+        : { shapes: [], slashBass: null, slashApplied: false },
+    [chord, fretted, instrument, shapeName],
   )
   // The pinned voicing opens first (#23); everything else keeps dataset order.
   const shapes = useMemo(
@@ -81,6 +95,12 @@ export function ChordShapeSheet({
     () => (chord && instrument === "piano" ? findPianoChord(chord) : null),
     [chord, instrument],
   )
+  // Bass has no dataset (roadmap #24), so its one position is derived.
+  const bassShape = useMemo(
+    () => (chord && instrument === "bass" ? findBassChord(shapeName) : null),
+    [chord, instrument, shapeName],
+  )
+  const frettedShapes = fretted ? shapes : bassShape ? [bassShape] : []
 
   // A new chord (or instrument, or pin) starts at the first position again: the
   // pager is keyed by all three, so it remounts already scrolled to the start.
@@ -92,13 +112,13 @@ export function ChordShapeSheet({
   }
 
   const goTo = (next: number): void => {
-    const clamped = Math.max(0, Math.min(next, shapes.length - 1))
+    const clamped = Math.max(0, Math.min(next, frettedShapes.length - 1))
     scrollRef.current?.scrollTo({ x: clamped * pageWidth, animated: true })
     setIndex(clamped)
   }
 
-  const guitarView =
-    shapes.length === 0 ? (
+  const frettedView =
+    frettedShapes.length === 0 ? (
       <AppText variant="body" tone="muted">
         {t("songs.noShapeForChord")}
       </AppText>
@@ -137,7 +157,7 @@ export function ChordShapeSheet({
                 setIndex(Math.round(event.nativeEvent.contentOffset.x / pageWidth))
               }
             >
-              {shapes.map((shape, shapeIndex) => (
+              {frettedShapes.map((shape, shapeIndex) => (
                 <View key={`shape-${shapeIndex}`} style={[styles.page, { width: pageWidth }]}>
                   <FretboardDiagram
                     shape={shape}
@@ -166,21 +186,22 @@ export function ChordShapeSheet({
             }
           />
           <AppText variant="caption" tone="muted">
-            {t("songs.shapePosition", { current: index + 1, total: shapes.length })}
+            {t("songs.shapePosition", { current: index + 1, total: frettedShapes.length })}
           </AppText>
           <IconButton
             label={t("songs.nextShape")}
             size={32}
-            disabled={index === shapes.length - 1}
+            disabled={index === frettedShapes.length - 1}
             onPress={() => goTo(index + 1)}
             icon={
               <ChevronRightIcon
                 size={18}
-                color={index === shapes.length - 1 ? Theme.colors.textFaint : Theme.colors.text}
+                color={index === frettedShapes.length - 1 ? Theme.colors.textFaint : Theme.colors.text}
               />
             }
           />
-          {onPinVoicing ? (
+          {/* Bass derives a single position, so there is nothing to pin (#23). */}
+          {onPinVoicing && fretted ? (
             <IconButton
               label={
                 pinned
@@ -189,7 +210,7 @@ export function ChordShapeSheet({
               }
               size={32}
               onPress={() => {
-                const current = shapes[index]
+                const current = frettedShapes[index]
                 if (!current) return
                 const id = guitarVoicingId(current)
                 // Tapping the already-pinned position clears the favourite.
@@ -254,22 +275,18 @@ export function ChordShapeSheet({
       {chord ? (
         <>
           <View style={styles.tabs}>
-            <Chip
-              label={t("songs.instrumentGuitar")}
-              size="sm"
-              tone="primary"
-              selected={instrument === "guitar"}
-              onPress={() => onInstrumentChange("guitar")}
-            />
-            <Chip
-              label={t("songs.instrumentPiano")}
-              size="sm"
-              tone="primary"
-              selected={instrument === "piano"}
-              onPress={() => onInstrumentChange("piano")}
-            />
+            {INSTRUMENT_TABS.map((tab) => (
+              <Chip
+                key={tab.value}
+                label={t(tab.labelKey)}
+                size="sm"
+                tone="primary"
+                selected={instrument === tab.value}
+                onPress={() => onInstrumentChange(tab.value)}
+              />
+            ))}
           </View>
-          {instrument === "guitar" ? guitarView : pianoView}
+          {instrument === "piano" ? pianoView : frettedView}
         </>
       ) : null}
     </BottomSheet>
@@ -278,7 +295,13 @@ export function ChordShapeSheet({
 
 const createStyles = () =>
   StyleSheet.create({
-    tabs: { flexDirection: "row", gap: Theme.spacing.s, alignSelf: "flex-start" },
+    /** Wraps: four instruments never share one row on a phone. */
+    tabs: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: Theme.spacing.s,
+      alignSelf: "flex-start",
+    },
     pagerWrap: { gap: Theme.spacing.s },
     capoNote: { textAlign: "center" },
     pager: { width: "100%" },

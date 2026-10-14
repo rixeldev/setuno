@@ -6,7 +6,6 @@ import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import type { GuitarShape } from "@/libs/chordShapes"
 
-const STRINGS = 6
 const FRETS = 5
 const STRING_GAP = 24
 const FRET_GAP = 26
@@ -21,13 +20,16 @@ interface FretboardDiagramProps {
 }
 
 /**
- * A guitar chord diagram: six strings, five frets, finger dots, barres and the
- * open/muted markers. Drawn with plain views so it renders identically on every
- * platform without extra native modules.
+ * A fretted chord diagram: one string per entry in `shape.frets` (six for
+ * guitar, four for ukulele and bass — roadmap #24), five frets, finger dots,
+ * barres and the open/muted markers. Drawn with plain views so it renders
+ * identically on every platform without extra native modules.
  */
 export function FretboardDiagram({ shape, label }: FretboardDiagramProps) {
   const styles = useThemedStyles(createStyles)
-  const width = PAD * 2 + STRING_GAP * (STRINGS - 1)
+  // Derived, never assumed: the dataset says how many strings an instrument has.
+  const strings = shape.frets.length > 0 ? shape.frets.length : 6
+  const width = PAD * 2 + STRING_GAP * (strings - 1)
   const height = TOP + FRET_GAP * FRETS + Theme.spacing.s
   const nut = shape.baseFret <= 1
   const stringX = (index: number): number => PAD + index * STRING_GAP
@@ -40,7 +42,7 @@ export function FretboardDiagram({ shape, label }: FretboardDiagramProps) {
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
-        {Array.from({ length: STRINGS }).map((_, index) => (
+        {Array.from({ length: strings }).map((_, index) => (
           <View
             key={`string-${index}`}
             style={[styles.string, { left: stringX(index), top: TOP, height: FRET_GAP * FRETS }]}
