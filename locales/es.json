@@ -83,7 +83,8 @@
     "changeTime": "Toca para cambiar la hora",
     "clearTime": "Borrar la hora",
     "hour": "Hora",
-    "minute": "Minuto"
+    "minute": "Minuto",
+    "diffA11y": "Actual: {{from}} — propuesto: {{to}}"
   },
   "sync": {
     "offline": "Sin conexión. Tus cambios se guardan en este dispositivo y se sincronizan solos.",
@@ -658,6 +659,7 @@
     "comment": "Comentario",
     "commentPlaceholder": "Explica por qué ayuda este cambio (opcional)",
     "proposedChange": "Cambio propuesto",
+    "diffLegend": "Tachado es lo que hay ahora; resaltado, la propuesta.",
     "suggest": "Sugerir",
     "suggesting": "Enviando…",
     "noSuggestions": "Sin sugerencias aún",
@@ -713,11 +715,7 @@
     "acceptedApplied": "Sugerencia aceptada y aplicada al cancionero.",
     "couldNotReview": "No pudimos revisar esa sugerencia.",
     "adminNote": "Nota del admin: {{note}}",
-    "current": "Actual",
-    "proposed": "Propuesto",
-    "noChord": "sin acorde",
     "removeIt": "quitarlo",
-    "noKey": "sin tono",
     "lineNumber": "Línea {{line}}",
     "reviewedStatus": "{{status}} por {{name}} · {{time}}",
     "originalUnavailable": "La canción original ya no está disponible, así que solo se muestra el cambio de acorde.",

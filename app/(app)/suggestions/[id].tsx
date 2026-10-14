@@ -19,7 +19,8 @@ import { useOrgData } from "@/hooks/useOrgData"
 import { acceptSuggestion, rejectSuggestion } from "@/services/suggestions"
 import { toFriendlyError } from "@/services/errors"
 import { formatRelativeTime } from "@/libs/format"
-import { buildChordRow } from "@/libs/songUtils"
+import { diffChordLine, diffWords } from "@/libs/songDiff"
+import { DiffText } from "@/components/ui/DiffText"
 import { toDate } from "@/interfaces/timestamp"
 
 const TYPE_LABEL_KEYS: Record<string, string> = {
@@ -69,6 +70,22 @@ export default function SuggestionDetail() {
   const sourceLyrics = change?.kind === "lyrics_change" && song
     ? (song.sections.find((entry) => entry.id === change.sectionId)?.lines[change.lineIndex] ?? null)
     : null
+
+  // What the reviewer actually reads (roadmap #54): the change marked *inside*
+  // the line instead of two lines to compare by eye. A chord change goes
+  // through the row builder so the monospace grid stays aligned around the one
+  // chord that moves; a line the song has lost falls back to comparing the two
+  // spellings on their own, and the lyrics diff against the song as it stands
+  // now rather than as the suggestion found it.
+  const chordSegments =
+    !chordDiff ? null
+    : sourceLine ? diffChordLine(sourceLine, chordDiff)
+    : diffWords(chordDiff.from, chordDiff.to)
+  const lyricsSegments =
+    change?.kind === "lyrics_change" ?
+      diffWords(sourceLyrics?.text ?? change.from, change.to)
+    : null
+  const keySegments = change?.kind === "key_change" ? diffWords(change.from, change.to) : null
 
   const review = async (action: "accept" | "reject"): Promise<void> => {
     if (!suggestion || !organizationId) return
@@ -161,87 +178,39 @@ export default function SuggestionDetail() {
         <AppText variant="label" tone="faint">
           {t("suggestions.proposedChange")}
         </AppText>
+        {chordSegments || lyricsSegments || keySegments ? (
+          <AppText variant="caption" tone="faint">
+            {t("suggestions.diffLegend")}
+          </AppText>
+        ) : null}
 
         {chordDiff ? (
           <View style={{ gap: Theme.spacing.m }}>
-            <View style={styles.diff}>
-              <View style={[styles.diffCol, styles.diffFrom]}>
-                <AppText variant="caption" tone="faint">
-                  {t("suggestions.current")}
-                </AppText>
-                <AppText variant="mono" tone={chordDiff.from.length > 0 ? "default" : "faint"}>
-                  {chordDiff.from || t("suggestions.noChord")}
-                </AppText>
-              </View>
-              <View style={[styles.diffCol, styles.diffTo]}>
-                <AppText variant="caption" tone="faint">
-                  {t("suggestions.proposed")}
-                </AppText>
-                <AppText variant="mono" tone={chordDiff.to.length > 0 ? "accent" : "faint"}>
-                  {chordDiff.to || t("suggestions.removeIt")}
-                </AppText>
-              </View>
-            </View>
-
-            {sourceLine ? (
-              <View style={{ gap: 4 }}>
-                <AppText variant="caption" tone="faint">
-                  {t("suggestions.lineNumber", { line: chordDiff.lineIndex + 1 })}
-                </AppText>
-                <AppText variant="mono" tone="primary">
-                  {buildChordRow(sourceLine.chords, sourceLine.text)}
-                </AppText>
-                <AppText variant="mono">
-                  {sourceLine.text}
-                </AppText>
-              </View>
-            ) : (
+            <View style={{ gap: 4 }}>
               <AppText variant="caption" tone="faint">
-                {t("suggestions.originalUnavailable")}
+                {t("suggestions.lineNumber", { line: chordDiff.lineIndex + 1 })}
               </AppText>
-            )}
+              {chordSegments ? <DiffText segments={chordSegments} mono /> : null}
+              {sourceLine ? (
+                <AppText variant="mono">{sourceLine.text}</AppText>
+              ) : (
+                <AppText variant="caption" tone="faint">
+                  {t("suggestions.originalUnavailable")}
+                </AppText>
+              )}
+            </View>
+            {/* An empty proposal is the one thing the highlight cannot draw. */}
+            {chordDiff.to.trim().length === 0 ? (
+              <AppText variant="caption" tone="danger">
+                {t("suggestions.removeIt")}
+              </AppText>
+            ) : null}
           </View>
         ) : null}
 
-        {change?.kind === "key_change" ? (
-          <View style={styles.diff}>
-            <View style={[styles.diffCol, styles.diffFrom]}>
-              <AppText variant="caption" tone="faint">
-                {t("suggestions.current")}
-              </AppText>
-              <AppText variant="mono" tone="faint">
-                {change.from || t("suggestions.noKey")}
-              </AppText>
-            </View>
-            <View style={[styles.diffCol, styles.diffTo]}>
-              <AppText variant="caption" tone="faint">
-                {t("suggestions.proposed")}
-              </AppText>
-              <AppText variant="mono" tone="accent">
-                {change.to}
-              </AppText>
-            </View>
-          </View>
-        ) : null}
+        {keySegments ? <DiffText segments={keySegments} mono /> : null}
 
-        {change?.kind === "lyrics_change" ? (
-          <View style={{ gap: 6 }}>
-            <View style={{ gap: 2 }}>
-              <AppText variant="caption" tone="faint">
-                {t("suggestions.current")}
-              </AppText>
-              <AppText variant="body" tone="faint" style={styles.strike}>
-                {sourceLyrics?.text || change.from}
-              </AppText>
-            </View>
-            <View style={{ gap: 2 }}>
-              <AppText variant="caption" tone="faint">
-                {t("suggestions.proposed")}
-              </AppText>
-              <AppText variant="body">{change.to}</AppText>
-            </View>
-          </View>
-        ) : null}
+        {lyricsSegments ? <DiffText segments={lyricsSegments} /> : null}
 
         {change?.kind === "new_song" ? (
           <View style={{ gap: 6 }}>
@@ -321,23 +290,11 @@ export default function SuggestionDetail() {
 const createStyles = () =>
   StyleSheet.create({
     row: { flexDirection: "row", alignItems: "center", gap: 6 },
-    diff: { flexDirection: "row", gap: Theme.spacing.s, alignItems: "stretch" },
-    diffCol: {
-      flex: 1,
-      minWidth: 0,
-      gap: 4,
-      padding: Theme.spacing.m,
-      borderRadius: Theme.radii.m,
-      backgroundColor: Theme.colors.surfaceMuted,
-    },
-    diffFrom: {},
-    diffTo: { backgroundColor: Theme.colors.accentSoft },
     quote: {
       paddingLeft: Theme.spacing.m,
       borderLeftWidth: 2,
       borderLeftColor: Theme.colors.primary,
     },
-    strike: { textDecorationLine: "line-through" },
     preview: { lineHeight: 20 },
     actions: { flexDirection: "row", gap: Theme.spacing.m },
     action: { flex: 1 },

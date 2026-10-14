@@ -83,7 +83,8 @@
     "changeTime": "Tap to change the time",
     "clearTime": "Clear the time",
     "hour": "Hour",
-    "minute": "Minute"
+    "minute": "Minute",
+    "diffA11y": "Current: {{from}} — proposed: {{to}}"
   },
   "sync": {
     "offline": "You are offline. Changes are saved on this device and synced automatically.",
@@ -753,6 +754,7 @@
     "comment": "Comment",
     "commentPlaceholder": "Explain why this change helps (optional)",
     "proposedChange": "Proposed change",
+    "diffLegend": "Struck out is what's there now, highlighted is the proposal.",
     "suggest": "Suggest",
     "suggesting": "Suggesting...",
     "noSuggestions": "No suggestions yet",
@@ -808,11 +810,7 @@
     "acceptedApplied": "Suggestion accepted and applied to the songbook.",
     "couldNotReview": "We couldn't review that suggestion.",
     "adminNote": "Admin note: {{note}}",
-    "current": "Current",
-    "proposed": "Proposed",
-    "noChord": "no chord",
     "removeIt": "remove it",
-    "noKey": "no key",
     "lineNumber": "Line {{line}}",
     "reviewedStatus": "{{status}} by {{name}} · {{time}}",
     "originalUnavailable": "The original song is no longer available, so only the chord change is shown.",

@@ -331,6 +331,12 @@ export interface ChordRowSegment {
    * tappable. Spacing lives in plain segments so the monospace grid is kept.
    */
   chord?: string
+  /**
+   * Character offset this chord was placed at — the same value a suggestion
+   * stores for a chord change, so the diff (`libs/songDiff.ts`) can mark the
+   * one chord that moves without having to re-derive the padding.
+   */
+  position?: number
 }
 
 /**
@@ -353,7 +359,7 @@ export const buildChordSegments = (
     // Never place a chord before the end of the previous one.
     const start = Math.max(target, length)
     if (start > length) segments.push({ text: " ".repeat(start - length) })
-    segments.push({ text: label, chord: chord.chord.trim() })
+    segments.push({ text: label, chord: chord.chord.trim(), position: chord.position })
     segments.push({ text: " " })
     length = start + label.length + 1
   }

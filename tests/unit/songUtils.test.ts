@@ -362,7 +362,13 @@ describe("buildChordSegments", () => {
       [{ chord: "F#m7", position: 3, label: "Fa#m7" }],
       "Hello world",
     )
-    expect(segments).toEqual([{ text: "   " }, { text: "Fa#m7", chord: "F#m7" }, { text: " " }])
+    // `position` is the offset a suggestion stores for a chord change, which is
+    // what lets `libs/songDiff.ts` mark the one chord that moves.
+    expect(segments).toEqual([
+      { text: "   " },
+      { text: "Fa#m7", chord: "F#m7", position: 3 },
+      { text: " " },
+    ])
   })
 })
 
