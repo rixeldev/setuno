@@ -916,6 +916,23 @@
     "breakMinutes_one": "{{count}} min",
     "breakMinutes_other": "{{count}} min"
   },
+  "palette": {
+    "placeholder": "Search songs, destinations, actions…",
+    "noResults": "Nothing matches that.",
+    "shortcuts": "↑↓ move · ↵ run · esc close",
+    "newSong": "New song",
+    "newSetlist": "New setlist",
+    "newEvent": "New event",
+    "transposeUp": "Transpose up a semitone",
+    "transposeDown": "Transpose down a semitone",
+    "transposeReset": "Back to the song's own key",
+    "group": {
+      "song": "This song",
+      "navigate": "Go to",
+      "create": "Create",
+      "songs": "Songs"
+    }
+  },
   "performances": {
     "performances": "Events",
     "performance": "Event",

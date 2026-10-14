@@ -62,12 +62,14 @@ import { useFontSizePinch } from "@/hooks/useFontSizePinch"
 import { useFontSizeShortcuts } from "@/hooks/useFontSizeShortcuts"
 import { useReaderKeys } from "@/hooks/useReaderKeys"
 import { useAnnotations } from "@/hooks/useAnnotations"
+import { usePaletteCommands } from "@/hooks/usePaletteCommands"
 import { deleteSong, subscribeSong } from "@/services/songs"
 import { saveReaderState, type ReaderState } from "@/services/readerState"
 import { updatePreferences } from "@/services/users"
 import { updateCachedPreferences, usePreferences } from "@/services/prefs"
 import { toFriendlyError } from "@/services/errors"
 import { displayKey as spellKey, semitonesBetweenKeys, transposeKey } from "@/libs/chords"
+import type { PaletteCommand } from "@/libs/commandPalette"
 import { voicingPrefKey } from "@/libs/chordShapes"
 import { liveSetEntries, liveTotalSec } from "@/libs/liveShow"
 import { formatRelativeTime, formatDuration } from "@/libs/format"
@@ -250,11 +252,14 @@ export default function SongScreen() {
     [profile, songId],
   )
 
-  const changeSemitones = (next: number): void => {
-    const value = clampReaderSemitones(next)
-    setTuning((current) => ({ ...current, semitones: value }))
-    persistReaderPatch({ semitones: value })
-  }
+  const changeSemitones = useCallback(
+    (next: number): void => {
+      const value = clampReaderSemitones(next)
+      setTuning((current) => ({ ...current, semitones: value }))
+      persistReaderPatch({ semitones: value })
+    },
+    [persistReaderPatch, setTuning],
+  )
 
   const changeCapo = (next: number): void => {
     const value = clampReaderCapo(next)
@@ -478,6 +483,38 @@ export default function SongScreen() {
     () => (transposedKey ? spellKey(transposedKey, notation) : ""),
     [transposedKey, notation],
   )
+
+  // Ctrl/Cmd+K (roadmap #29) reaches everywhere the app does, but the key the
+  // band is playing in is the one thing it cannot know — so the reader
+  // contributes its own transpose, with the key each step lands on as the hint.
+  const paletteCommands = useMemo<PaletteCommand[]>(() => {
+    if (!song) return []
+    const at = (delta: number): string => transposeKey(song.key, semitones + delta)
+    return [
+      {
+        id: "reader.transposeUp",
+        title: t("palette.transposeUp"),
+        group: t("palette.group.song"),
+        hint: at(1),
+        run: () => changeSemitones(semitones + 1),
+      },
+      {
+        id: "reader.transposeDown",
+        title: t("palette.transposeDown"),
+        group: t("palette.group.song"),
+        hint: at(-1),
+        run: () => changeSemitones(semitones - 1),
+      },
+      {
+        id: "reader.transposeReset",
+        title: t("palette.transposeReset"),
+        group: t("palette.group.song"),
+        hint: song.key,
+        run: () => changeSemitones(0),
+      },
+    ]
+  }, [t, song, semitones, changeSemitones])
+  usePaletteCommands(paletteCommands, song !== null)
 
   // Corner arrows to walk the running order: only for songs opened from a
   // setlist screen, and only when that list really belongs to a live event —

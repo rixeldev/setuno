@@ -6,6 +6,7 @@ import { usePathname } from "expo-router"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { setBottomChromeHeight } from "@/hooks/useBottomChrome"
 import { BottomBar, SidebarNav } from "@/components/app/AppNavigation"
+import { CommandPaletteHost } from "@/components/app/CommandPaletteHost"
 import { SyncBanner } from "@/components/app/SyncBanner"
 import { BannerAdSlot } from "@/components/ads/BannerAdSlot"
 import { useResponsive } from "@/hooks/useResponsive"
@@ -43,6 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {children}
           {onDashboard ? <BannerAdSlot /> : null}
         </View>
+        <CommandPaletteHost />
       </View>
     )
   }
@@ -53,6 +55,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SyncBanner />
         {children}
       </SafeAreaView>
+      <CommandPaletteHost />
       {focused ? null : (
         <View
           onLayout={(event) => setBottomChromeHeight(event.nativeEvent.layout.height)}
