@@ -17,6 +17,8 @@ import {
   type Unsubscribe,
 } from "@/db/Fire"
 import type { ActivityEvent, ActivityType } from "@/interfaces"
+import type { TimestampLike } from "@/interfaces/timestamp"
+import { toDate } from "@/interfaces/timestamp"
 import { createId } from "@/libs/songUtils"
 
 const mapActivity = (data: Record<string, unknown>, id: string): ActivityEvent =>
@@ -104,4 +106,47 @@ export const fetchActivityEvent = async (
 ): Promise<ActivityEvent | null> => {
   const snapshot = await getDoc(doc(firestore, paths.activityEvent(organizationId, activityId)))
   return mapDoc(snapshot, mapActivity)
+}
+
+/**
+ * Live personal read marker of the feed for one user and band (roadmap #53):
+ * `null` until the user has never marked it, then the instant of the last
+ * "mark as read". Private by design — the band never learns who read what.
+ */
+export const subscribeActivityRead = (
+  uid: string,
+  organizationId: string,
+  onChange: (lastReadAt: Date | null) => void,
+): Unsubscribe => {
+  if (!uid || !organizationId) return () => undefined
+  return onSnapshot(
+    doc(firestore, paths.userActivityRead(uid, organizationId)),
+    (snapshot) =>
+      onChange(mapDoc(snapshot, (data) => toDate(data.lastActivityReadAt as TimestampLike | null))),
+    () => onChange(null),
+  )
+}
+
+/**
+ * Stamps the feed as read up to now (roadmap #53). **Client** time, exactly
+ * like a trashed song or a version's `savedAt`: a `serverTimestamp` is null
+ * while an offline write queues, and a marker that reads "nothing was ever
+ * read" would light up every badge until the connection returns. Best-effort
+ * like `logActivity` — a rejected marker only keeps the badge lit.
+ */
+export const markActivityRead = async (
+  uid: string,
+  organizationId: string,
+  at: Date = new Date(),
+): Promise<void> => {
+  if (!uid || !organizationId) return
+  try {
+    await setDoc(
+      doc(firestore, paths.userActivityRead(uid, organizationId)),
+      { lastActivityReadAt: at },
+      { merge: true },
+    )
+  } catch {
+    // The badge staying lit is the whole cost of a failed marker.
+  }
 }

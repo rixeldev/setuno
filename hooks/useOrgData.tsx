@@ -1,6 +1,10 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react"
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 
-import { subscribeActivity } from "@/services/activity"
+import {
+  markActivityRead as writeActivityRead,
+  subscribeActivity,
+  subscribeActivityRead,
+} from "@/services/activity"
 import { subscribeInvitations, subscribeMembers } from "@/services/organizations"
 import {
   nextPerformance,
@@ -12,6 +16,7 @@ import { subscribeSuggestions } from "@/services/suggestions"
 import { subscribeSetlists } from "@/services/setlists"
 import { songFacets } from "@/libs/songSearch"
 import { partitionTrashed } from "@/libs/songTrash"
+import { countUnreadActivity } from "@/libs/activityUnread"
 import { toFriendlyError } from "@/services/errors"
 import type {
   ActivityEvent,
@@ -24,6 +29,7 @@ import type {
   SongFacets,
 } from "@/interfaces"
 import { useOrganization } from "@/hooks/useOrganization"
+import { useAuth } from "@/hooks/useAuth"
 
 interface OrgDataContextValue {
   songs: Song[]
@@ -36,6 +42,10 @@ interface OrgDataContextValue {
   members: OrganizationMember[]
   invitations: Invitation[]
   activity: ActivityEvent[]
+  /** Unread events in the feed, derived against the personal marker (#53). */
+  unreadActivityCount: number
+  /** Stamps the feed as read — the dashboard calls it on focus. */
+  markActivityRead: () => void
   /** Songs indexed by id (memoised lookup for setlists). */
   songLibrary: Map<string, Song>
   facets: SongFacets
@@ -87,8 +97,26 @@ const OrgDataContext = createContext<OrgDataContextValue | null>(null)
  */
 export function OrgDataProvider({ children }: { children: React.ReactNode }) {
   const { organizationId, isAdmin } = useOrganization()
+  const { profile } = useAuth()
+  const uid = profile?.uid ?? null
 
   const [snapshot, setSnapshot] = useState<OrgSnapshot>(EMPTY)
+
+  // Roadmap #53: the personal read marker rides alongside the snapshot — it is
+  // per user *and* per band, so the value is tagged with the pair it belongs
+  // to and anything else reads as "nothing" in render (the #37B tag pattern:
+  // never sync a band switch through the effect body). `null` while the user
+  // has never stamped it.
+  const [readMarker, setReadMarker] = useState<{ key: string; at: Date | null } | null>(null)
+  const markerKey = uid && organizationId ? `${uid}/${organizationId}` : ""
+  const activityReadAt = readMarker && readMarker.key === markerKey ? readMarker.at : null
+
+  useEffect(() => {
+    if (!markerKey) return
+    return subscribeActivityRead(uid ?? "", organizationId ?? "", (at) =>
+      setReadMarker({ key: markerKey, at }),
+    )
+  }, [markerKey, uid, organizationId])
 
   // Switching bands empties the snapshot while rendering, so the previous band's
   // songs are never shown under the new band's name (React's documented
@@ -147,6 +175,11 @@ export function OrgDataProvider({ children }: { children: React.ReactNode }) {
 
   const current = organizationId !== null && snapshot.organizationId === organizationId ? snapshot : EMPTY
 
+  const markRead = useCallback((): void => {
+    if (!uid || !organizationId) return
+    void writeActivityRead(uid, organizationId)
+  }, [uid, organizationId])
+
   const value = useMemo<OrgDataContextValue>(() => {
     const { upcoming, past } = partitionPerformances(current.performances)
     // One seam for "trashed songs are hidden everywhere" (roadmap #31): every
@@ -166,6 +199,9 @@ export function OrgDataProvider({ children }: { children: React.ReactNode }) {
       // Demotions must not leave an admin-only slice behind.
       invitations: isAdmin ? current.invitations : EMPTY.invitations,
       activity: current.activity,
+      // Derived, never stored per event: the badge is the feed minus the marker.
+      unreadActivityCount: countUnreadActivity(current.activity, activityReadAt),
+      markActivityRead: markRead,
       songLibrary,
       facets: songFacets(visible),
       stats: computeSongStats(visible),
@@ -175,7 +211,7 @@ export function OrgDataProvider({ children }: { children: React.ReactNode }) {
       loading: current.pending,
       error: current.error,
     }
-  }, [current, isAdmin])
+  }, [current, isAdmin, activityReadAt, markRead])
 
   return <OrgDataContext.Provider value={value}>{children}</OrgDataContext.Provider>
 }

@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo } from "react"
+import React, { useCallback, useEffect, useMemo } from "react"
 import { Pressable, StyleSheet, View } from "react-native"
 import { LinearGradient } from "expo-linear-gradient"
-import { useRouter } from "expo-router"
+import { useFocusEffect, useRouter } from "expo-router"
 import { useTranslation } from "react-i18next"
 
 import { Theme, colorWithOpacity } from "@/constants/Theme"
@@ -66,8 +66,21 @@ export default function Dashboard() {
     upcomingPerformances,
     pendingSuggestions,
     activity,
+    unreadActivityCount,
+    markActivityRead,
     members,
   } = useOrgData()
+
+  // Roadmap #53: seeing the feed is reading it. Focus, not mount — the tab
+  // root stays mounted while the user moves around, so a mount-only mark
+  // would clear events nobody looked at; and `activity` in the deps means a
+  // snapshot that lands while this screen is focused (already on screen) is
+  // read the moment it appears, instead of waiting for the next visit.
+  useFocusEffect(
+    useCallback(() => {
+      if (activity.length > 0 && unreadActivityCount > 0) markActivityRead()
+    }, [activity, unreadActivityCount, markActivityRead]),
+  )
 
   const dayLabels: RelativeDayLabels = {
     today: t("common.today"),

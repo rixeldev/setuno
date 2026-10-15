@@ -269,6 +269,29 @@ describe("reader state is private and validated", () => {
   })
 })
 
+describe("the activity read marker is a private stamp", () => {
+  const markerPath = () => `users/alice/activityRead/${orgId}`
+
+  it("hides one member's marker from another", async () => {
+    await assertFails(bob().firestore().doc(markerPath()).get())
+  })
+
+  it("accepts the owner's stamp", async () => {
+    await assertSucceeds(
+      alice().firestore().doc(markerPath()).set({ lastActivityReadAt: new Date() }),
+    )
+  })
+
+  it("rejects a marker carrying anything but the timestamp", async () => {
+    await assertFails(
+      alice()
+        .firestore()
+        .doc(markerPath())
+        .set({ lastActivityReadAt: new Date(), readIds: ["act-1"] }),
+    )
+  })
+})
+
 describe("song versions are an admin-written, member-readable history", () => {
   /** The shape `services/songVersions.ts` writes — one immutable snapshot. */
   const version = (savedBy: string, overrides: Record<string, unknown> = {}) => ({

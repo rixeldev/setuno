@@ -89,6 +89,8 @@ export const paths = {
   userReaderState: (uid: string, songId: string) => `users/${uid}/readerState/${songId}`,
   /** Private per-song personal notes (roadmap #3), owner-only. */
   userAnnotation: (uid: string, songId: string) => `users/${uid}/annotations/${songId}`,
+  /** Personal read marker of a band's activity feed (roadmap #53). */
+  userActivityRead: (uid: string, orgId: string) => `users/${uid}/activityRead/${orgId}`,
   organizations: "organizations",
   organization: (orgId: string) => `organizations/${orgId}`,
   members: (orgId: string) => `organizations/${orgId}/members`,

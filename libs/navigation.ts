@@ -23,12 +23,12 @@ export interface NavItem {
   /** Only visible to organization admins. */
   adminOnly?: boolean
   /** Shows the pending suggestion counter. */
-  badge?: "suggestions"
+  badge?: "suggestions" | "activity"
 }
 
 /** Desktop / web sidebar navigation (docs §18). */
 export const SIDEBAR_NAV: NavItem[] = [
-  { href: "/", label: "nav.dashboard", icon: GridIcon },
+  { href: "/", label: "nav.dashboard", icon: GridIcon, badge: "activity" },
   { href: "/songs", label: "nav.songs", icon: MusicIcon },
   { href: "/setlists", label: "nav.setlists", icon: ListIcon },
   { href: "/performances", label: "nav.performances", icon: CalendarIcon },
@@ -40,7 +40,7 @@ export const SIDEBAR_NAV: NavItem[] = [
 
 /** Mobile bottom bar (docs §18): four primary destinations plus More. */
 export const MOBILE_NAV: NavItem[] = [
-  { href: "/", label: "nav.home", icon: GridIcon },
+  { href: "/", label: "nav.home", icon: GridIcon, badge: "activity" },
   { href: "/songs", label: "nav.songs", icon: MusicIcon },
   { href: "/performances", label: "nav.gigs", icon: CalendarIcon },
   { href: "/setlists", label: "nav.setlists", icon: ListIcon },

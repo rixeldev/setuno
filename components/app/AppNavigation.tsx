@@ -26,7 +26,16 @@ import {
   SIDEBAR_NAV,
   isNavActive,
   isTabActive,
+  type NavItem,
 } from "@/libs/navigation"
+
+/** Badge count for a nav entry: pending suggestions or unread activity (#53). */
+const navBadge = (item: NavItem, pendingSuggestions: number, unreadActivity: number): number =>
+  item.badge === "suggestions"
+    ? pendingSuggestions
+    : item.badge === "activity"
+      ? unreadActivity
+      : 0
 
 /**
  * Organization switcher: shows the active band and lets the user move between
@@ -154,7 +163,7 @@ export function SidebarNav() {
   const { t } = useTranslation()
   const router = useRouter()
   const pathname = usePathname()
-  const { pendingSuggestions } = useOrgData()
+  const { pendingSuggestions, unreadActivityCount } = useOrgData()
   const { signOut, profile } = useAuth()
 
   return (
@@ -174,8 +183,7 @@ export function SidebarNav() {
       <ScrollView style={styles.nav} contentContainerStyle={styles.navContent}>
         {SIDEBAR_NAV.map((item) => {
           const active = isNavActive(item.href, pathname)
-          const badge =
-            item.badge === "suggestions" ? pendingSuggestions.length : 0
+          const badge = navBadge(item, pendingSuggestions.length, unreadActivityCount)
           const Icon = item.icon
           return (
             <Pressable
@@ -251,7 +259,7 @@ export function BottomBar() {
   const { t } = useTranslation()
   const pathname = usePathname()
   const insets = useSafeAreaInsets()
-  const { pendingSuggestions } = useOrgData()
+  const { pendingSuggestions, unreadActivityCount } = useOrgData()
   const { goToTab } = useTabNavigation()
 
   const items = useMemo(() => MOBILE_NAV, [])
@@ -262,8 +270,7 @@ export function BottomBar() {
     >
       {items.map((item) => {
         const active = isTabActive(item.href, pathname)
-        const badge =
-          item.badge === "suggestions" ? pendingSuggestions.length : 0
+        const badge = navBadge(item, pendingSuggestions.length, unreadActivityCount)
         const Icon = item.icon
         return (
           <Pressable

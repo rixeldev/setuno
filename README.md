@@ -64,6 +64,7 @@ a sidebar layout on the web.
 | **Version history** | Every save keeps the version it replaced (up to 20 per song): open the history from the reader, compare any version with the song as it is now — struck text is what was lost, highlighted text what was gained — and restore it behind a confirmation; the current state is saved first, so a restore can itself be undone |
 | **Song status** | Mark a song as **draft**, **active** or **retired** from its editor; the songbook badges the exceptions, and retired songs stay searchable everywhere while being skipped when you build a setlist — until you switch on "Include retired" in the picker |
 | **Trash and recovery** | Deleting a song from the reader moves it to the **trash** instead of destroying it: restore it anytime, or an admin can delete it — and its version history — forever. Trashed songs vanish from the songbook, search and setlist pickers |
+| **Unread activity** | The band's activity feed now knows what you have seen: the Home tab carries an unread badge and opening the dashboard clears it. Each member's marker is private — the band never learns who read what |
 | **Favourite voicings** | Pin a preferred guitar position per chord; the play guide opens on it from then on (stored on your profile, not the song) |
 | **Transposition** | Move any song up/down by semitones — the stored song is never mutated |
 | **Play guide** | Tap any chord while reading to see how to play it: every guitar position (capo-aware) or the piano keys |
