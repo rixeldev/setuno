@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import type { Performance, TimestampLike } from "@/interfaces"
 import type { Setlist, SetlistSong } from "@/interfaces/setlist"
-import { buildSongUsage, usagePassIds } from "@/libs/songUsage"
+import { buildSongUsage, rotationSuggestions, usagePassIds } from "@/libs/songUsage"
 
 const TIMESTAMP: TimestampLike = { seconds: 0, nanoseconds: 0, toDate: () => new Date(0) }
 
@@ -183,5 +183,77 @@ describe("usagePassIds", () => {
     const passed = usagePassIds(songs, "notRecent", usage, TODAY)
     expect(passed.has("boundary")).toBe(false)
     expect(passed.has("edge")).toBe(true)
+  })
+})
+
+describe("rotationSuggestions", () => {
+  const songs = [
+    { id: "current", title: "Current hit" },
+    { id: "missed2", title: "Missed two" },
+    { id: "missed3", title: "Missed three" },
+    { id: "missed5", title: "Missed five" },
+    { id: "neverA", title: "Never A" },
+    { id: "neverB", title: "Never B" },
+    { id: "battlehorse", title: "Battlehorse" },
+  ]
+  const usage = new Map([
+    ["current", { timesPlayed: 4, lastPlayedOn: "2026-10-01", eventsAgo: 0 }],
+    ["missed2", { timesPlayed: 2, lastPlayedOn: "2026-08-01", eventsAgo: 2 }],
+    ["missed3", { timesPlayed: 6, lastPlayedOn: "2026-06-01", eventsAgo: 3 }],
+    ["missed5", { timesPlayed: 1, lastPlayedOn: "2026-02-01", eventsAgo: 5 }],
+    ["battlehorse", { timesPlayed: 6, lastPlayedOn: "2026-06-01", eventsAgo: 3 }],
+  ])
+
+  it("offers the songs that missed three or more events, most neglected first", () => {
+    const ranked = rotationSuggestions(songs, usage)
+    // `missed5` is the most neglected; `battlehorse` wins the tie against
+    // `missed3` (same distance, same plays) on the title.
+    expect(ranked.map(({ song }) => song.id)).toEqual([
+      "missed5",
+      "battlehorse",
+      "missed3",
+    ])
+  })
+
+  it("keeps a song that played recently out of the rotation", () => {
+    // 0 and 2 events ago are still "in rotation"; the boundary (3) is not.
+    const ids = rotationSuggestions(songs, usage, { limit: 99 }).map(({ song }) => song.id)
+    expect(ids).not.toContain("current")
+    expect(ids).not.toContain("missed2")
+    expect(ids).toContain("missed3")
+  })
+
+  it("breaks a tie by fewer plays, then title, then id — never by insertion order", () => {
+    // `missed3` and `battlehorse` both missed 3 events with 6 plays each:
+    // the title decides, and the input order is deliberately against it.
+    const reversed = [...songs].reverse()
+    expect(rotationSuggestions(reversed, usage).map(({ song }) => song.id)).toEqual(
+      rotationSuggestions(songs, usage).map(({ song }) => song.id),
+    )
+  })
+
+  it("suggests never-played songs last, labelled as such", () => {
+    const ranked = rotationSuggestions(songs, usage, { limit: 99 })
+    expect(ranked.map(({ song }) => song.id)).toEqual([
+      "missed5",
+      "battlehorse",
+      "missed3",
+      "neverA",
+      "neverB",
+    ])
+    expect(ranked.find(({ song }) => song.id === "neverA")?.eventsAgo).toBeNull()
+    expect(ranked.find(({ song }) => song.id === "missed5")?.eventsAgo).toBe(5)
+  })
+
+  it("respects the limit and degrades gracefully", () => {
+    expect(rotationSuggestions(songs, usage, { limit: 2 })).toHaveLength(2)
+    expect(rotationSuggestions(songs, usage, { limit: 0 })).toEqual([])
+    // A band that has never completed a gig has only never-played candidates,
+    // which fall through to the title order.
+    expect(rotationSuggestions(songs, new Map()).map(({ song }) => song.id)).toEqual([
+      "battlehorse",
+      "current",
+      "missed5",
+    ])
   })
 })

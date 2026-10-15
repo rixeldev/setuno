@@ -35,6 +35,7 @@ import {
 import { toFriendlyError } from "@/services/errors"
 import { filterSongs, EMPTY_FILTERS } from "@/libs/songSearch"
 import { isPickableForSetlist } from "@/libs/songStatus"
+import { ROTATION_MISSED_EVENTS, rotationSuggestions } from "@/libs/songUsage"
 import { setlistPrintHtml } from "@/libs/songPrint"
 import type { RelativeDayLabels } from "@/libs/format"
 import {
@@ -83,7 +84,7 @@ export default function SetlistDetail() {
 
   const { profile } = useAuth()
   const { organizationId, isAdmin } = useOrganization()
-  const { setlists, songs, songLibrary, performances } = useOrgData()
+  const { setlists, songs, songLibrary, performances, songUsage } = useOrgData()
   // Keys are stored in letters; the reader settings decide how they are spelled.
   const notation = usePreferences().chordNotation ?? "letters"
 
@@ -94,6 +95,9 @@ export default function SetlistDetail() {
   // Retired songs are hidden from the picker by default (roadmap #30); the
   // chip below only shows up once there is actually something to reveal.
   const [showRetired, setShowRetired] = useState(false)
+  // Rotation mode (roadmap #44): the picker lists the songs the band has not
+  // played in the last few events, most neglected first, instead of A→Z.
+  const [rotationOnly, setRotationOnly] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
@@ -401,9 +405,22 @@ export default function SetlistDetail() {
   }
 
   const hasRetired = songs.some((song) => song.status === "retired")
-  const candidates = filterSongs(songs, { ...EMPTY_FILTERS, search })
+  const pool = filterSongs(songs, { ...EMPTY_FILTERS, search })
     .filter((song) => !setlist.songs.some((entry) => entry.songId === song.id))
     .filter((song) => isPickableForSetlist(song, showRetired))
+  // Rotation mode (roadmap #44): the same pool, most neglected first. Derived
+  // from `songUsage` (already in `useOrgData` since #34), so nothing new is
+  // stored and a deleted event cannot leave a stale suggestion behind.
+  const rotation = rotationSuggestions(pool, songUsage)
+  const candidates = rotationOnly ? rotation.map(({ song }) => song) : pool
+  /** In rotation mode the second line says *why* it is suggested (#34's own phrasing). */
+  const pickerCaption = (songId: string, artist: string): string => {
+    if (!rotationOnly) return artist || t("common.unknownArtist")
+    const entry = songUsage.get(songId)
+    if (!entry) return t("songs.usageNever")
+    if (entry.eventsAgo === 0) return t("songs.lastPlayedLatest")
+    return t("songs.lastPlayedAgo", { count: entry.eventsAgo })
+  }
   const runsLabel = t("setlists.songsCount", {
     count: setlist.songs.length,
     duration: formatDurationLong(setlist.estimatedDurationSec),
@@ -854,13 +871,25 @@ export default function SetlistDetail() {
           onChangeText={setSearch}
           onClear={() => setSearch("")}
         />
-        {hasRetired ? (
-          <Chip
-            label={t("setlists.includeRetired")}
-            selected={showRetired}
-            onPress={() => setShowRetired((value) => !value)}
-            accessibilityLabel={t("setlists.includeRetired")}
-          />
+        {hasRetired || rotation.length > 0 || rotationOnly ? (
+          <View style={styles.pickerChips}>
+            {rotation.length > 0 || rotationOnly ? (
+              <Chip
+                label={t("setlists.rotationChip", { count: ROTATION_MISSED_EVENTS })}
+                selected={rotationOnly}
+                onPress={() => setRotationOnly((value) => !value)}
+                accessibilityLabel={t("setlists.rotationChip", { count: ROTATION_MISSED_EVENTS })}
+              />
+            ) : null}
+            {hasRetired ? (
+              <Chip
+                label={t("setlists.includeRetired")}
+                selected={showRetired}
+                onPress={() => setShowRetired((value) => !value)}
+                accessibilityLabel={t("setlists.includeRetired")}
+              />
+            ) : null}
+          </View>
         ) : null}
         <FlatList
           data={candidates}
@@ -871,7 +900,9 @@ export default function SetlistDetail() {
             <AppText variant="caption" tone="faint">
               {songs.length === 0
                 ? t("setlists.songbookEmpty")
-                : t("setlists.noMoreSongs")}
+                : rotationOnly
+                  ? t("setlists.rotationEmpty")
+                  : t("setlists.noMoreSongs")}
             </AppText>
           }
           renderItem={({ item }) => (
@@ -899,7 +930,7 @@ export default function SetlistDetail() {
                   {item.title}
                 </AppText>
                 <AppText variant="caption" tone="muted" numberOfLines={1}>
-                  {item.artist || t("common.unknownArtist")}
+                  {pickerCaption(item.id, item.artist)}
                 </AppText>
               </View>
               {showRetired && item.status === "retired" ? (
@@ -1074,6 +1105,12 @@ const createStyles = () =>
       gap: Theme.spacing.m,
     },
     pressed: { opacity: 0.7 },
+    pickerChips: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: Theme.spacing.xs,
+      marginVertical: Theme.spacing.xs,
+    },
     pickerList: { maxHeight: 320, width: "100%", flexShrink: 1 },
     pickerRow: {
       flexDirection: "row",

@@ -119,3 +119,61 @@ export const usagePassIds = (
   }
   return passing
 }
+
+/** How many completed events a song must have missed before the picker offers
+ * it again (roadmap #44). The roadmap's own example is "not played in 3 gigs". */
+export const ROTATION_MISSED_EVENTS = 3
+/** How many suggestions the setlist picker shows at once. */
+export const ROTATION_SUGGESTION_LIMIT = 3
+
+/** A picker suggestion: the song, and how many events it missed (`null`: never played). */
+export interface RotationSuggestion<T extends { id: string; title: string }> {
+  song: T
+  eventsAgo: number | null
+}
+
+/**
+ * Rotation candidates for a setlist (roadmap #44), derived from the same usage
+ * map the songbook's filters read — nothing is stored, and a deleted event
+ * cannot leave a stale suggestion behind.
+ *
+ * A song qualifies when it missed at least `ROTATION_MISSED_EVENTS` completed
+ * events, or was never played at all. The ranking is **most neglected first**:
+ * played songs come out by how many events they missed (most first), ties
+ * broken by fewer total plays and then title, with never-played songs *last* —
+ * reviving known material beats debuting untested songs in a running order,
+ * and the row's caption ("Never played" / "last played 5 events ago") always
+ * says which kind each row is.
+ *
+ * The caller passes the pool it is already showing (the picker's own
+ * candidates), so the retired filter and the "already in this list" exclusion
+ * are respected without re-deriving them here.
+ */
+export const rotationSuggestions = <T extends { id: string; title: string }>(
+  songs: readonly T[],
+  usage: ReadonlyMap<string, SongUsage>,
+  options: { limit?: number } = {},
+): RotationSuggestion<T>[] => {
+  const limit = Math.max(0, Math.round(options.limit ?? ROTATION_SUGGESTION_LIMIT))
+  const ranked: RotationSuggestion<T>[] = []
+  for (const song of songs) {
+    const entry = usage.get(song.id)
+    if (entry && entry.eventsAgo < ROTATION_MISSED_EVENTS) continue
+    ranked.push({ song, eventsAgo: entry ? entry.eventsAgo : null })
+  }
+  ranked.sort((a, b) => {
+    // Never-played songs rank *after* every played one (they are the least
+    // urgent rotation: no history to revive), then by distance — most
+    // neglected first — then by fewer total plays, then title, then id, so
+    // the same data always produces the same list on every device.
+    const aPlayed = a.eventsAgo !== null
+    const bPlayed = b.eventsAgo !== null
+    if (aPlayed !== bPlayed) return aPlayed ? -1 : 1
+    if (a.eventsAgo !== b.eventsAgo) return (b.eventsAgo ?? 0) - (a.eventsAgo ?? 0)
+    const aPlays = usage.get(a.song.id)?.timesPlayed ?? 0
+    const bPlays = usage.get(b.song.id)?.timesPlayed ?? 0
+    if (aPlays !== bPlays) return aPlays - bPlays
+    return a.song.title.localeCompare(b.song.title) || a.song.id.localeCompare(b.song.id)
+  })
+  return ranked.slice(0, limit)
+}
