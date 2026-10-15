@@ -12,7 +12,9 @@ import { midiToFrequency } from "@/libs/pitchDetection"
  * - **`pluck`** — Karplus-Strong, the classic digital waveguide: a noise burst
  *   circulates an integer delay line through a one-pole averaging filter, and
  *   the string decays exactly like a plucked one. Guitar, ukulele and bass all
- *   get it; only the frequencies differ.
+ *   get it; only the frequencies differ. The burst is low-passed and scaled
+ *   before it circulates — raw full-band noise at full scale is the "dirty,
+ *   saturated" onset that made the previews sound clipped.
  * - **`piano`** — a struck tone is not a plucked one, so piano gets a decaying
  *   stack of slightly inharmonic partials instead.
  *
@@ -40,9 +42,23 @@ export const PIANO_SPREAD_SECONDS = 0.004
  * damping would make a high C die seconds before a low E — real strings do
  * not, so the per-cycle factor is derived from this half-life instead. */
 const STRING_HALF_LIFE_SECONDS = 1.8
+/**
+ * How strongly the string is excited. Raw ±1 noise is not what a fingertip
+ * does, and a full-scale burst of it is exactly the "dirty, saturated" onset
+ * this synth used to produce — the burst is scaled down *and* low-passed
+ * below (see `EXCITATION_PASSES`), so the string opens on its own partials.
+ */
+const EXCITATION_AMPLITUDE = 0.7
+/** Ring-filter passes run over the burst before it is ever heard. */
+const EXCITATION_PASSES = 2
+/** Each note opens on a short ramp: a step from silence to noise is a click. */
+const PLUCK_ATTACK_SECONDS = 0.002
 const PIANO_HARMONICS = 6
 const PIANO_BASE_TAU_SECONDS = 1.1
 const PIANO_ATTACK_SECONDS = 0.004
+/** Steepness of the piano's harmonic stack: higher partials sit well under
+ * the fundamental, so a chord reads as warm instead of buzzy. */
+const PIANO_HARMONIC_ROLLOFF = 1.5
 /** Several strings sum, so the mix is limited — never clipped. */
 const TARGET_PEAK = 0.85
 /** The ending fades on a raised cosine: a still-ringing string cut off clicks. */
@@ -63,15 +79,24 @@ function pluckedString(frequency: number, length: number, sampleRate: number): F
   const period = Math.max(2, Math.round(sampleRate / frequency))
   const state = { seed: (Math.round(frequency * 1000) ^ 0x9e3779b9) >>> 0 }
   const delay = new Float32Array(period)
-  for (let i = 0; i < period; i++) delay[i] = noise(state)
+  for (let i = 0; i < period; i++) delay[i] = noise(state) * EXCITATION_AMPLITUDE
+  // Run the burst through the ring filter before it is heard: full-band white
+  // noise as an onset sounds like distortion, while the same burst smoothed
+  // into the string's own bandwidth sounds like a pluck.
+  const smoothed = new Float32Array(period)
+  for (let pass = 0; pass < EXCITATION_PASSES; pass++) {
+    for (let i = 0; i < period; i++) smoothed[i] = 0.5 * (delay[i] + delay[i + 1 === period ? 0 : i + 1])
+    delay.set(smoothed)
+  }
   // Per-cycle damping for the string's constant *time* half-life.
   const damping = 0.5 ** (1 / (frequency * STRING_HALF_LIFE_SECONDS))
+  const attack = Math.min(Math.max(2, Math.round(PLUCK_ATTACK_SECONDS * sampleRate)), length)
   const out = new Float32Array(length)
   let index = 0
   for (let i = 0; i < length; i++) {
     const current = delay[index]
     const next = delay[(index + 1) % period]
-    out[i] = current
+    out[i] = i < attack ? current * ((i + 1) / attack) : current
     delay[index] = damping * 0.5 * (current + next)
     index = index + 1 === period ? 0 : index + 1
   }
@@ -87,7 +112,7 @@ function pianoNote(frequency: number, length: number, sampleRate: number): Float
     // Real strings stiffen: partials sit slightly sharp of the integer series.
     const partial = frequency * harmonic * (1 + 0.0004 * harmonic * harmonic)
     if (partial > sampleRate / 2) break
-    const amplitude = 1 / harmonic ** 1.2
+    const amplitude = 1 / harmonic ** PIANO_HARMONIC_ROLLOFF
     const decayStep = Math.exp(-1 / ((PIANO_BASE_TAU_SECONDS / harmonic ** 0.6) * sampleRate))
     const phaseStep = (2 * Math.PI * partial) / sampleRate
     let envelope = 1

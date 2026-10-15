@@ -78,22 +78,21 @@ describe("ukulele chord shapes", () => {
 })
 
 describe("bass positions", () => {
-  it("puts the root under the fifth, on the lowest string that reaches it", () => {
-    // C is not on the low E within five frets, so it moves up to the A string,
-    // and G lands beside it rather than on the open high string.
-    expect(findBassChord("C")?.frets).toEqual([3, 3, -1, -1])
-    expect(findBassChord("G")?.frets).toEqual([3, 5, -1, -1])
-    expect(findBassChord("E")?.frets).toEqual([0, 2, -1, -1])
+  it("marks one position: the root on the lowest sounding string that reaches it", () => {
+    // 5-string bass, low B first. C is a semitone over the open B string; G is
+    // not on the B string within five frets, so it moves up to the low E.
+    expect(findBassChord("C")?.frets).toEqual([1, -1, -1, -1, -1])
+    expect(findBassChord("G")?.frets).toEqual([-1, 3, -1, -1, -1])
+    // Same pitch on two strings (fret 5 on the B string *is* the open E, and
+    // fret 5 on the E *is* the open A): the open string wins.
+    expect(findBassChord("E")?.frets).toEqual([-1, 0, -1, -1, -1])
+    expect(findBassChord("A")?.frets).toEqual([-1, -1, 0, -1, -1])
+    // The B string's own open note.
+    expect(findBassChord("B")?.frets).toEqual([0, -1, -1, -1, -1])
   })
 
   it("plays the bass note of a slash chord as the root", () => {
     expect(findBassChord("C/G")?.frets).toEqual(findBassChord("G")?.frets)
-  })
-
-  it("drops the fifth for a chord that has none", () => {
-    // C sits on the A string (its low-E position is fret 8, out of reach), and
-    // a dim has no fifth, so nothing lands beside it.
-    expect(findBassChord("Cdim")?.frets).toEqual([-1, 3, -1, -1])
   })
 
   it("never asks for a fret the diagram cannot draw", () => {
@@ -101,17 +100,19 @@ describe("bass positions", () => {
       const root = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"][pitch]
       const shape = findBassChord(`${root}m7`)
       expect(shape).not.toBeNull()
-      expect(shape?.frets).toHaveLength(4)
+      expect(shape?.frets).toHaveLength(5)
       for (const fret of shape?.frets ?? []) {
         expect(fret).toBeGreaterThanOrEqual(-1)
         expect(fret).toBeLessThanOrEqual(5)
       }
+      // One dot per chord, whatever its quality — never a root+fifth dyad.
+      expect((shape?.frets ?? []).filter((fret) => fret >= 0)).toHaveLength(1)
     }
   })
 
   it("marks every string the shape does not use", () => {
     const frets = findBassChord("C")?.frets ?? []
-    expect(frets.filter((fret) => fret === -1).length).toBe(2)
+    expect(frets.filter((fret) => fret === -1).length).toBe(4)
   })
 
   it("returns nothing for text that is not a chord", () => {
@@ -286,9 +287,9 @@ describe("sounding midis", () => {
     const shape = findBassChord("C")
     expect(shape).not.toBeNull()
     if (!shape) return
-    // G1 (E string, fret 3) under C2 (A string, fret 3), two strings muted.
-    expect(bassSoundingMidis(shape, 0)).toEqual([31, 36])
-    expect(bassSoundingMidis(shape, 1)).toEqual([32, 37])
+    // C1 on the low B string (fret 1) — one string sounds, four are muted.
+    expect(bassSoundingMidis(shape, 0)).toEqual([24])
+    expect(bassSoundingMidis(shape, 1)).toEqual([25])
   })
 
   it("stacks a piano voicing close-position above the bass floor", () => {

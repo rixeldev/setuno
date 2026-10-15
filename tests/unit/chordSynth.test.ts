@@ -70,6 +70,21 @@ describe("synthesizeChord", () => {
     }
   })
 
+  it("opens on a soft onset instead of a burst of static", () => {
+    // Two things made the first previews sound dirty: every string started at
+    // full scale (no ramp) out of a raw full-band noise burst. Both are gone —
+    // the excitation is pre-filtered through the ring and the first samples
+    // ride a short ramp — so a lone note opens from silence, stays audible,
+    // and never even reaches the clip limit.
+    const out = synthesizeChord([43], "pluck", { seconds: 1.5 })
+    let peak = 0
+    for (const value of out) if (Math.abs(value) > peak) peak = Math.abs(value)
+    expect(peak).toBeGreaterThan(0.05)
+    expect(peak).toBeLessThan(0.85)
+    expect(Math.abs(out[0])).toBeLessThan(0.02)
+    expect(Math.abs(out[0])).toBeLessThan(peak / 10)
+  })
+
   it("plucks a note at its written pitch", () => {
     // C4 = 261.63 Hz. Karplus-Strong runs an integer delay line, so the
     // reading lands within a fraction of a percent of it.

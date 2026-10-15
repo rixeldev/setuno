@@ -21,9 +21,10 @@ interface FretboardDiagramProps {
 
 /**
  * A fretted chord diagram: one string per entry in `shape.frets` (six for
- * guitar, four for ukulele and bass — roadmap #24), five frets, finger dots,
- * barres and the open/muted markers. Drawn with plain views so it renders
- * identically on every platform without extra native modules.
+ * guitar, four for ukulele, five for the derived bass — roadmap #24), five
+ * frets, finger dots, barres and the open/muted markers. Drawn with plain
+ * views so it renders identically on every platform without extra native
+ * modules.
  */
 export function FretboardDiagram({ shape, label }: FretboardDiagramProps) {
   const styles = useThemedStyles(createStyles)

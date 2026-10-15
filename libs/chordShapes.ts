@@ -296,7 +296,7 @@ export const pianoBassName = (shape: PianoChordShape): string | null =>
   shape.bassIndex === null ? null : noteName(shape.bassIndex, shape.usesFlats)
 
 export interface BassShape {
-  /** Four strings, low E first: -1 muted, 0 open, 1+ the fret to hold. */
+  /** Five strings, low B first (B0 E1 A1 D2 G2): -1 muted, 0 open, 1+ the fret to hold. */
   frets: number[]
   /** Finger per string: 1 for anything held, 0 for an open or muted string. */
   fingers: number[]
@@ -304,14 +304,16 @@ export interface BassShape {
   baseFret: number
 }
 
-/** Open pitch classes of a standard 4-string bass, low E first. */
-const BASS_OPEN = [4, 9, 2, 7]
-const BASS_STRINGS = 4
+/** Open strings of a 5-string bass, low B first (B0 E1 A1 D2 G2). */
+const BASS_OPEN_MIDIS = [23, 28, 33, 38, 43]
+/** Open pitch classes, low B first — the only thing the fret maths needs. */
+const BASS_OPEN = BASS_OPEN_MIDIS.map((midi) => midi % 12)
+const BASS_STRINGS = BASS_OPEN_MIDIS.length
 /**
- * The furthest fret worth showing. The four open strings sit five semitones
- * apart, so for any root one of them is always within three frets of it — this
- * cap is therefore never what makes a chord unreachable, it just keeps every
- * derived shape inside the five frets the diagram draws (roadmap #24).
+ * The furthest fret worth showing. The five open strings sit five semitones
+ * apart, so the nearest open string is always within two frets of any root —
+ * this cap is therefore never what makes a chord unreachable, it just keeps
+ * every derived shape inside the five frets the diagram draws (roadmap #24).
  */
 const BASS_MAX_FRET = 5
 
@@ -323,50 +325,43 @@ const bassFret = (pitch: number, string: number): number | null => {
 
 /**
  * Bass position for a chord, derived from its spelling — `chords-db` carries
- * no bass dataset, and inventing one would mean shipping shapes nobody verified.
+ * no bass dataset, and inventing one would mean shipping shapes nobody
+ * verified.
  *
- * What a bassist actually needs is where the root lives in one position and
- * which neighbouring string carries the fifth under it, so that is exactly what
- * this returns: the root on the lowest string that can reach it within
- * `BASS_MAX_FRET` — the register matters more than staying near the nut, which
- * is why a G is played on the low E rather than as the open high string — and
- * the fifth on an adjacent string when it lands within two frets of it, the
- * dyad played under a triad. A slash chord takes its bass note as the root,
- * which is what the slash means on this instrument.
+ * **One note, one dot** (the owner's call, revising roadmap #24): the guide
+ * marks where the root lives and nothing else — the first version also added
+ * the fifth beside it, and a root+fifth dyad in this register reads as mud on
+ * a phone speaker. The root lands on the *lowest sounding position* inside the
+ * five-fret window, and when the neighbouring string's open note spells the
+ * same pitch (fret 5 on the B string **is** the open E) the open string wins:
+ * same note, no finger. A slash chord takes its bass note as the root, which
+ * is what the slash means on this instrument.
  */
 export const findBassChord = (chord: string): BassShape | null => {
   const parsed = parseChord(chord)
   if (!parsed.valid || parsed.rootIndex < 0) return null
 
   const root = parsed.bassIndex ?? parsed.rootIndex
-  const intervals = CHORD_INTERVALS[simplifyQuality(parsed.quality)] ?? CHORD_INTERVALS.major
   const frets = new Array<number>(BASS_STRINGS).fill(-1)
 
-  // Low string first: the root belongs under everything else.
+  // Lowest sounding pitch wins; an equal pitch is settled by the lower fret.
   let rootString = -1
   let rootFret = 0
+  let bestPitch = Infinity
+  let bestFret = Infinity
   for (let string = 0; string < BASS_STRINGS; string += 1) {
     const fret = bassFret(root, string)
-    if (fret !== null) {
+    if (fret === null) continue
+    const pitch = BASS_OPEN_MIDIS[string] + fret
+    if (pitch < bestPitch || (pitch === bestPitch && fret < bestFret)) {
       rootString = string
       rootFret = fret
-      break
+      bestPitch = pitch
+      bestFret = fret
     }
   }
   if (rootString < 0) return null
   frets[rootString] = rootFret
-
-  if (intervals.includes(7)) {
-    const fifth = (root + 7) % 12
-    for (const string of [rootString - 1, rootString + 1]) {
-      if (string < 0 || string >= BASS_STRINGS) continue
-      const fret = bassFret(fifth, string)
-      if (fret !== null && Math.abs(fret - rootFret) <= 2) {
-        frets[string] = fret
-        break
-      }
-    }
-  }
 
   return {
     frets,
@@ -419,9 +414,6 @@ const OPEN_STRING_MIDIS: Record<FrettedInstrument, (number | null)[]> = {
   guitar: guitarData.tunings.standard.map(openStringMidi),
   ukulele: ukuleleData.tunings.standard.map(openStringMidi),
 }
-
-/** Open strings of a standard 4-string bass, low E first (E1 A1 D2 G2). */
-const BASS_OPEN_MIDIS = [28, 33, 38, 43]
 
 /** Sounding midi of one string, or null when the string is muted/unmapped. */
 const stringMidi = (openMidi: number | null | undefined, fret: number, baseFret: number): number | null => {
