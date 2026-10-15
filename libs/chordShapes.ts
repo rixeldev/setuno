@@ -383,3 +383,95 @@ export const findBassChord = (chord: string): BassShape | null => {
  */
 export const capoShapeChord = (chord: string, capo: number): string =>
   capo > 0 ? transposeChord(chord, -capo) : chord.trim()
+
+/* ---------------------------------------------------------------------------
+ * Sounding pitches (roadmap #14 — "hear the chord")
+ * ------------------------------------------------------------------------ */
+
+/**
+ * The midi pitches a displayed shape actually sounds. The dataset ships its
+ * own `midi` per position; this math was verified against **all 4183 shipped
+ * positions** (guitar + ukulele) before being written here, so it is not an
+ * interpretation of the data — it reproduces it exactly:
+ *
+ * - a fret of `0` is the **open string** and never moves with `baseFret` (a
+ *   high position may still let an open string ring);
+ * - frets ≥ 1 are relative to `baseFret` (`absolute = fret + baseFret − 1`),
+ *   which is also how `FretboardDiagram` spaces its dots, so sound and picture
+ *   can never disagree;
+ * - the capo adds its semitones: the sheet shows the shape to finger `capo`
+ *   below the chord, and sounding pitches are that chord.
+ */
+const NOTE_TO_SEMITONE: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }
+
+/** Midi note of an `"E2"`-style name, or null for anything malformed. */
+const openStringMidi = (name: string): number | null => {
+  const match = /^([A-G])([#b]?)(-?\d+)$/.exec(name)
+  const letter = match?.[1]
+  const octave = match?.[3]
+  if (!letter || octave === undefined) return null
+  const accidental = match[2] === "#" ? 1 : match[2] === "b" ? -1 : 0
+  return (NOTE_TO_SEMITONE[letter] ?? 0) + accidental + (parseInt(octave, 10) + 1) * 12
+}
+
+/** Open-string midis per fretted instrument, read from the dataset's tunings. */
+const OPEN_STRING_MIDIS: Record<FrettedInstrument, (number | null)[]> = {
+  guitar: guitarData.tunings.standard.map(openStringMidi),
+  ukulele: ukuleleData.tunings.standard.map(openStringMidi),
+}
+
+/** Open strings of a standard 4-string bass, low E first (E1 A1 D2 G2). */
+const BASS_OPEN_MIDIS = [28, 33, 38, 43]
+
+/** Sounding midi of one string, or null when the string is muted/unmapped. */
+const stringMidi = (openMidi: number | null | undefined, fret: number, baseFret: number): number | null => {
+  if (openMidi === null || openMidi === undefined || fret < 0) return null
+  return openMidi + (fret === 0 ? 0 : fret + baseFret - 1)
+}
+
+/** Sounding midis of a displayed guitar/ukulele position (+ capo), muted strings dropped. */
+export const frettedSoundingMidis = (
+  shape: GuitarShape,
+  instrument: FrettedInstrument,
+  capo: number
+): number[] => {
+  const shift = Math.max(0, Math.round(capo))
+  return shape.frets
+    .map((fret, index) => stringMidi(OPEN_STRING_MIDIS[instrument][index], fret, shape.baseFret))
+    .filter((midi): midi is number => midi !== null)
+    .map((midi) => midi + shift)
+}
+
+/** Sounding midis of a derived bass position (+ capo), muted strings dropped. */
+export const bassSoundingMidis = (shape: BassShape, capo: number): number[] => {
+  const shift = Math.max(0, Math.round(capo))
+  return shape.frets
+    .map((fret, index) => stringMidi(BASS_OPEN_MIDIS[index], fret, shape.baseFret))
+    .filter((midi): midi is number => midi !== null)
+    .map((midi) => midi + shift)
+}
+
+/** Piano voicing floor for the chord tones; the slash bass sits an octave down. */
+const PIANO_BASS_FLOOR = 36 // C2 — below it a preview turns to mud
+const PIANO_CHORD_FLOOR = 48 // C3 — the register the diagram reads from
+
+/** Smallest midi ≥ floor carrying `pitchClass`. */
+const placeAbove = (pitchClass: number, floor: number): number =>
+  floor + (((pitchClass - floor) % 12) + 12) % 12
+
+/**
+ * Piano voicing in sounding octaves: the slash bass (or nothing) anchors at
+ * C2 or above, the chord stacks from C3 upward in root order — close position,
+ * never below the bass floor.
+ */
+export const pianoSoundingMidis = (shape: PianoChordShape): number[] => {
+  const midis: number[] = []
+  if (shape.bassIndex !== null) midis.push(placeAbove(shape.bassIndex, PIANO_BASS_FLOOR))
+  let floor = PIANO_CHORD_FLOOR
+  for (const pitchClass of shape.pitchClasses) {
+    const midi = placeAbove(pitchClass, floor)
+    midis.push(midi)
+    floor = midi + 1
+  }
+  return midis
+}

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
 import { ScrollView, StyleSheet, View } from "react-native"
 import { useTranslation } from "react-i18next"
 
@@ -7,22 +7,33 @@ import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { IconButton } from "@/components/ui/Button"
 import { Chip } from "@/components/ui/Card"
-import { ChevronRightIcon, StarFilledIcon, StarIcon } from "@/components/ui/Icons"
+import {
+  ChevronRightIcon,
+  PauseIcon,
+  PlayFilledIcon,
+  StarFilledIcon,
+  StarIcon,
+} from "@/components/ui/Icons"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { FretboardDiagram } from "@/components/songs/FretboardDiagram"
 import { PianoChord } from "@/components/songs/PianoChord"
 import { displayChord, displayNote } from "@/libs/chords"
 import {
+  bassSoundingMidis,
   capoShapeChord,
   findBassChord,
   findFrettedVoicings,
   findPianoChord,
+  frettedSoundingMidis,
   guitarVoicingId,
   isFrettedInstrument,
   orderGuitarVoicings,
   pianoBassName,
   pianoNoteNames,
+  pianoSoundingMidis,
 } from "@/libs/chordShapes"
+import { chordDurationMs, type ChordSound } from "@/libs/chordSynth"
+import { playChord, stopChord } from "@/libs/playChord"
 import type { ChordInstrument, ChordNotation } from "@/interfaces/user"
 
 interface ChordShapeSheetProps {
@@ -101,6 +112,8 @@ export function ChordShapeSheet({
     [chord, instrument, shapeName],
   )
   const frettedShapes = fretted ? shapes : bassShape ? [bassShape] : []
+  /** The preview button is disabled exactly when there is nothing to sound. */
+  const soundAvailable = instrument === "piano" ? piano !== null : frettedShapes.length > 0
 
   // A new chord (or instrument, or pin) starts at the first position again: the
   // pager is keyed by all three, so it remounts already scrolled to the start.
@@ -110,6 +123,64 @@ export function ChordShapeSheet({
     setPagerState(pagerKey)
     setIndex(0)
   }
+
+  // Chord preview (#14): the button reads Play again as soon as what is on
+  // screen stops matching what is ringing — same render-phase reset the pager
+  // uses, never a state synced in an effect. The timer re-asserts the same
+  // state a moment later; this just never lies in between.
+  const [playing, setPlaying] = useState(false)
+  const playTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const playbackKey = `${pagerKey}|${index}|${capo}`
+  const [playbackState, setPlaybackState] = useState(playbackKey)
+  if (playbackState !== playbackKey) {
+    setPlaybackState(playbackKey)
+    setPlaying(false)
+  }
+
+  // What is on screen right now, as something to sound: the paged position for
+  // a fretted instrument, the single derived one for bass, the voicing for
+  // piano (which has no capo — its shape is the chord itself).
+  const currentSound = (): ChordSound | null => {
+    if (instrument === "piano") {
+      return piano ? { midis: pianoSoundingMidis(piano), timbre: "piano" } : null
+    }
+    if (isFrettedInstrument(instrument)) {
+      const shape = shapes[index]
+      return shape
+        ? { midis: frettedSoundingMidis(shape, instrument, capo), timbre: "pluck" }
+        : null
+    }
+    return bassShape ? { midis: bassSoundingMidis(bassShape, capo), timbre: "pluck" } : null
+  }
+
+  const stopPlayback = (): void => {
+    stopChord()
+    if (playTimerRef.current) clearTimeout(playTimerRef.current)
+    playTimerRef.current = null
+    setPlaying(false)
+  }
+
+  const toggleChordSound = (): void => {
+    if (playing) {
+      stopPlayback()
+      return
+    }
+    const sound = currentSound()
+    if (!sound) return
+    playChord(sound)
+    setPlaying(true)
+    if (playTimerRef.current) clearTimeout(playTimerRef.current)
+    playTimerRef.current = setTimeout(() => setPlaying(false), chordDurationMs(sound.midis.length))
+  }
+
+  // The sheet unmounts with the reader: nothing keeps sounding behind it.
+  useEffect(
+    () => () => {
+      stopChord()
+      if (playTimerRef.current) clearTimeout(playTimerRef.current)
+    },
+    []
+  )
 
   const goTo = (next: number): void => {
     const clamped = Math.max(0, Math.min(next, frettedShapes.length - 1))
@@ -269,22 +340,54 @@ export function ChordShapeSheet({
   return (
     <BottomSheet
       visible={visible}
-      onClose={onClose}
+      onClose={() => {
+        stopPlayback()
+        onClose()
+      }}
       title={chord ? t("songs.howToPlayChord", { chord: display }) : ""}
     >
       {chord ? (
         <>
-          <View style={styles.tabs}>
-            {INSTRUMENT_TABS.map((tab) => (
-              <Chip
-                key={tab.value}
-                label={t(tab.labelKey)}
-                size="sm"
-                tone="primary"
-                selected={instrument === tab.value}
-                onPress={() => onInstrumentChange(tab.value)}
-              />
-            ))}
+          <View style={styles.tabsRow}>
+            <View style={styles.tabs}>
+              {INSTRUMENT_TABS.map((tab) => (
+                <Chip
+                  key={tab.value}
+                  label={t(tab.labelKey)}
+                  size="sm"
+                  tone="primary"
+                  selected={instrument === tab.value}
+                  onPress={() => {
+                    // Switching instruments changes what would sound (#14).
+                    stopPlayback()
+                    onInstrumentChange(tab.value)
+                  }}
+                />
+              ))}
+            </View>
+            {/* Hear the voicing on screen (#14): the paged position for a
+                fretted instrument, the derived one for bass, the voicing for
+                piano. Disabled when the chord has no shape to sound. */}
+            <IconButton
+              label={
+                playing
+                  ? t("songs.stopChord", { chord: display })
+                  : t("songs.playChord", { chord: display })
+              }
+              size={32}
+              disabled={soundAvailable === false}
+              onPress={toggleChordSound}
+              icon={
+                playing ? (
+                  <PauseIcon size={18} color={Theme.colors.accent} />
+                ) : (
+                  <PlayFilledIcon
+                    size={18}
+                    color={soundAvailable ? Theme.colors.textMuted : Theme.colors.textFaint}
+                  />
+                )
+              }
+            />
           </View>
           {instrument === "piano" ? pianoView : frettedView}
         </>
@@ -296,11 +399,18 @@ export function ChordShapeSheet({
 const createStyles = () =>
   StyleSheet.create({
     /** Wraps: four instruments never share one row on a phone. */
+    tabsRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: Theme.spacing.s,
+    },
     tabs: {
       flexDirection: "row",
       flexWrap: "wrap",
       gap: Theme.spacing.s,
       alignSelf: "flex-start",
+      flexShrink: 1,
     },
     pagerWrap: { gap: Theme.spacing.s },
     capoNote: { textAlign: "center" },

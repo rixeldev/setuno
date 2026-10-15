@@ -69,7 +69,7 @@ a sidebar layout on the web.
 | **Unread activity** | The band's activity feed now knows what you have seen: the Home tab carries an unread badge and opening the dashboard clears it. Each member's marker is private — the band never learns who read what |
 | **Favourite voicings** | Pin a preferred guitar position per chord; the play guide opens on it from then on (stored on your profile, not the song) |
 | **Transposition** | Move any song up/down by semitones — the stored song is never mutated |
-| **Play guide** | Tap any chord while reading to see how to play it: every guitar position (capo-aware) or the piano keys |
+| **Play guide** | Tap any chord while reading to see how to play it: every guitar, ukulele or bass position (capo-aware) or the piano keys — and hear the exact voicing on screen, synthesized on the device (no samples, works offline) |
 | **Chord notation & layout** | Spell chords as letters (C F#m), solfège (Do Fa#m) or Nashville numbers (1 4 5, relative to the song's key); show chords above the lyrics, lyrics only, or a chords-only chart |
 | **Stage mode** | Full-screen reading with adjustable font size and chord visibility that survives stepping to the next song; holds a screen wake lock (toggleable) so the display never sleeps mid-show |
 | **Autoscroll** | Hands-free reading with a start delay, a speed in lyric lines per minute and a resume button; manual scrolling pauses it, and each song remembers its own speed (per user) |

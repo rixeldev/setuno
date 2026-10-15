@@ -770,6 +770,8 @@
     "pinnedVoicingNote": "This is your default shape for this chord.",
     "slashFallback": "No slash shape for {{chord}} — showing {{fallback}}.",
     "slashBassNote": "Bass note: {{note}}",
+    "playChord": "Play {{chord}}",
+    "stopChord": "Stop {{chord}}",
     "duplicateTitle": "This song may already exist",
     "duplicateBody_one": "You already have {{count}} song with a similar title.",
     "duplicateBody_other": "You already have {{count}} songs with a similar title.",

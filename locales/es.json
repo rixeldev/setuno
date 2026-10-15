@@ -675,6 +675,8 @@
     "pinnedVoicingNote": "Esta es tu forma por defecto para este acorde.",
     "slashFallback": "No hay forma con bajo para {{chord}}; se muestra {{fallback}}.",
     "slashBassNote": "Nota de bajo: {{note}}",
+    "playChord": "Tocar {{chord}}",
+    "stopChord": "Detener {{chord}}",
     "duplicateTitle": "Esta canción ya existe",
     "duplicateBody_one": "Ya tienes {{count}} canción con un título parecido.",
     "duplicateBody_other": "Ya tienes {{count}} canciones con un título parecido.",
