@@ -61,6 +61,7 @@ a sidebar layout on the web.
 | **Section blocks** | Insert a standard block (intro, verse, pre-chorus, chorus, bridge, outro, instrumental) after any section, duplicate or reorder sections, and tag a section with an optional bar count |
 | **Duplicate warning** | Creating a song whose title (and artist) the band already has opens a dialog first — open the existing song, or create yours anyway |
 | **Duplicate & merge** | Admins can duplicate a song straight into a variant's editor, or fold two copies together: pick which one survives, see how many setlists and suggestions move across, and the other is deleted in one step |
+| **Version history** | Every save keeps the version it replaced (up to 20 per song): open the history from the reader, compare any version with the song as it is now — struck text is what was lost, highlighted text what was gained — and restore it behind a confirmation; the current state is saved first, so a restore can itself be undone |
 | **Favourite voicings** | Pin a preferred guitar position per chord; the play guide opens on it from then on (stored on your profile, not the song) |
 | **Transposition** | Move any song up/down by semitones — the stored song is never mutated |
 | **Play guide** | Tap any chord while reading to see how to play it: every guitar position (capo-aware) or the piano keys |

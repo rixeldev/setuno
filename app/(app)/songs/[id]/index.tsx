@@ -22,6 +22,7 @@ import { EmptyState, Skeleton } from "@/components/ui/States"
 import {
   BookIcon,
   ChevronRightIcon,
+  ClockIcon,
   CopyIcon,
   EditIcon,
   ExportIcon,
@@ -1082,6 +1083,20 @@ export default function SongScreen() {
 
               {isAdmin ? (
                 <>
+                  <Pressable
+                    onPress={() =>
+                      router.push(`/songs/${song.id}/history?title=${encodeURIComponent(song.title)}`)
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={t("songs.historyA11y", { title: song.title })}
+                    style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
+                  >
+                    <ClockIcon size={15} color={Theme.colors.textMuted} />
+                    <AppText variant="caption" tone="muted">
+                      {t("songs.history")}
+                    </AppText>
+                  </Pressable>
+
                   <Pressable
                     onPress={() => {
                       if (!duplicating) void duplicate()

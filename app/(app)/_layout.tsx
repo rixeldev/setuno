@@ -45,6 +45,7 @@ export default function AppLayout() {
         />
         <Stack.Screen name="songs/[id]/edit" />
         <Stack.Screen name="songs/[id]/suggest" />
+        <Stack.Screen name="songs/[id]/history" options={modalOptions} />
         {/* Personal notes of one song (roadmap #3). */}
         <Stack.Screen name="annotations/[id]" options={modalOptions} />
         <Stack.Screen name="setlists/index" options={{ animation: "none" }} />

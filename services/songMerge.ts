@@ -14,6 +14,7 @@ import {
 import { logActivity } from "@/services/activity"
 import { buildSetlistSongs, estimateSetlistDuration, fetchSetlists } from "@/services/setlists"
 import { fetchSong, fetchSongs } from "@/services/songs"
+import { deleteVersions } from "@/services/songVersions"
 import { ValidationError } from "@/services/errors"
 import {
   annotationSnapshot,
@@ -144,6 +145,9 @@ export const mergeSongs = async (
 
   batch.delete(doc(firestore, paths.song(organizationId, loserId)))
   await batch.commit()
+  // The loser's version history goes with it — Firestore does not cascade
+  // subcollections, and the merge is the one other song deletion (roadmap #26).
+  void deleteVersions(organizationId, loserId)
 
   void logActivity({
     organizationId,

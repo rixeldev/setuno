@@ -108,6 +108,8 @@ const FOCUS_ROUTES: RegExp[] = [
   /^\/songs\/[^/]+$/,
   /^\/songs\/[^/]+\/edit$/,
   /^\/songs\/[^/]+\/suggest$/,
+  // Version history is a focused review over the reader, like suggest/edit.
+  /^\/songs\/[^/]+\/history$/,
   /^\/setlists\/new$/,
   /^\/setlists\/[^/]+\/edit$/,
   /^\/performances\/new$/,

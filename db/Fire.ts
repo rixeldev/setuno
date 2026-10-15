@@ -95,6 +95,9 @@ export const paths = {
   member: (orgId: string, uid: string) => `organizations/${orgId}/members/${uid}`,
   songs: (orgId: string) => `organizations/${orgId}/songs`,
   song: (orgId: string, songId: string) => `organizations/${orgId}/songs/${songId}`,
+  /** Saved states of a song's content, one per admin save (roadmap #26). */
+  songVersions: (orgId: string, songId: string) =>
+    `organizations/${orgId}/songs/${songId}/versions`,
   setlists: (orgId: string) => `organizations/${orgId}/setlists`,
   setlist: (orgId: string, setlistId: string) => `organizations/${orgId}/setlists/${setlistId}`,
   performances: (orgId: string) => `organizations/${orgId}/performances`,

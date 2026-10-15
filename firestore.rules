@@ -399,6 +399,23 @@ service cloud.firestore {
             'genre', 'notes', 'tags', 'sections', 'links', 'authorId', 'authorName', 'updatedAt'
           ]);
         allow delete: if isAdmin(organizationId);
+
+        // The song's version history (roadmap #26): one immutable document
+        // per admin save, pruned past the cap by an admin delete. Members may
+        // read the history — it holds no content the song itself hides.
+        match /versions/{versionId} {
+          allow read: if isMember(organizationId);
+          allow create: if isAdmin(organizationId)
+            && request.resource.data.keys().hasOnly(['data', 'savedAt', 'savedBy', 'savedByName'])
+            && request.resource.data.data is map
+            && request.resource.data.data.title is string
+            && request.resource.data.data.title.size() > 0
+            && request.resource.data.data.sections is list
+            && request.resource.data.savedBy == request.auth.uid
+            && request.resource.data.savedAt is timestamp;
+          allow update: if false;
+          allow delete: if isAdmin(organizationId);
+        }
       }
 
       // ---------------------------------------------------------------- setlists

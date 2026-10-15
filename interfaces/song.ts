@@ -88,6 +88,20 @@ export interface SongInput {
   links: SongLinks
 }
 
+/**
+ * The state a save replaced (roadmap #26): written to
+ * `songs/{id}/versions` on every admin save, capped and pruned. `data` is
+ * exactly what restoring the version writes back, so the history list never
+ * joins a version against the song to be usable.
+ */
+export interface SongVersion {
+  id: string
+  data: SongInput
+  savedAt: TimestampLike
+  savedBy: string
+  savedByName: string
+}
+
 /** Chips used by the song filters. */
 export interface SongFacets {
   artists: string[]

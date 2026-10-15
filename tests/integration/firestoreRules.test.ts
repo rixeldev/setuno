@@ -1,8 +1,9 @@
 /**
  * The Firestore security rules (docs §23) against the emulator — the seed
  * suite described in `tests/integration/README.md`. The scenarios mirror its
- * contract: private profiles, admin-only song writes, suggestion review and
- * membership management, plus the owner-only reader state.
+ * contract: private profiles, admin-only song writes, suggestion review,
+ * membership management, the owner-only reader state and the song version
+ * history (roadmap #26).
  *
  * Run through `firebase emulators:exec --only firestore,storage "pnpm
  * test:integration"`, which starts the emulators, exports their host variables
@@ -243,5 +244,89 @@ describe("reader state is private and validated", () => {
 
   it("rejects a font size outside the 13..30 range", async () => {
     await assertFails(alice().firestore().doc(`users/alice/readerState/${songId}`).set(state(99)))
+  })
+})
+
+describe("song versions are an admin-written, member-readable history", () => {
+  /** The shape `services/songVersions.ts` writes — one immutable snapshot. */
+  const version = (savedBy: string, overrides: Record<string, unknown> = {}) => ({
+    data: { title: "Seed song", sections: [] },
+    savedAt: new Date(),
+    savedBy,
+    savedByName: savedBy,
+    ...overrides,
+  })
+
+  const versionPath = (id: string) => `${songPath()}/versions/${id}`
+
+  it("lets an admin save a version", async () => {
+    await assertSucceeds(alice().firestore().doc(versionPath(createId("v"))).set(version("alice")))
+  })
+
+  it("denies a member saving one", async () => {
+    await assertFails(bob().firestore().doc(versionPath(createId("v"))).set(version("bob")))
+  })
+
+  it("rejects a snapshot credited to somebody else", async () => {
+    await assertFails(alice().firestore().doc(versionPath(createId("v"))).set(version("bob")))
+  })
+
+  it("rejects keys outside the documented shape", async () => {
+    await assertFails(
+      alice()
+        .firestore()
+        .doc(versionPath(createId("v")))
+        .set({ ...version("alice"), extra: true }),
+    )
+  })
+
+  it("rejects a snapshot that could not be restored", async () => {
+    await assertFails(
+      alice()
+        .firestore()
+        .doc(versionPath(createId("v")))
+        .set(version("alice", { data: { title: "", sections: [] } })),
+    )
+  })
+
+  it("lets a member read the history", async () => {
+    const id = createId("v")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(versionPath(id)).set(version("alice"))
+    })
+    const snapshot = await assertSucceeds(bob().firestore().doc(versionPath(id)).get())
+    expect(snapshot.exists).toBe(true)
+  })
+
+  it("hides the history from signed-out visitors", async () => {
+    const id = createId("v")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(versionPath(id)).set(version("alice"))
+    })
+    await assertFails(guest().firestore().doc(versionPath(id)).get())
+  })
+
+  it("freezes versions: nobody edits one, not even an admin", async () => {
+    const id = createId("v")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(versionPath(id)).set(version("alice"))
+    })
+    await assertFails(alice().firestore().doc(versionPath(id)).update({ savedByName: "rewritten" }))
+  })
+
+  it("lets an admin prune the oldest", async () => {
+    const id = createId("v")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(versionPath(id)).set(version("alice"))
+    })
+    await assertSucceeds(alice().firestore().doc(versionPath(id)).delete())
+  })
+
+  it("denies a member pruning", async () => {
+    const id = createId("v")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(versionPath(id)).set(version("alice"))
+    })
+    await assertFails(bob().firestore().doc(versionPath(id)).delete())
   })
 })

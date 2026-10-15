@@ -21,8 +21,10 @@ import {
 } from "@/db/Fire"
 import type { LyricLine, Song, SongInput, SongSection } from "@/interfaces"
 import { logActivity } from "@/services/activity"
+import { deleteVersions, writeVersion } from "@/services/songVersions"
 import { ValidationError } from "@/services/errors"
 import { countSongChords, countSongLines, clampSectionBars, normalizeSectionLabels } from "@/libs/songUtils"
+import { songVersionData } from "@/libs/songHistory"
 import { normalizeSongLinks } from "@/libs/songLinks"
 import { duplicateSongTitle } from "@/libs/songMerge"
 
@@ -62,22 +64,30 @@ const mapSections = (raw: unknown): SongSection[] => {
   })
 }
 
+/**
+ * The editable content of a song as stored — shared by the song reader and,
+ * since roadmap #26, by version documents, so both normalise identically.
+ */
+export const mapSongInput = (data: Record<string, unknown>): SongInput => ({
+  title: String(data.title ?? ""),
+  artist: String(data.artist ?? ""),
+  key: String(data.key ?? ""),
+  originalKey: String(data.originalKey ?? data.key ?? ""),
+  capo: typeof data.capo === "number" ? data.capo : 0,
+  bpm: typeof data.bpm === "number" ? data.bpm : null,
+  durationSec: typeof data.durationSec === "number" ? data.durationSec : null,
+  genre: String(data.genre ?? ""),
+  notes: String(data.notes ?? ""),
+  tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
+  sections: mapSections(data.sections),
+  links: normalizeSongLinks(data.links),
+})
+
 const mapSong = (data: Record<string, unknown>, id: string): Song =>
   ({
     id,
     organizationId: String(data.organizationId ?? ""),
-    title: String(data.title ?? ""),
-    artist: String(data.artist ?? ""),
-    key: String(data.key ?? ""),
-    originalKey: String(data.originalKey ?? data.key ?? ""),
-    capo: typeof data.capo === "number" ? data.capo : 0,
-    bpm: typeof data.bpm === "number" ? data.bpm : null,
-    durationSec: typeof data.durationSec === "number" ? data.durationSec : null,
-    genre: String(data.genre ?? ""),
-    notes: String(data.notes ?? ""),
-    tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
-    sections: mapSections(data.sections),
-    links: normalizeSongLinks(data.links),
+    ...mapSongInput(data),
     createdBy: String(data.createdBy ?? ""),
     createdByName: String(data.createdByName ?? ""),
     createdAt: data.createdAt as Song["createdAt"],
@@ -216,10 +226,21 @@ export const updateSong = async (
 ): Promise<void> => {
   const uid = requireUserId()
   const normalized = normalizeSongInput(input)
+  // The version keeps the state this save replaces (roadmap #26), so the
+  // history reads as the list of states the song has been — and a restore,
+  // which is itself an update, versions the current state first for free.
+  const previous = await fetchSong(organizationId, songId)
   await updateDoc(doc(firestore, paths.song(organizationId, songId)), {
     ...normalized,
     updatedAt: serverTimestamp(),
   })
+
+  if (previous) {
+    void writeVersion(organizationId, songId, songVersionData(previous), {
+      id: uid,
+      name: actor.name,
+    })
+  }
 
   void logActivity({
     organizationId,
@@ -294,6 +315,9 @@ export const deleteSong = async (
   const uid = requireUserId()
   const song = await fetchSong(organizationId, songId)
   await deleteDocFor(organizationId, songId)
+  // Firestore does not cascade: the song's version history goes with it
+  // (roadmap #26), best-effort like the activity log below.
+  void deleteVersions(organizationId, songId)
 
   void logActivity({
     organizationId,
