@@ -41,6 +41,11 @@ import {
 } from "@/libs/format"
 import { parseIsoDate } from "@/libs/validation"
 import { estimateDurationSec } from "@/libs/songUtils"
+import {
+  durationGoalTargetLabel,
+  durationGoalText,
+  setlistGoal,
+} from "@/libs/setlistDuration"
 import { displayKey } from "@/libs/chords"
 import { usePreferences } from "@/services/prefs"
 
@@ -93,6 +98,16 @@ export default function SetlistDetail() {
     () => setlists.find((entry) => entry.id === setlistId) ?? null,
     [setlists, setlistId],
   )
+  // Derived, never stored: the readout follows the running order as songs come
+  // and go, because every edit on this screen round-trips through the listener
+  // (Firestore echoes the write locally first, so it lands immediately).
+  const goal = setlist ?
+    setlistGoal({
+      targetMinutes: setlist.targetMinutes,
+      breakMinutes: setlist.breakMinutes,
+      estimatedDurationSec: setlist.estimatedDurationSec,
+    })
+  : null
   // Full documents for the printed sheet: each entry carries the key the band
   // plays that song in. A song deleted since the list was built drops out
   // instead of blanking its page.
@@ -140,6 +155,10 @@ export default function SetlistDetail() {
           notes: setlist.notes,
           songIds,
           songKeys,
+          // This call only ever means "the order changed": carrying the goal
+          // through is what keeps a reorder from silently clearing it.
+          targetMinutes: setlist.targetMinutes,
+          breakMinutes: setlist.breakMinutes,
         },
         songLibrary,
         actor,
@@ -486,6 +505,20 @@ export default function SetlistDetail() {
         </Card>
       )}
 
+      {goal ? (
+        <View style={styles.goal}>
+          <AppText variant="caption" tone="faint" style={styles.flex}>
+            {durationGoalTargetLabel(goal, t)}
+          </AppText>
+          <AppText
+            variant="bodyStrong"
+            tone={goal.over ? "danger" : goal.onTarget ? "success" : "accent"}
+          >
+            {durationGoalText(goal, t)}
+          </AppText>
+        </View>
+      ) : null}
+
       {isAdmin && editing ? (
         <Button
           label={t("setlists.addSongs")}
@@ -725,6 +758,13 @@ const createStyles = () =>
       paddingLeft: Theme.spacing.m,
     },
     listCard: { overflow: "hidden", justifyContent: "center" },
+    goal: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: Theme.spacing.m,
+      paddingHorizontal: Theme.spacing.xs,
+    },
     songRow: {
       flexDirection: "row",
       alignItems: "center",

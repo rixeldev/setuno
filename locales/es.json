@@ -823,7 +823,19 @@
     "removeFromTemplates": "Quitar de plantillas",
     "templateRemoved": "\"{{name}}\" ya no es una plantilla.",
     "couldNotUpdateTemplate": "No pudimos actualizar la plantilla.",
-    "copySuffix": " (copia)"
+    "copySuffix": " (copia)",
+    "goalSection": "Objetivo de duración",
+    "targetMinutes": "Objetivo (minutos)",
+    "targetMinutesHint": "El tiempo del que dispones, con los descansos incluidos. Vacío = sin objetivo.",
+    "targetMinutesPlaceholder": "45",
+    "breakMinutes": "Descanso (minutos)",
+    "breakMinutesHint": "Se cuenta dentro del objetivo.",
+    "breakMinutesPlaceholder": "10",
+    "goalTarget": "Objetivo {{target}}",
+    "goalTargetBreak": "Objetivo {{target}} · {{breakTime}} de descanso",
+    "goalRemaining": "Quedan {{time}}",
+    "goalOver": "{{time}} por encima del objetivo",
+    "goalOnTarget": "En el objetivo"
   },
   "liveShow": {
     "title": "En directo",

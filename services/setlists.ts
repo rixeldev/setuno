@@ -23,6 +23,7 @@ import type { Setlist, SetlistInput, SetlistSong, Song } from "@/interfaces"
 import { logActivity } from "@/services/activity"
 import { ValidationError } from "@/services/errors"
 import { estimateDurationSec } from "@/libs/songUtils"
+import { clampGoalMinutes, MAX_BREAK_MINUTES, MAX_GOAL_MINUTES } from "@/libs/setlistDuration"
 
 const mapSetlist = (data: Record<string, unknown>, id: string): Setlist => {
   const songs = Array.isArray(data.songs)
@@ -51,6 +52,10 @@ const mapSetlist = (data: Record<string, unknown>, id: string): Setlist => {
     songs,
     estimatedDurationSec:
       typeof data.estimatedDurationSec === "number" ? data.estimatedDurationSec : 0,
+    // Documents written before #42 carry no goal, and 0 is exactly what
+    // "no goal" means — so there is nothing to migrate.
+    targetMinutes: typeof data.targetMinutes === "number" ? data.targetMinutes : 0,
+    breakMinutes: typeof data.breakMinutes === "number" ? data.breakMinutes : 0,
     // Written before this field existed, so absence means "an ordinary list".
     template: data.template === true,
     createdBy: String(data.createdBy ?? ""),
@@ -141,6 +146,11 @@ const normalizeInput = (input: SetlistInput): SetlistInput => {
     date: input.date,
     notes: input.notes,
     songIds,
+    // Clamped here, not validated: the goal is a number field, and a target
+    // typed as "9999" becomes the bound rather than an error the band cannot
+    // read past. 0 is kept as 0 — that is "no goal".
+    targetMinutes: clampGoalMinutes(input.targetMinutes, MAX_GOAL_MINUTES),
+    breakMinutes: clampGoalMinutes(input.breakMinutes, MAX_BREAK_MINUTES),
     songKeys,
   }
 }
@@ -166,6 +176,8 @@ export const createSetlist = async (
     songs,
     estimatedDurationSec: estimateSetlistDuration(songs, library),
     template: false,
+    targetMinutes: normalized.targetMinutes,
+    breakMinutes: normalized.breakMinutes,
     createdBy: uid,
     createdAt: now,
     updatedAt: now,
@@ -202,6 +214,8 @@ export const updateSetlist = async (
     notes: normalized.notes,
     songs,
     estimatedDurationSec: estimateSetlistDuration(songs, library),
+    targetMinutes: normalized.targetMinutes,
+    breakMinutes: normalized.breakMinutes,
     updatedAt: serverTimestamp(),
   })
 
@@ -259,6 +273,10 @@ export const duplicateSetlist = async (
     notes: source.notes,
     songs: source.songs,
     estimatedDurationSec: source.estimatedDurationSec,
+    // The goal travels with the list: a copy of a 45-minute set is a
+    // 45-minute set.
+    targetMinutes: source.targetMinutes,
+    breakMinutes: source.breakMinutes,
     template: source.template,
     createdBy: uid,
     createdAt: now,
@@ -308,6 +326,9 @@ export const saveSetlistAsTemplate = async (
     notes: source.notes,
     songs: source.songs,
     estimatedDurationSec: source.estimatedDurationSec,
+    // A template keeps the goal — "45-min set" is most of why it is one.
+    targetMinutes: source.targetMinutes,
+    breakMinutes: source.breakMinutes,
     template: true,
     createdBy: uid,
     createdAt: now,

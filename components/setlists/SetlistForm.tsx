@@ -20,6 +20,11 @@ import { useUnsavedChanges } from "@/hooks/useUnsavedChanges"
 import { createSetlist, setlistSongKeys, updateSetlist } from "@/services/setlists"
 import { toFriendlyError } from "@/services/errors"
 import { parseIsoDate, validateRequired } from "@/libs/validation"
+import {
+  MAX_BREAK_MINUTES,
+  MAX_GOAL_MINUTES,
+  parseGoalMinutes,
+} from "@/libs/setlistDuration"
 import type { Setlist, SetlistInput } from "@/interfaces"
 
 interface SetlistFormProps {
@@ -33,6 +38,9 @@ interface SetlistFormState {
   description: string
   date: string
   notes: string
+  /** Minutes, as typed — the field is free text until it is parsed on save. */
+  targetMinutes: string
+  breakMinutes: string
 }
 
 /** Stable snapshot used to detect unsaved changes. */
@@ -43,6 +51,10 @@ const formStateFrom = (setlist: Setlist | null | undefined): SetlistFormState =>
   description: setlist?.description ?? "",
   date: setlist?.date ?? "",
   notes: setlist?.notes ?? "",
+  // No goal is blank rather than "0": an empty field says "unset" in a way
+  // a zero does not.
+  targetMinutes: setlist && setlist.targetMinutes > 0 ? `${setlist.targetMinutes}` : "",
+  breakMinutes: setlist && setlist.breakMinutes > 0 ? `${setlist.breakMinutes}` : "",
 })
 
 /** Create/edit form for a setlist (docs §20), presented as a modal. Songs are added on the detail screen. */
@@ -55,15 +67,27 @@ export function SetlistForm({ setlist, onSaved }: SetlistFormProps) {
   const { organizationId } = useOrganization()
   const { songLibrary } = useOrgData()
 
+  // Read once: the same snapshot seeds both the goal fields and the baseline
+  // the leave guard compares against.
+  const initial = formStateFrom(setlist)
   const [name, setName] = useState(setlist?.name ?? "")
   const [description, setDescription] = useState(setlist?.description ?? "")
   const [date, setDate] = useState(setlist?.date ?? "")
   const [notes, setNotes] = useState(setlist?.notes ?? "")
+  const [targetMinutes, setTargetMinutes] = useState(initial.targetMinutes)
+  const [breakMinutes, setBreakMinutes] = useState(initial.breakMinutes)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
-  const [baseline, setBaseline] = useState(() => serializeForm(formStateFrom(setlist)))
+  const [baseline, setBaseline] = useState(() => serializeForm(initial))
 
-  const currentState: SetlistFormState = { name, description, date, notes }
+  const currentState: SetlistFormState = {
+    name,
+    description,
+    date,
+    notes,
+    targetMinutes,
+    breakMinutes,
+  }
   const hasUnsavedChanges = serializeForm(currentState) !== baseline && !saving
   const leaveGuard = useUnsavedChanges(hasUnsavedChanges)
 
@@ -83,6 +107,10 @@ export function SetlistForm({ setlist, onSaved }: SetlistFormProps) {
       date: date.trim().length > 0 ? date.trim() : null,
       notes: notes.trim(),
       songIds: setlist?.songs.map((entry) => entry.songId) ?? [],
+      // Parsed here so the field stays free text while typing: "45 min" and
+      // "9999" both land as a sensible number instead of an error to fix.
+      targetMinutes: parseGoalMinutes(targetMinutes, MAX_GOAL_MINUTES),
+      breakMinutes: parseGoalMinutes(breakMinutes, MAX_BREAK_MINUTES),
       songKeys: setlist ? setlistSongKeys(setlist.songs) : undefined,
     }
 
@@ -147,6 +175,28 @@ export function SetlistForm({ setlist, onSaved }: SetlistFormProps) {
           onChangeText={setNotes}
           placeholder={t("setlists.notesPlaceholder")}
           multiline
+        />
+      </Card>
+
+      <Card style={styles.card}>
+        <AppText variant="label" tone="faint">
+          {t("setlists.goalSection")}
+        </AppText>
+        <Input
+          label={t("setlists.targetMinutes")}
+          hint={t("setlists.targetMinutesHint")}
+          value={targetMinutes}
+          onChangeText={setTargetMinutes}
+          placeholder={t("setlists.targetMinutesPlaceholder")}
+          keyboardType="numeric"
+        />
+        <Input
+          label={t("setlists.breakMinutes")}
+          hint={t("setlists.breakMinutesHint")}
+          value={breakMinutes}
+          onChangeText={setBreakMinutes}
+          placeholder={t("setlists.breakMinutesPlaceholder")}
+          keyboardType="numeric"
         />
       </Card>
 

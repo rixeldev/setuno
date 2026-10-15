@@ -918,7 +918,19 @@
     "removeFromTemplates": "Remove from templates",
     "templateRemoved": "\"{{name}}\" is no longer a template.",
     "couldNotUpdateTemplate": "We couldn't update the template.",
-    "copySuffix": " (copy)"
+    "copySuffix": " (copy)",
+    "goalSection": "Duration goal",
+    "targetMinutes": "Target (minutes)",
+    "targetMinutesHint": "The slot you have, breaks included. Empty means no goal.",
+    "targetMinutesPlaceholder": "45",
+    "breakMinutes": "Break (minutes)",
+    "breakMinutesHint": "Counted inside the target.",
+    "breakMinutesPlaceholder": "10",
+    "goalTarget": "Goal {{target}}",
+    "goalTargetBreak": "Goal {{target}} · {{breakTime}} break",
+    "goalRemaining": "{{time}} left",
+    "goalOver": "{{time}} over the goal",
+    "goalOnTarget": "On target"
   },
   "liveShow": {
     "title": "Live show",
