@@ -76,7 +76,7 @@ a sidebar layout on the web.
 | **Print & PDF** | Print a song or a whole setlist — with chords or lyrics only, at three text sizes — and share it as a PDF or send it straight to a printer; a setlist prints each song in the key the band actually plays it in |
 | **Setlist running order** | Open a song from an event's setlist and step through it with corner arrows |
 | **Suggestions** | Members propose changes, admins accept/reject them with a note |
-| **Setlists** | Build running orders, reorder songs, estimate duration — and measure it against a **goal**: target minutes with breaks counted inside them, plus a live "5m left / 6m over" readout while you edit. Lists live under their events, and any list can be duplicated or saved as a **template** (45-min, acoustic, wedding) that lives outside events |
+| **Setlists** | Build running orders — with **Set 1 / Break / Encore dividers**, a per-song note the band reads in the reader ("tune Eb") and a **goal**: target minutes with breaks counted inside, plus a live "5m left / 6m over" readout while you edit. Lists live under their events, and any list can be duplicated or saved as a **template** (45-min, acoustic, wedding) that lives outside events |
 | **Performances** | Schedule gigs with venue, times, status and attached setlists |
 | **Calendar** | Month view of upcoming and past shows |
 | **Calendar export** | Save the band calendar or a single event as an `.ics` file — share sheet on mobile, download on web — with stable UIDs so re-imports update instead of duplicating |

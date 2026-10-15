@@ -19,10 +19,11 @@ import {
   type SubscribeErrorHandler,
   type Unsubscribe,
 } from "@/db/Fire"
-import type { Setlist, SetlistInput, SetlistSong, Song } from "@/interfaces"
+import type { Setlist, SetlistBlock, SetlistInput, SetlistSong, Song } from "@/interfaces"
 import { logActivity } from "@/services/activity"
 import { ValidationError } from "@/services/errors"
 import { estimateDurationSec } from "@/libs/songUtils"
+import { cleanBlocks, MAX_SONG_NOTE } from "@/libs/setlistBlocks"
 import { clampGoalMinutes, MAX_BREAK_MINUTES, MAX_GOAL_MINUTES } from "@/libs/setlistDuration"
 
 const mapSetlist = (data: Record<string, unknown>, id: string): Setlist => {
@@ -36,11 +37,27 @@ const mapSetlist = (data: Record<string, unknown>, id: string): Setlist => {
             artist: String(song.artist ?? ""),
             key: String(song.key ?? ""),
             order: typeof song.order === "number" ? song.order : index,
+            note: String(song.note ?? ""),
           }
         })
         .filter((entry) => entry.songId.length > 0)
         .sort((a, b) => a.order - b.order)
     : []
+
+  // Rebuilt from storage the same way the songbook sanitizes its state: an
+  // unnamed or duplicated divider never reaches the UI (idempotent, so a write
+  // that carries these back changes nothing).
+  const rawBlocks: SetlistBlock[] = Array.isArray(data.blocks)
+    ? (data.blocks as unknown[]).map((entry) => {
+        const block = (entry ?? {}) as Partial<SetlistBlock>
+        return {
+          id: String(block.id ?? ""),
+          name: String(block.name ?? ""),
+          afterSongId: typeof block.afterSongId === "string" ? block.afterSongId : null,
+        }
+      })
+    : []
+  const blocks = cleanBlocks(rawBlocks)
 
   return {
     id,
@@ -50,6 +67,7 @@ const mapSetlist = (data: Record<string, unknown>, id: string): Setlist => {
     date: (data.date as string | null) ?? null,
     notes: String(data.notes ?? ""),
     songs,
+    blocks,
     estimatedDurationSec:
       typeof data.estimatedDurationSec === "number" ? data.estimatedDurationSec : 0,
     // Documents written before #42 carry no goal, and 0 is exactly what
@@ -103,6 +121,8 @@ export const buildSetlistSongs = (
   library: Map<string, Song>,
   /** Key each song will be played in, keyed by song id (defaults to the song's). */
   songKeys: Record<string, string> = {},
+  /** The band's note for this entry, keyed by song id (defaults to none). */
+  songNotes: Record<string, string> = {},
 ): SetlistSong[] =>
   songIds
     .map((songId, order) => {
@@ -113,6 +133,9 @@ export const buildSetlistSongs = (
         artist: song?.artist ?? "",
         key: songKeys[songId] ?? song?.key ?? "",
         order,
+        // Keyed by id, like the play key, so a reorder carries the note with
+        // its song rather than with whatever row it used to sit in.
+        note: songNotes[songId] ?? "",
       }
     })
     .filter((entry) => library.has(entry.songId))
@@ -120,6 +143,10 @@ export const buildSetlistSongs = (
 /** Current play-key map of a setlist, ready to feed `buildSetlistSongs`. */
 export const setlistSongKeys = (songs: readonly SetlistSong[]): Record<string, string> =>
   Object.fromEntries(songs.map((entry) => [entry.songId, entry.key]))
+
+/** Current note map of a setlist, ready to feed `buildSetlistSongs`. */
+export const setlistSongNotes = (songs: readonly SetlistSong[]): Record<string, string> =>
+  Object.fromEntries(songs.map((entry) => [entry.songId, entry.note]))
 
 /** Sum of known song durations, falling back to a lyric-length estimate. */
 export const estimateSetlistDuration = (songs: SetlistSong[], library: Map<string, Song>): number =>
@@ -151,6 +178,18 @@ const normalizeInput = (input: SetlistInput): SetlistInput => {
     // read past. 0 is kept as 0 — that is "no goal".
     targetMinutes: clampGoalMinutes(input.targetMinutes, MAX_GOAL_MINUTES),
     breakMinutes: clampGoalMinutes(input.breakMinutes, MAX_BREAK_MINUTES),
+    // Names trimmed and bounded, unnamed dividers dropped, orphans kept (the
+    // renderer shows them at the end rather than losing them).
+    blocks: cleanBlocks(input.blocks),
+    // An empty note is absence, not content, so it is dropped instead of
+    // stored as "" — the builder then reads it back the same way.
+    songNotes: Object.fromEntries(
+      Object.entries(input.songNotes)
+        .map(
+          ([songId, note]) => [songId, String(note).trim().slice(0, MAX_SONG_NOTE)] as const,
+        )
+        .filter(([, note]) => note.length > 0),
+    ),
     songKeys,
   }
 }
@@ -163,7 +202,12 @@ export const createSetlist = async (
 ): Promise<string> => {
   const uid = requireUserId()
   const normalized = normalizeInput(input)
-  const songs = buildSetlistSongs(normalized.songIds, library, normalized.songKeys)
+  const songs = buildSetlistSongs(
+    normalized.songIds,
+    library,
+    normalized.songKeys,
+    normalized.songNotes,
+  )
   const reference = doc(collection(firestore, paths.setlists(organizationId)))
   const now = serverTimestamp()
 
@@ -174,6 +218,7 @@ export const createSetlist = async (
     date: normalized.date,
     notes: normalized.notes,
     songs,
+    blocks: normalized.blocks,
     estimatedDurationSec: estimateSetlistDuration(songs, library),
     template: false,
     targetMinutes: normalized.targetMinutes,
@@ -205,7 +250,12 @@ export const updateSetlist = async (
 ): Promise<void> => {
   const uid = requireUserId()
   const normalized = normalizeInput(input)
-  const songs = buildSetlistSongs(normalized.songIds, library, normalized.songKeys)
+  const songs = buildSetlistSongs(
+    normalized.songIds,
+    library,
+    normalized.songKeys,
+    normalized.songNotes,
+  )
 
   await updateDoc(doc(firestore, paths.setlist(organizationId, setlistId)), {
     name: normalized.name,
@@ -213,6 +263,7 @@ export const updateSetlist = async (
     date: normalized.date,
     notes: normalized.notes,
     songs,
+    blocks: normalized.blocks,
     estimatedDurationSec: estimateSetlistDuration(songs, library),
     targetMinutes: normalized.targetMinutes,
     breakMinutes: normalized.breakMinutes,
@@ -272,6 +323,7 @@ export const duplicateSetlist = async (
     date: source.date,
     notes: source.notes,
     songs: source.songs,
+    blocks: source.blocks,
     estimatedDurationSec: source.estimatedDurationSec,
     // The goal travels with the list: a copy of a 45-minute set is a
     // 45-minute set.
@@ -325,6 +377,7 @@ export const saveSetlistAsTemplate = async (
     date: null,
     notes: source.notes,
     songs: source.songs,
+    blocks: source.blocks,
     estimatedDurationSec: source.estimatedDurationSec,
     // A template keeps the goal — "45-min set" is most of why it is one.
     targetMinutes: source.targetMinutes,
@@ -378,21 +431,6 @@ export const setSetlistTemplate = async (
 }
 
 /** Reorders the songs of a setlist (docs §14: songs must be reorderable). */
-export const reorderSetlistSongs = async (
-  organizationId: string,
-  setlistId: string,
-  songIds: string[],
-  library: Map<string, Song>,
-  songKeys: Record<string, string> = {},
-): Promise<void> => {
-  const songs = buildSetlistSongs(songIds, library, songKeys)
-  await updateDoc(doc(firestore, paths.setlist(organizationId, setlistId)), {
-    songs,
-    estimatedDurationSec: estimateSetlistDuration(songs, library),
-    updatedAt: serverTimestamp(),
-  })
-}
-
 /**
  * Sets the key one song will be played in inside a setlist (docs §20). Stored
  * on the setlist entry only — the songbook keeps its original key — and synced

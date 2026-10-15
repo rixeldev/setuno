@@ -413,7 +413,7 @@ service cloud.firestore {
         allow update: if isAdmin(organizationId)
           && request.resource.data.organizationId == organizationId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'name', 'description', 'date', 'notes', 'songs',
+            'name', 'description', 'date', 'notes', 'songs', 'blocks',
             'estimatedDurationSec', 'targetMinutes', 'breakMinutes',
             'template', 'updatedAt'
           ]);

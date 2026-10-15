@@ -28,6 +28,7 @@ import {
   FullscreenExitIcon,
   KeepAwakeIcon,
   MusicIcon,
+  NoteIcon,
   PauseIcon,
   PlayFilledIcon,
   PrintIcon,
@@ -154,6 +155,12 @@ export default function SongScreen() {
   }, [contextSetlist, performances])
   // Key the band chose for this song in a live event's setlist ("" otherwise).
   const chosenPlayKey = eventSetlist?.songs.find((entry) => entry.songId === song?.id)?.key ?? ""
+  // The band's cue for *this entry* of the list it was opened from — "tune Eb",
+  // "starts alone" (roadmap #43). Context, not the song: the same song can be
+  // called something different in another list. Any list counts, live show or
+  // not — you opened it from there, and the note is meant to be read while you do.
+  const entryNote =
+    contextSetlist?.songs.find((entry) => entry.songId === song?.id)?.note ?? ""
 
   // Live show (#7): the running order with durations, this song's place in it
   // and the setlist's estimate. Shown while reading from an event's setlist.
@@ -725,9 +732,20 @@ export default function SongScreen() {
           style={[styles.immersiveBar, { transform: [{ translateY: stageBarY }] }]}
         >
           <View style={styles.immersiveHeading}>
-            <AppText variant="bodyStrong" numberOfLines={1} style={styles.immersiveHeadingTitle}>
-              {song.title}
-            </AppText>
+            <View style={styles.immersiveHeadingText}>
+              <AppText
+                variant="bodyStrong"
+                numberOfLines={1}
+                style={styles.immersiveHeadingTitle}
+              >
+                {song.title}
+              </AppText>
+              {entryNote ? (
+                <AppText variant="caption" tone="muted" numberOfLines={1}>
+                  {entryNote}
+                </AppText>
+              ) : null}
+            </View>
             <View style={styles.immersiveKey}>
               <MusicIcon size={13} color={Theme.colors.primary} />
               <AppText variant="caption" tone="primary" numberOfLines={1}>
@@ -898,6 +916,15 @@ export default function SongScreen() {
               }}
               onSkip={() => setTourActive(false)}
             />
+          ) : null}
+
+          {entryNote ? (
+            <View style={styles.setlistNote}>
+              <NoteIcon size={14} color={Theme.colors.accent} />
+              <AppText variant="caption" tone="muted" style={styles.flex}>
+                {entryNote}
+              </AppText>
+            </View>
           ) : null}
 
           {details.length > 0 ? (
@@ -1140,6 +1167,19 @@ const createStyles = () =>
       borderColor: Theme.colors.borderSoft,
       backgroundColor: Theme.colors.surface,
     },
+    /**
+     * The setlist entry's own note (roadmap #43) — a wash of the accent so it
+     * reads as a sticky note pinned to this performance, not as song metadata.
+     */
+    setlistNote: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: Theme.spacing.xs,
+      backgroundColor: Theme.colors.accentSoft,
+      borderRadius: Theme.radii.s,
+      paddingHorizontal: Theme.spacing.s,
+      paddingVertical: Theme.spacing.xs,
+    },
     badges: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
     footer: {
       gap: Theme.spacing.m,
@@ -1212,6 +1252,8 @@ const createStyles = () =>
       paddingBottom: Theme.spacing.huge,
     },
     immersiveHeadingTitle: { flexShrink: 1 },
+    /** Title stacked over the entry's note (only when the list has one). */
+    immersiveHeadingText: { flex: 1, minWidth: 0, gap: 1 },
     // Room for the corner arrows, which are lifted over the tray, so they never
     // cover the last lines.
     withNavPadding: {

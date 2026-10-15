@@ -14,6 +14,7 @@ const setlist = (overrides: Partial<Setlist> = {}): Setlist => ({
   date: null,
   notes: "",
   songs: [],
+  blocks: [],
   estimatedDurationSec: 0,
   targetMinutes: 0,
   breakMinutes: 0,

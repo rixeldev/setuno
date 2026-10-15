@@ -8,6 +8,26 @@ export interface SetlistSong {
   key: string
   /** Position in the setlist (0-based, contiguous). */
   order: number
+  /**
+   * The band's shared note for *this entry* (roadmap #43): "tune Eb", "starts
+   * alone". On the setlist, never on the song — the same song can be called
+   * something different in two lists. Empty string when unset.
+   */
+  note: string
+}
+
+/**
+ * A divider in the running order — Set 1 / Set 2 / Break / Encore (roadmap #43).
+ *
+ * Anchored to a **song**, never to a position: reordering the list then carries
+ * the divider with its music. `afterSongId` (rather than "before") makes every
+ * gap expressible — `null` is the top, a song id is the gap right after it,
+ * including the bottom after the last song.
+ */
+export interface SetlistBlock {
+  id: string
+  name: string
+  afterSongId: string | null
 }
 
 export interface Setlist {
@@ -19,6 +39,8 @@ export interface Setlist {
   date: string | null
   notes: string
   songs: SetlistSong[]
+  /** Dividers splitting the running order into sets (roadmap #43). */
+  blocks: SetlistBlock[]
   /** Sum of known song durations, in seconds. */
   estimatedDurationSec: number
   /**
@@ -56,6 +78,19 @@ export interface SetlistInput {
    */
   targetMinutes: number
   breakMinutes: number
+  /**
+   * Required for the same reason as the goal: the running-order editor writes
+   * through `updateSetlist` with an object that only means "the order changed",
+   * and an optional left out of it would drop every divider on the next
+   * reorder.
+   */
+  blocks: SetlistBlock[]
+  /**
+   * Note per song id, mirroring `songKeys` so a reorder carries each note with
+   * its song instead of with a position. Required for the same reason as
+   * `blocks`.
+   */
+  songNotes: Record<string, string>
   /**
    * Key each song will be played in, keyed by song id. Falls back to the song's
    * own key when missing.

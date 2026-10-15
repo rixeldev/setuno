@@ -13,9 +13,11 @@ import { Dialog } from "@/components/ui/Dialog"
 import { EmptyState } from "@/components/ui/States"
 import { Input, SearchInput } from "@/components/ui/Input"
 import { useToast } from "@/components/ui/Toast"
-import { CloseIcon, DotsIcon, MusicIcon, PlusIcon } from "@/components/ui/Icons"
+import { CloseIcon, DotsIcon, EditIcon, MusicIcon, NoteIcon, PlusIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { SetlistKeyDialog } from "@/components/setlists/SetlistKeyDialog"
+import { SetlistBlockDialog } from "@/components/setlists/SetlistBlockDialog"
+import { SetlistNoteDialog } from "@/components/setlists/SetlistNoteDialog"
 import { PrintSheet } from "@/components/songs/PrintSheet"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
@@ -25,6 +27,7 @@ import {
   duplicateSetlist,
   saveSetlistAsTemplate,
   setlistSongKeys,
+  setlistSongNotes,
   setSetlistTemplate,
   updateSetlist,
   updateSetlistSongKey,
@@ -46,8 +49,18 @@ import {
   durationGoalText,
   setlistGoal,
 } from "@/libs/setlistDuration"
+import { cleanBlockName, insertBlock, listRows, removeBlock, removeEntry, renameBlock } from "@/libs/setlistBlocks"
+import type { SetlistBlock } from "@/interfaces/setlist"
 import { displayKey } from "@/libs/chords"
 import { usePreferences } from "@/services/prefs"
+
+/** Fields the running-order editor can change; the rest always ride along. */
+interface OrderPatch {
+  songIds?: string[]
+  songKeys?: Record<string, string>
+  songNotes?: Record<string, string>
+  blocks?: SetlistBlock[]
+}
 
 /**
  * Setlist detail (docs §20), built for playing live: the running order is the
@@ -93,6 +106,20 @@ export default function SetlistDetail() {
     key: string
     mode: "add" | "edit"
   } | null>(null)
+  // Divider being inserted (anchored after a song) or renamed, with its text:
+  // controlled, seeded by the press that opens it — never by an effect.
+  const [blockTarget, setBlockTarget] = useState<{
+    mode: "insert" | "rename"
+    blockId: string | null
+    afterSongId: string | null
+    name: string
+  } | null>(null)
+  // Entry whose shared note is being edited ("tune Eb", "starts alone").
+  const [noteTarget, setNoteTarget] = useState<{
+    songId: string
+    title: string
+    note: string
+  } | null>(null)
 
   const setlist = useMemo(
     () => setlists.find((entry) => entry.id === setlistId) ?? null,
@@ -108,6 +135,15 @@ export default function SetlistDetail() {
       estimatedDurationSec: setlist.estimatedDurationSec,
     })
   : null
+  /**
+   * The running order as rows — dividers interleaved with their songs (the
+   * song number on a row counts songs only). Pure: the anchor an "insert
+   * divider" bar needs is derived from the row's position, never accumulated.
+   */
+  const rows = useMemo(
+    () => listRows(setlist?.songs ?? [], setlist?.blocks ?? []),
+    [setlist?.songs, setlist?.blocks],
+  )
   // Full documents for the printed sheet: each entry carries the key the band
   // plays that song in. A song deleted since the list was built drops out
   // instead of blanking its page.
@@ -139,10 +175,15 @@ export default function SetlistDetail() {
     name: profile?.displayName || "An admin",
   }
 
-  const persistOrder = async (
-    songIds: string[],
-    songKeys: Record<string, string>,
-  ): Promise<void> => {
+  /**
+   * Every write this screen makes to the running order goes through here. The
+   * state on screen is the base and the action's own piece is the patch, so
+   * the fields that are *not* part of an action — the goal, the notes, the
+   * dividers — are carried explicitly rather than by accident (#42 and #43
+   * both hang off this: an omitted optional would wipe them on the next
+   * reorder).
+   */
+  const persistOrder = async (patch: OrderPatch = {}): Promise<void> => {
     if (!setlist) return
     try {
       await updateSetlist(
@@ -153,10 +194,10 @@ export default function SetlistDetail() {
           description: setlist.description,
           date: setlist.date,
           notes: setlist.notes,
-          songIds,
-          songKeys,
-          // This call only ever means "the order changed": carrying the goal
-          // through is what keeps a reorder from silently clearing it.
+          songIds: patch.songIds ?? setlist.songs.map((entry) => entry.songId),
+          songKeys: patch.songKeys ?? setlistSongKeys(setlist.songs),
+          songNotes: patch.songNotes ?? setlistSongNotes(setlist.songs),
+          blocks: patch.blocks ?? setlist.blocks,
           targetMinutes: setlist.targetMinutes,
           breakMinutes: setlist.breakMinutes,
         },
@@ -175,17 +216,21 @@ export default function SetlistDetail() {
     if (target < 0 || target >= ids.length) return
     const [moved] = ids.splice(index, 1)
     ids.splice(target, 0, moved)
-    void persistOrder(ids, setlistSongKeys(setlist.songs))
+    // Keys, notes and dividers are all keyed by song id, so they follow the
+    // song without being mentioned.
+    void persistOrder({ songIds: ids })
   }
 
   const removeSong = (songId: string): void => {
     if (!setlist) return
-    void persistOrder(
-      setlist.songs
-        .filter((entry) => entry.songId !== songId)
-        .map((entry) => entry.songId),
-      setlistSongKeys(setlist.songs),
-    )
+    const next = removeEntry(setlist.songs, setlist.blocks, songId)
+    void persistOrder({
+      songIds: next.songs.map((entry) => entry.songId),
+      // The dividers that pointed at the removed song are re-anchored to the
+      // gap it used to fill — dropping them here would take the band's sets
+      // away with the song.
+      blocks: next.blocks,
+    })
   }
 
   const addSongs = (ids: string[], keys: Record<string, string> = {}): void => {
@@ -194,13 +239,50 @@ export default function SetlistDetail() {
       return
     }
     const existing = setlist.songs.map((entry) => entry.songId)
-    void persistOrder([...existing, ...ids], {
-      ...setlistSongKeys(setlist.songs),
-      ...keys,
+    void persistOrder({
+      songIds: [...existing, ...ids],
+      songKeys: {
+        ...setlistSongKeys(setlist.songs),
+        ...keys,
+      },
     })
     setPickerOpen(false)
     setSearch("")
     toast.showSuccess(t("setlists.songsAdded", { count: ids.length }))
+  }
+
+  /** Inserts a new divider, or renames the one picked — one dialog, two modes. */
+  const submitBlock = (name: string): void => {
+    if (!setlist || !blockTarget) return
+    const cleaned = cleanBlockName(name)
+    if (cleaned.length === 0) return
+    if (blockTarget.mode === "insert") {
+      void persistOrder({
+        blocks: insertBlock(setlist.blocks, cleaned, blockTarget.afterSongId),
+      })
+    } else if (blockTarget.blockId) {
+      void persistOrder({
+        blocks: renameBlock(setlist.blocks, blockTarget.blockId, cleaned),
+      })
+    }
+    setBlockTarget(null)
+  }
+
+  /**
+   * Writes the entry's note. An empty value is a deliberate clear — absence is
+   * what "no note" means, so `normalizeInput` drops it instead of storing "".
+   * Notes are keyed by song id, so this reorder-safe write never moves one to
+   * a different row.
+   */
+  const submitNote = (note: string): void => {
+    if (!setlist || !noteTarget) return
+    void persistOrder({
+      songNotes: {
+        ...setlistSongNotes(setlist.songs),
+        [noteTarget.songId]: note,
+      },
+    })
+    setNoteTarget(null)
   }
 
   const changeKey = async (songId: string, key: string): Promise<void> => {
@@ -382,124 +464,239 @@ export default function SetlistDetail() {
         />
       ) : (
         <Card padded={false} style={styles.listCard}>
-          {setlist.songs.map((entry, index) => {
+          {rows.map((row, rowIndex) => {
+            if (row.kind === "block") {
+              const block = row.block
+              return (
+                <View key={`block-${block.id}`} style={[styles.songRow, styles.blockRow]}>
+                  <View style={styles.blockLabelRow}>
+                    <View style={styles.blockLine} />
+                    <AppText
+                      variant="label"
+                      tone="accent"
+                      numberOfLines={1}
+                      style={styles.blockName}
+                    >
+                      {block.name}
+                    </AppText>
+                    <View style={styles.blockLine} />
+                  </View>
+                  {editing ? (
+                    <View style={styles.blockActions}>
+                      <IconButton
+                        label={t("setlists.renameBlock")}
+                        size={30}
+                        onPress={() =>
+                          setBlockTarget({
+                            mode: "rename",
+                            blockId: block.id,
+                            afterSongId: block.afterSongId,
+                            name: block.name,
+                          })
+                        }
+                        icon={<EditIcon size={15} color={Theme.colors.textMuted} />}
+                      />
+                      <IconButton
+                        label={t("setlists.removeBlock")}
+                        size={30}
+                        onPress={() =>
+                          void persistOrder({
+                            blocks: removeBlock(setlist.blocks, block.id),
+                          })
+                        }
+                        icon={<CloseIcon size={15} color={Theme.colors.danger} />}
+                      />
+                    </View>
+                  ) : null}
+                </View>
+              )
+            }
+
+            const { entry, order } = row
+            // Position among the *songs*: a divider never takes a number, so
+            // this is both what the running order shows and what `move` indexes.
+            const index = order - 1
+            // A divider sits *after* a song, so the bar above this song goes
+            // after the previous one (`null` at the top). Anchoring to the song
+            // the bar precedes would put the new divider on the wrong side of
+            // every divider already in that gap.
+            const afterSongId =
+              index > 0 ? (setlist.songs[index - 1]?.songId ?? null) : null
             const song = songLibrary.get(entry.songId)
             const seconds = song
               ? (song.durationSec ?? estimateDurationSec(song.sections))
               : null
             return (
-              <View
-                key={`${entry.songId}-${index}`}
-                style={[styles.songRow, index > 0 && styles.songDivider]}
-              >
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t("setlists.openSong", {
-                    title: entry.title,
-                  })}
-                  onPress={() =>
-                    router.push(
-                      relatedShows.length > 0
-                        ? `/songs/${entry.songId}?setlist=${setlist.id}`
-                        : `/songs/${entry.songId}`,
-                    )
-                  }
-                  style={({ pressed }) => [
-                    styles.songMain,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <AppText variant="caption" tone="faint" style={styles.order}>
-                    {index + 1}
-                  </AppText>
-                  <View style={styles.flex}>
-                    <AppText variant="bodyStrong" numberOfLines={1}>
-                      {entry.title}
-                    </AppText>
-                    <AppText variant="caption" tone="muted" numberOfLines={1}>
-                      {[
-                        entry.artist || t("common.unknownArtist"),
-                        formatDuration(seconds),
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </AppText>
-                  </View>
-                </Pressable>
-
+              <React.Fragment key={`${entry.songId}-${order}`}>
                 {editing ? (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={t("setlists.changeKey")}
-                    hitSlop={Theme.hitSlop}
+                    accessibilityLabel={t("setlists.insertBlockBefore", {
+                      title: entry.title,
+                    })}
+                    hitSlop={4}
                     onPress={() =>
-                      setKeyTarget({
-                        songId: entry.songId,
-                        title: entry.title,
-                        originalKey: song?.key ?? "",
-                        key: entry.key,
-                        mode: "edit",
+                      setBlockTarget({
+                        mode: "insert",
+                        blockId: null,
+                        afterSongId,
+                        name: "",
                       })
                     }
-                    style={({ pressed }) => [pressed && styles.pressed]}
+                    style={({ pressed }) => [
+                      styles.insertBar,
+                      pressed && styles.pressed,
+                    ]}
                   >
+                    <PlusIcon size={12} color={Theme.colors.textFaint} />
+                  </Pressable>
+                ) : null}
+                <View
+                  style={[styles.songRow, rowIndex > 0 && styles.songDivider]}
+                >
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t("setlists.openSong", {
+                      title: entry.title,
+                    })}
+                    onPress={() =>
+                      router.push(
+                        relatedShows.length > 0
+                          ? `/songs/${entry.songId}?setlist=${setlist.id}`
+                          : `/songs/${entry.songId}`,
+                      )
+                    }
+                    style={({ pressed }) => [
+                      styles.songMain,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <AppText variant="caption" tone="faint" style={styles.order}>
+                      {order}
+                    </AppText>
+                    <View style={styles.flex}>
+                      <AppText variant="bodyStrong" numberOfLines={1}>
+                        {entry.title}
+                      </AppText>
+                      <AppText variant="caption" tone="muted" numberOfLines={1}>
+                        {[
+                          entry.artist || t("common.unknownArtist"),
+                          formatDuration(seconds),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </AppText>
+                      {entry.note ? (
+                        <View style={styles.noteLine}>
+                          <NoteIcon size={12} color={Theme.colors.accent} />
+                          <AppText
+                            variant="caption"
+                            tone="muted"
+                            numberOfLines={2}
+                            style={styles.flex}
+                          >
+                            {entry.note}
+                          </AppText>
+                        </View>
+                      ) : null}
+                    </View>
+                  </Pressable>
+
+                  {editing ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t("setlists.changeKey")}
+                      hitSlop={Theme.hitSlop}
+                      onPress={() =>
+                        setKeyTarget({
+                          songId: entry.songId,
+                          title: entry.title,
+                          originalKey: song?.key ?? "",
+                          key: entry.key,
+                          mode: "edit",
+                        })
+                      }
+                      style={({ pressed }) => [pressed && styles.pressed]}
+                    >
+                      <Badge
+                        label={entry.key ? displayKey(entry.key, notation) : "—"}
+                        tone="accent"
+                        style={styles.keyBadge}
+                      />
+                    </Pressable>
+                  ) : entry.key ? (
                     <Badge
-                      label={entry.key ? displayKey(entry.key, notation) : "—"}
+                      label={displayKey(entry.key, notation)}
                       tone="accent"
                       style={styles.keyBadge}
                     />
-                  </Pressable>
-                ) : entry.key ? (
-                  <Badge
-                    label={displayKey(entry.key, notation)}
-                    tone="accent"
-                    style={styles.keyBadge}
-                  />
-                ) : null}
+                  ) : null}
 
-                {editing ? (
-                  <View style={styles.rowActions}>
-                    <IconButton
-                      label={t("setlists.moveUp")}
-                      size={30}
-                      disabled={index === 0}
-                      onPress={() => move(index, -1)}
-                      icon={
-                        <AppText
-                          variant="bodyStrong"
-                          tone={index === 0 ? "faint" : "muted"}
-                        >
-                          ↑
-                        </AppText>
-                      }
-                    />
-                    <IconButton
-                      label={t("setlists.moveDown")}
-                      size={30}
-                      disabled={index === setlist.songs.length - 1}
-                      onPress={() => move(index, 1)}
-                      icon={
-                        <AppText
-                          variant="bodyStrong"
-                          tone={
-                            index === setlist.songs.length - 1
-                              ? "faint"
-                              : "muted"
-                          }
-                        >
-                          ↓
-                        </AppText>
-                      }
-                    />
-                    <IconButton
-                      label={t("setlists.removeFromSetlist")}
-                      size={30}
-                      onPress={() => removeSong(entry.songId)}
-                      icon={<CloseIcon size={15} color={Theme.colors.danger} />}
-                    />
-                  </View>
-                ) : null}
-              </View>
+                  {editing ? (
+                    <View style={styles.rowActions}>
+                      <IconButton
+                        label={t("setlists.moveUp")}
+                        size={30}
+                        disabled={index === 0}
+                        onPress={() => move(index, -1)}
+                        icon={
+                          <AppText
+                            variant="bodyStrong"
+                            tone={index === 0 ? "faint" : "muted"}
+                          >
+                            ↑
+                          </AppText>
+                        }
+                      />
+                      <IconButton
+                        label={t("setlists.moveDown")}
+                        size={30}
+                        disabled={index === setlist.songs.length - 1}
+                        onPress={() => move(index, 1)}
+                        icon={
+                          <AppText
+                            variant="bodyStrong"
+                            tone={
+                              index === setlist.songs.length - 1
+                                ? "faint"
+                                : "muted"
+                            }
+                          >
+                            ↓
+                          </AppText>
+                        }
+                      />
+                      <IconButton
+                        label={t("setlists.editNote")}
+                        size={30}
+                        onPress={() =>
+                          setNoteTarget({
+                            songId: entry.songId,
+                            title: entry.title,
+                            note: entry.note,
+                          })
+                        }
+                        icon={
+                          <NoteIcon
+                            size={15}
+                            color={
+                              entry.note
+                                ? Theme.colors.accent
+                                : Theme.colors.textMuted
+                            }
+                          />
+                        }
+                      />
+                      <IconButton
+                        label={t("setlists.removeFromSetlist")}
+                        size={30}
+                        onPress={() => removeSong(entry.songId)}
+                        icon={<CloseIcon size={15} color={Theme.colors.danger} />}
+                      />
+                    </View>
+                  ) : null}
+                </View>
+              </React.Fragment>
             )
           })}
         </Card>
@@ -744,6 +941,30 @@ export default function SetlistDetail() {
         onClose={() => setKeyTarget(null)}
         onSelect={pickKey}
       />
+
+      <SetlistBlockDialog
+        visible={blockTarget !== null}
+        mode={blockTarget?.mode ?? "insert"}
+        name={blockTarget?.name ?? ""}
+        onChangeName={(name) =>
+          setBlockTarget((current) =>
+            current ? { ...current, name } : current,
+          )
+        }
+        onClose={() => setBlockTarget(null)}
+        onSubmit={submitBlock}
+      />
+
+      <SetlistNoteDialog
+        visible={noteTarget !== null}
+        title={noteTarget?.title ?? ""}
+        note={noteTarget?.note ?? ""}
+        onChangeNote={(note) =>
+          setNoteTarget((current) => (current ? { ...current, note } : current))
+        }
+        onClose={() => setNoteTarget(null)}
+        onSubmit={submitNote}
+      />
     </ScreenContainer>
   )
 }
@@ -772,6 +993,39 @@ const createStyles = () =>
       gap: Theme.spacing.xs,
     },
     songDivider: { borderTopWidth: 1, borderTopColor: Theme.colors.borderSoft },
+    /** A divider of the running order (roadmap #43): its label between rules. */
+    blockRow: {
+      paddingVertical: Theme.spacing.xs,
+      paddingHorizontal: Theme.spacing.m,
+    },
+    blockLabelRow: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.s,
+    },
+    blockLine: {
+      flex: 1,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: Theme.colors.borderSoft,
+    },
+    blockName: { flexShrink: 1 },
+    blockActions: { flexDirection: "row", alignItems: "center" },
+    /**
+     * The thin "+" bar between songs while editing — the place a divider goes.
+     * A sibling row (not a child of the song) so it never counts as content.
+     */
+    insertBar: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 3,
+    },
+    noteLine: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      marginTop: 2,
+    },
     songMain: {
       flex: 1,
       minHeight: 56,
