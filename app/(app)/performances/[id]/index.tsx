@@ -85,6 +85,7 @@ export default function PerformanceDetail() {
           notes: performance.notes,
           setlists: performance.setlists,
           status,
+          type: performance.type,
         },
         actor,
       )
@@ -209,10 +210,15 @@ export default function PerformanceDetail() {
           </View>
 
           <View style={styles.infoBody}>
-            <Badge
-              label={t(`performances.${performance.status}`)}
-              tone={STATUS_TONES[performance.status]}
-            />
+            <View style={styles.badges}>
+              {performance.type === "rehearsal" ? (
+                <Badge label={t("performances.typeRehearsal")} tone="accent" />
+              ) : null}
+              <Badge
+                label={t(`performances.${performance.status}`)}
+                tone={STATUS_TONES[performance.status]}
+              />
+            </View>
             {relativeDay ? (
               <AppText variant="bodyStrong" numberOfLines={2}>
                 {relativeDay}
@@ -389,6 +395,7 @@ const createStyles = () =>
       borderRightColor: Theme.colors.borderSoft,
     },
     infoBody: { flex: 1, minWidth: 0, gap: 6, justifyContent: "center" },
+    badges: { flexDirection: "row", alignItems: "center", gap: 4 },
     metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
     flex: { flex: 1, minWidth: 0 },
     notes: {

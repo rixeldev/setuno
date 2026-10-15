@@ -87,8 +87,8 @@ a sidebar layout on the web.
 | **Setlist running order** | Open a song from an event's setlist and step through it with corner arrows |
 | **Suggestions** | Members propose changes, admins accept/reject them with a note |
 | **Setlists** | Build running orders — with **Set 1 / Break / Encore dividers**, a per-song note the band reads in the reader ("tune Eb") and a **goal**: target minutes with breaks counted inside, plus a live "5m left / 6m over" readout while you edit. Lists live under their events, and any list can be duplicated or saved as a **template** (45-min, acoustic, wedding) that lives outside events |
-| **Performances** | Schedule gigs with venue, times, status and attached setlists |
-| **Calendar** | Month view of upcoming and past shows |
+| **Performances** | Schedule the band's events — **gigs and rehearsals**: the type is picked when creating one, a rehearsal carries its own **goals** instead of notes, both filter lists (and the calendar) by type, and only rehearsals wear the badge |
+| **Calendar** | Month, week and agenda views of upcoming and past events, filtered by status and by gig/rehearsal |
 | **Calendar export** | Save the band calendar or a single event as an `.ics` file — share sheet on mobile, download on web — with stable UIDs so re-imports update instead of duplicating |
 | **Dashboard** | Next show, quick actions, library stats, recent activity feed |
 | **Onboarding** | A four-slide welcome for brand-new accounts, then a step-by-step tour of the real reader and chord editor, with the sample song as the playground |

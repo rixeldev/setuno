@@ -24,7 +24,8 @@ import { createPerformance, updatePerformance } from "@/services/performances"
 import { toFriendlyError } from "@/services/errors"
 import { formatDurationLong } from "@/libs/format"
 import { ISO_DATE_PATTERN, validateRequired, validateTime } from "@/libs/validation"
-import type { Performance, PerformanceInput, PerformanceStatus } from "@/interfaces"
+import { PERFORMANCE_TYPE_KEYS } from "@/interfaces/performance"
+import type { Performance, PerformanceInput, PerformanceStatus, PerformanceType } from "@/interfaces"
 
 interface PerformanceFormProps {
   /** Present when editing an existing show. */
@@ -44,6 +45,7 @@ interface PerformanceFormState {
   notes: string
   setlistIds: string[]
   status: PerformanceStatus
+  type: PerformanceType
 }
 
 /** Stable snapshot used to detect unsaved changes. */
@@ -61,13 +63,18 @@ const formStateFrom = (performance: Performance | null | undefined): Performance
   notes: performance?.notes ?? "",
   setlistIds: performance?.setlists.map((entry) => entry.id) ?? [],
   status: performance?.status ?? "scheduled",
+  type: performance?.type ?? "gig",
 })
 
 const STATUSES: PerformanceStatus[] = ["scheduled", "completed", "cancelled"]
 
+/** Roadmap #46: what the event *is*, before it is anything else. */
+const TYPES: PerformanceType[] = ["gig", "rehearsal"]
+
 /**
- * Performance (gig) form (docs §22): date range, times, venue, notes, optional
- * setlist and status. Presented as a modal on both the new and edit routes.
+ * Performance form (docs §22): type (gig / rehearsal), date range, times,
+ * venue, notes/goals, optional setlist and status. Presented as a modal on
+ * both the new and edit routes.
  */
 export function PerformanceForm({ performance, onSaved }: PerformanceFormProps) {
   const { t } = useTranslation()
@@ -91,6 +98,7 @@ export function PerformanceForm({ performance, onSaved }: PerformanceFormProps) 
     performance?.setlists.map((entry) => entry.id) ?? [],
   )
   const [status, setStatus] = useState<PerformanceStatus>(performance?.status ?? "scheduled")
+  const [type, setType] = useState<PerformanceType>(performance?.type ?? "gig")
   const [setlistPicker, setSetlistPicker] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -132,6 +140,7 @@ export function PerformanceForm({ performance, onSaved }: PerformanceFormProps) 
     notes,
     setlistIds,
     status,
+    type,
   }
   const hasUnsavedChanges = serializeForm(currentState) !== baseline && !saving
   const leaveGuard = useUnsavedChanges(hasUnsavedChanges)
@@ -166,6 +175,7 @@ export function PerformanceForm({ performance, onSaved }: PerformanceFormProps) 
       notes: notes.trim(),
       setlists: selectedSetlists,
       status,
+      type,
     }
 
     setSaving(true)
@@ -195,6 +205,25 @@ export function PerformanceForm({ performance, onSaved }: PerformanceFormProps) 
       subtitle={t("performances.formSubtitle")}
     >
       <Card style={styles.card}>
+        {/* What the event *is*, before it is anything else: a rehearsal frames
+            everything below it differently (goals, not rider notes). */}
+        <View style={styles.field}>
+          <AppText variant="caption" tone="muted">
+            {t("performances.type")}
+          </AppText>
+          <View style={styles.wrap}>
+            {TYPES.map((entry) => (
+              <Chip
+                key={entry}
+                label={t(PERFORMANCE_TYPE_KEYS[entry])}
+                tone="primary"
+                selected={type === entry}
+                onPress={() => setType(entry)}
+              />
+            ))}
+          </View>
+        </View>
+
         <Input
           label={t("performances.gigName")}
           required
@@ -260,10 +289,14 @@ export function PerformanceForm({ performance, onSaved }: PerformanceFormProps) 
         </View>
 
         <Input
-          label={t("performances.notes")}
+          label={type === "rehearsal" ? t("performances.goals") : t("performances.notes")}
           value={notes}
           onChangeText={setNotes}
-          placeholder={t("performances.notesPlaceholder")}
+          placeholder={
+            type === "rehearsal"
+              ? t("performances.goalsPlaceholder")
+              : t("performances.notesPlaceholder")
+          }
           multiline
         />
       </Card>

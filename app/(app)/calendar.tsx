@@ -34,7 +34,9 @@ import {
 } from "@/libs/calendarView"
 import type { RelativeDayLabels } from "@/libs/format"
 import { formatDateRange, formatRelativeDay } from "@/libs/format"
-import type { PerformanceStatus } from "@/interfaces/performance"
+import { PERFORMANCE_TYPE_KEYS } from "@/interfaces/performance"
+import type { PerformanceStatus, PerformanceType } from "@/interfaces/performance"
+import { DEFAULT_EVENT_TYPES, EVENT_TYPES, filterByEventType } from "@/libs/performances"
 import { parseIsoDate } from "@/libs/validation"
 import { toFriendlyError } from "@/services/errors"
 import { performanceDays, performanceLastDay, todayIsoDate } from "@/services/performances"
@@ -56,7 +58,8 @@ const STATUS_KEYS: Record<PerformanceStatus, string> = {
 /**
  * Band calendar (docs §23): a month grid with show markers plus the agenda for
  * the selected day, and — since roadmap #51 — a week view over the same seven
- * days and a running agenda from today, both filtered by status.
+ * days and a running agenda from today, all filtered by status and, since
+ * roadmap #46, by event type (gig / rehearsal).
  *
  * The view and the statuses are session state, not preferences: remembering
  * them is the storage shape the songbook already owns, and that is a decision
@@ -78,6 +81,7 @@ export default function CalendarScreen() {
   const [exporting, setExporting] = useState(false)
   const [view, setView] = useState<CalendarView>("month")
   const [statuses, setStatuses] = useState<PerformanceStatus[]>([...DEFAULT_STATUSES])
+  const [types, setTypes] = useState<PerformanceType[]>([...DEFAULT_EVENT_TYPES])
   const [month, setMonth] = useState(() => {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1, 12)
@@ -86,7 +90,14 @@ export default function CalendarScreen() {
 
   // Everything below reads the filtered list, so the chips move the dots, the
   // day agenda and the upcoming list together rather than only the list.
-  const filtered = useMemo(() => filterByStatus(performances, statuses), [performances, statuses])
+  const filtered = useMemo(
+    () => filterByEventType(filterByStatus(performances, statuses), types),
+    [performances, statuses, types],
+  )
+  // The type row only shows up once the band has a rehearsal to show or hide —
+  // a control that filters nothing is noise (the picker's "include retired"
+  // chip follows the same rule).
+  const hasRehearsal = performances.some((entry) => entry.type === "rehearsal")
   const counts = useMemo(() => dayCounts(filtered), [filtered])
 
   const dayShows = useMemo(
@@ -128,6 +139,15 @@ export default function CalendarScreen() {
       // Never leave the row empty: with nothing selected the calendar would fall
       // back to the default while every chip read as off.
       return next.length > 0 ? next : [...DEFAULT_STATUSES]
+    })
+
+  const toggleType = (type: PerformanceType): void =>
+    setTypes((current) => {
+      const next = current.includes(type) ?
+        current.filter((entry) => entry !== type)
+      : [...current, type]
+      // Same rule as the statuses above.
+      return next.length > 0 ? next : [...DEFAULT_EVENT_TYPES]
     })
 
   const exportCalendar = async (): Promise<void> => {
@@ -215,6 +235,19 @@ export default function CalendarScreen() {
             />
           ))}
         </View>
+
+        {hasRehearsal ? (
+          <View style={styles.chips}>
+            {EVENT_TYPES.map((type) => (
+              <Chip
+                key={type}
+                label={t(PERFORMANCE_TYPE_KEYS[type])}
+                selected={types.includes(type)}
+                onPress={() => toggleType(type)}
+              />
+            ))}
+          </View>
+        ) : null}
 
         {view === "month" ? (
           <CalendarMonth

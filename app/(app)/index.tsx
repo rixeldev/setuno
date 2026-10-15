@@ -400,7 +400,9 @@ export default function Dashboard() {
                 </AppText>
                 <View style={styles.heroStatus}>
                   <AppText variant="caption" tone="inverse" numberOfLines={1}>
-                    {t(`performances.${nextShow.status}`)}
+                    {nextShow.type === "rehearsal"
+                      ? `${t("performances.typeRehearsal")} · ${t(`performances.${nextShow.status}`)}`
+                      : t(`performances.${nextShow.status}`)}
                   </AppText>
                 </View>
               </View>

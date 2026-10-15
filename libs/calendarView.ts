@@ -26,9 +26,10 @@ export const CALENDAR_STATUSES: readonly PerformanceStatus[] = [
 
 /**
  * What the calendar shows before anything has been switched: everything but the
- * cancelled, which the month grid has always skipped. A status field is the
- * only facet the model carries today — roadmap #46 adds `type: gig | rehearsal`,
- * and the filter row is built to grow a second group of chips beside this one.
+ * cancelled, which the month grid has always skipped. The status filter is one
+ * facet of the model; the type chips beside it (roadmap #46, `gig | rehearsal`)
+ * come from `libs/performances.ts` (`filterByEventType`), because the shows
+ * list filters by type too.
  */
 export const DEFAULT_STATUSES: readonly PerformanceStatus[] = ["scheduled", "completed"]
 

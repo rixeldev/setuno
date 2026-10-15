@@ -38,7 +38,7 @@ export function PerformanceCard({ performance, onPress }: CardProps) {
   return (
     <Card
       onPress={onPress}
-      accessibilityLabel={`${performance.name}, ${dateLine}`}
+      accessibilityLabel={`${performance.type === "rehearsal" ? `${t("performances.typeRehearsal")}, ` : ""}${performance.name}, ${dateLine}`}
       style={{ gap: Theme.spacing.s }}
     >
       <View style={styles.row}>
@@ -69,10 +69,17 @@ export function PerformanceCard({ performance, onPress }: CardProps) {
           ) : null}
         </View>
 
-        <Badge
-          label={t(`performances.${performance.status}`)}
-          tone={PERFORMANCE_STATUS_TONES[performance.status]}
-        />
+        {/* Only the exception is badged (the songbook's own rule): a gig is
+            what an event is by default, a rehearsal says so. */}
+        <View style={styles.badges}>
+          {performance.type === "rehearsal" ? (
+            <Badge label={t("performances.typeRehearsal")} tone="accent" />
+          ) : null}
+          <Badge
+            label={t(`performances.${performance.status}`)}
+            tone={PERFORMANCE_STATUS_TONES[performance.status]}
+          />
+        </View>
       </View>
 
       {performance.venue.address ? (
@@ -102,7 +109,7 @@ export function PerformanceListRow({ performance, onPress }: CardProps) {
       onPress={onPress}
       padded={false}
       style={styles.compact}
-      accessibilityLabel={`${performance.name}, ${formatRelativeDay(parseIsoDate(performance.date), relativeLabels)}`}
+      accessibilityLabel={`${performance.type === "rehearsal" ? `${t("performances.typeRehearsal")}, ` : ""}${performance.name}, ${formatRelativeDay(parseIsoDate(performance.date), relativeLabels)}`}
     >
       <View style={styles.compactRow}>
         <View style={styles.flex}>
@@ -121,10 +128,15 @@ export function PerformanceListRow({ performance, onPress }: CardProps) {
               .join(" · ")}
           </AppText>
         </View>
-        <Badge
-          label={t(`performances.${performance.status}`)}
-          tone={PERFORMANCE_STATUS_TONES[performance.status]}
-        />
+        <View style={styles.badges}>
+          {performance.type === "rehearsal" ? (
+            <Badge label={t("performances.typeRehearsal")} tone="accent" />
+          ) : null}
+          <Badge
+            label={t(`performances.${performance.status}`)}
+            tone={PERFORMANCE_STATUS_TONES[performance.status]}
+          />
+        </View>
       </View>
     </Card>
   )
@@ -133,6 +145,7 @@ export function PerformanceListRow({ performance, onPress }: CardProps) {
 const createStyles = () =>
   StyleSheet.create({
     row: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.m },
+    badges: { flexDirection: "row", alignItems: "center", gap: 4 },
     flex: { flex: 1, minWidth: 0 },
     dateBlock: {
       minWidth: 58,

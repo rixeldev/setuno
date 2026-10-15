@@ -13,6 +13,9 @@ import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { PerformanceCard } from "@/components/performances/PerformanceCard"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
+import { DEFAULT_EVENT_TYPES, EVENT_TYPES, filterByEventType } from "@/libs/performances"
+import { PERFORMANCE_TYPE_KEYS } from "@/interfaces/performance"
+import type { PerformanceType } from "@/interfaces/performance"
 
 const TABS = [
   { key: "upcoming", labelKey: "performances.upcoming" },
@@ -21,7 +24,10 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"]
 
-/** Gigs and rehearsals (docs §22): upcoming first, history below. */
+/**
+ * Gigs and rehearsals (docs §22): upcoming first, history below, each narrowed
+ * by the event-type chips (roadmap #46) once the band has a rehearsal.
+ */
 export default function PerformancesScreen() {
   const { t } = useTranslation()
   const styles = useThemedStyles(createStyles)
@@ -29,11 +35,45 @@ export default function PerformancesScreen() {
   const { isAdmin } = useOrganization()
   const { performances, upcomingPerformances, pastPerformances, loading, error } = useOrgData()
   const [tab, setTab] = useState<TabKey>("upcoming")
+  const [types, setTypes] = useState<PerformanceType[]>([...DEFAULT_EVENT_TYPES])
 
-  const visible = useMemo(
-    () => (tab === "upcoming" ? upcomingPerformances : pastPerformances),
-    [tab, upcomingPerformances, pastPerformances],
+  // The type row only shows up once the band has a rehearsal to show or hide.
+  const hasRehearsal = performances.some((entry) => entry.type === "rehearsal")
+  const toggleType = (type: PerformanceType): void =>
+    setTypes((current) => {
+      const next = current.includes(type) ?
+        current.filter((entry) => entry !== type)
+      : [...current, type]
+      // Never leave nothing selected: the list would fall back to the default
+      // while every chip read as off.
+      return next.length > 0 ? next : [...DEFAULT_EVENT_TYPES]
+    })
+
+  const base = tab === "upcoming" ? upcomingPerformances : pastPerformances
+  const visible = useMemo(() => filterByEventType(base, types), [base, types])
+  // The tab counts follow the filter, so the number and the list can never
+  // disagree about how many events are being shown.
+  const upcomingCount = useMemo(
+    () => filterByEventType(upcomingPerformances, types).length,
+    [upcomingPerformances, types],
   )
+  const pastCount = useMemo(
+    () => filterByEventType(pastPerformances, types).length,
+    [pastPerformances, types],
+  )
+
+  // Filtered out is not the same as gone: an empty list whose band still has
+  // events of another type says so, instead of reading like a fresh band.
+  const emptyTitle =
+    base.length > 0 ? t("performances.emptyFiltered")
+    : tab === "upcoming" ? t("dashboard.noGig")
+    : t("performances.noPast")
+  const emptyMessage =
+    base.length > 0 ? t("performances.emptyFilteredHint")
+    : tab === "upcoming" ?
+      isAdmin ? t("performances.emptyUpcomingAdmin")
+      : t("performances.emptyUpcomingMember")
+    : t("performances.emptyPast")
 
   return (
     <ScreenContainer
@@ -53,16 +93,31 @@ export default function PerformancesScreen() {
         ) : null
       }
       toolbar={
-        <View style={styles.segment}>
-          {TABS.map((entry) => (
-            <Chip
-              key={entry.key}
-              label={`${t(entry.labelKey)} (${entry.key === "upcoming" ? upcomingPerformances.length : pastPerformances.length})`}
-              tone="primary"
-              selected={tab === entry.key}
-              onPress={() => setTab(entry.key)}
-            />
-          ))}
+        <View style={styles.toolbar}>
+          <View style={styles.segment}>
+            {TABS.map((entry) => (
+              <Chip
+                key={entry.key}
+                label={`${t(entry.labelKey)} (${entry.key === "upcoming" ? upcomingCount : pastCount})`}
+                tone="primary"
+                selected={tab === entry.key}
+                onPress={() => setTab(entry.key)}
+              />
+            ))}
+          </View>
+
+          {hasRehearsal ? (
+            <View style={styles.filterRow}>
+              {EVENT_TYPES.map((type) => (
+                <Chip
+                  key={type}
+                  label={t(PERFORMANCE_TYPE_KEYS[type])}
+                  selected={types.includes(type)}
+                  onPress={() => toggleType(type)}
+                />
+              ))}
+            </View>
+          ) : null}
         </View>
       }
     >
@@ -73,16 +128,18 @@ export default function PerformancesScreen() {
       ) : visible.length === 0 ? (
         <EmptyState
           icon={<CalendarCheckIcon size={24} color={Theme.colors.primary} />}
-          title={tab === "upcoming" ? t("dashboard.noGig") : t("performances.noPast")}
-          message={
-            tab === "upcoming"
-              ? isAdmin
-                ? t("performances.emptyUpcomingAdmin")
-                : t("performances.emptyUpcomingMember")
-              : t("performances.emptyPast")
+          title={emptyTitle}
+          message={emptyMessage}
+          actionLabel={
+            isAdmin && tab === "upcoming" && base.length === 0
+              ? t("performances.schedule")
+              : undefined
           }
-          actionLabel={isAdmin && tab === "upcoming" ? t("performances.schedule") : undefined}
-          onAction={isAdmin && tab === "upcoming" ? () => router.push("/performances/new") : undefined}
+          onAction={
+            isAdmin && tab === "upcoming" && base.length === 0
+              ? () => router.push("/performances/new")
+              : undefined
+          }
         />
       ) : (
         <View style={styles.list}>
@@ -109,6 +166,10 @@ export default function PerformancesScreen() {
 
 const createStyles = () =>
   StyleSheet.create({
+    toolbar: {
+      gap: 6,
+      alignSelf: "flex-start",
+    },
     segment: {
       flexDirection: "row",
       flexWrap: "wrap",
@@ -121,6 +182,14 @@ const createStyles = () =>
       backgroundColor: Theme.colors.surfaceHigh,
       borderWidth: 1,
       borderColor: Theme.colors.borderSoft,
+    },
+    // The type chips sit plainly on the screen, like the calendar's filter
+    // rows — only the tab row carries the pill container.
+    filterRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+      alignSelf: "flex-start",
     },
     list: { gap: Theme.spacing.m },
   })

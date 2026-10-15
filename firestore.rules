@@ -501,12 +501,17 @@ service cloud.firestore {
           && request.resource.data.date is string
           && request.resource.data.setlists is list
           && request.resource.data.venue is map
-          && request.resource.data.status in ['scheduled', 'completed', 'cancelled'];
+          && request.resource.data.status in ['scheduled', 'completed', 'cancelled']
+          // The event type (roadmap #46) may be absent on an older client's
+          // create — `mapPerformance` reads absence back as 'gig' — but a
+          // present value must be one of the two.
+          && (!('type' in request.resource.data)
+            || request.resource.data.type in ['gig', 'rehearsal']);
         allow update: if isAdmin(organizationId)
           && request.resource.data.organizationId == organizationId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'name', 'date', 'endDate', 'startTime', 'endTime', 'venue', 'notes',
-            'setlists', 'status', 'updatedAt'
+            'setlists', 'status', 'type', 'updatedAt'
           ]);
         allow delete: if isAdmin(organizationId);
       }

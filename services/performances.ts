@@ -65,6 +65,9 @@ const mapPerformance = (data: Record<string, unknown>, id: string): Performance 
     notes: String(data.notes ?? ""),
     setlists: mapSetlists(data),
     status: status === "completed" ? "completed" : status === "cancelled" ? "cancelled" : "scheduled",
+    // Roadmap #46: absent (or unrecognised) reads back as `gig`, exactly like
+    // `status` above — an older document needs no migration.
+    type: data.type === "rehearsal" ? "rehearsal" : "gig",
     createdBy: String(data.createdBy ?? ""),
     createdAt: data.createdAt as Performance["createdAt"],
     updatedAt: data.updatedAt as Performance["updatedAt"],
@@ -157,6 +160,7 @@ const normalizeInput = (input: PerformanceInput): PerformanceInput => {
       .filter((entry, index, all) => all.findIndex((other) => other.id === entry.id) === index)
       .slice(0, MAX_SETLISTS),
     status: input.status,
+    type: input.type === "rehearsal" ? "rehearsal" : "gig",
   }
 }
 

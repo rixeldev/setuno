@@ -2,8 +2,8 @@
  * The Firestore security rules (docs §23) against the emulator — the seed
  * suite described in `tests/integration/README.md`. The scenarios mirror its
  * contract: private profiles, admin-only song writes, suggestion review,
- * membership management, the owner-only reader state and the song version
- * history (roadmap #26).
+ * membership management, the owner-only reader state, the song version
+ * history (roadmap #26) and the performances' event type (roadmap #46).
  *
  * Run through `firebase emulators:exec --only firestore,storage "pnpm
  * test:integration"`, which starts the emulators, exports their host variables
@@ -160,6 +160,64 @@ describe("songs are written by admins only", () => {
   it("lets an admin restore a trashed song", async () => {
     await assertSucceeds(
       alice().firestore().doc(songPath()).update({ deletedAt: null, deletedBy: null }),
+    )
+  })
+})
+
+describe("performances carry their type (#46)", () => {
+  /** The minimal body the performances create rule accepts. */
+  const show = (overrides: Record<string, unknown> = {}) => ({
+    organizationId: orgId,
+    name: "Sala Sur",
+    date: "2026-10-13",
+    setlists: [],
+    venue: { name: "Sala Sur", address: "", notes: "" },
+    status: "scheduled",
+    ...overrides,
+  })
+  const pathFor = (id: string) => `organizations/${orgId}/performances/${id}`
+
+  const seedShow = async (overrides: Record<string, unknown> = {}): Promise<string> => {
+    const id = createId("show")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(pathFor(id)).set(show({ type: "gig", ...overrides }))
+    })
+    return id
+  }
+
+  it("denies a member creating one", async () => {
+    await assertFails(
+      bob().firestore().doc(pathFor(createId("show"))).set(show({ type: "rehearsal" })),
+    )
+  })
+
+  it("lets an admin create an event with a type", async () => {
+    await assertSucceeds(
+      alice().firestore().doc(pathFor(createId("show"))).set(show({ type: "rehearsal" })),
+    )
+  })
+
+  it("still lets an older client create one without a type", async () => {
+    // The field is absent on documents written before roadmap #46, so a client
+    // that has not been updated must keep working (it reads back as a gig).
+    await assertSucceeds(alice().firestore().doc(pathFor(createId("show"))).set(show()))
+  })
+
+  it("rejects an unknown type value", async () => {
+    await assertFails(
+      alice().firestore().doc(pathFor(createId("show"))).set(show({ type: "open-mic" })),
+    )
+  })
+
+  it("lets an admin change the type", async () => {
+    const id = await seedShow()
+    await assertSucceeds(alice().firestore().doc(pathFor(id)).update({ type: "rehearsal" }))
+  })
+
+  it("still rejects an update carrying a field outside the whitelist", async () => {
+    const id = await seedShow()
+    await assertFails(
+      alice().firestore().doc(pathFor(id)).update({ type: "gig", mood: "nervous" }),
     )
   })
 })

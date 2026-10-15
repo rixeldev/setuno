@@ -57,6 +57,7 @@ const show = (overrides: Partial<Performance> = {}): Performance => ({
   notes: "",
   setlists: [],
   status: "completed",
+  type: "gig",
   createdBy: "uid-1",
   createdAt: stampAt(2026, 1, 1),
   updatedAt: stampAt(2026, 1, 1),
@@ -226,6 +227,26 @@ describe("buildBandStats", () => {
     // "ghost" authored an event but is no longer in the band: no row for them.
     expect(stats.memberActivity.some((activity) => activity.uid === "ghost")).toBe(false)
   })
+
+  it("never counts a rehearsal as a show, but keeps its songs played (#46)", () => {
+    const lists = [list("l1", ["a"], { estimatedDurationSec: 600 })]
+    const stats = buildBandStats(
+      [
+        attached("gig", "2026-03-01", ["l1"]),
+        attached("run", "2026-03-15", ["l1"], { type: "rehearsal" }),
+      ],
+      lists,
+      [song("a")],
+      [],
+    )
+    // The gig is the show; the rehearsal still ran the list, so the song's
+    // play count — the number the reader footer and the usage filter quote —
+    // counts both.
+    expect(stats.showsPlayed).toBe(1)
+    expect(stats.musicMinutes).toBe(10)
+    expect(stats.songsPlayed).toBe(1)
+    expect(stats.topSongs.find((top) => top.id === "a")?.timesPlayed).toBe(2)
+  })
 })
 
 describe("buildYearRecap", () => {
@@ -256,6 +277,24 @@ describe("buildYearRecap", () => {
     run.endDate = "2026-01-01"
     expect(buildYearRecap([run], [list("l1", ["a"])], [song("a")], 2025).shows).toBe(1)
     expect(buildYearRecap([run], [list("l1", ["a"])], [song("a")], 2026).shows).toBe(0)
+  })
+
+  it("recaps gigs only — a completed rehearsal is not a show (#46)", () => {
+    const lists = [list("l1", ["a"], { estimatedDurationSec: 600 })]
+    const recap = buildYearRecap(
+      [
+        attached("gig", "2026-06-01", ["l1"]),
+        attached("run", "2026-06-15", ["l1"], { type: "rehearsal" }),
+      ],
+      lists,
+      [song("a")],
+      2026,
+    )
+    // The card tells the story of the stage: one show, one sighting, ten
+    // minutes — the practice room never reaches the recap.
+    expect(recap.shows).toBe(1)
+    expect(recap.songsPlayed).toBe(1)
+    expect(recap.minutes).toBe(10)
   })
 
   it("counts one play per song per night and sums both lists' minutes", () => {

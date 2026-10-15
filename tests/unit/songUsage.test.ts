@@ -45,6 +45,7 @@ const performance = (overrides: Partial<Performance> = {}): Performance => ({
   notes: "",
   setlists: [],
   status: "scheduled",
+  type: "gig",
   createdBy: "uid-1",
   createdAt: TIMESTAMP,
   updatedAt: TIMESTAMP,
@@ -86,6 +87,23 @@ describe("buildSongUsage", () => {
       lists,
     )
     expect(usage.get("a")).toEqual({ timesPlayed: 1, lastPlayedOn: "2026-09-01", eventsAgo: 0 })
+  })
+
+  it("counts a completed rehearsal too — practice is a play (#46)", () => {
+    const lists = [setlist("l1", [entry("a")])]
+    const usage = buildSongUsage(
+      [
+        performance({
+          id: "rehearsal",
+          date: "2026-10-01",
+          status: "completed",
+          type: "rehearsal",
+          setlists: [{ id: "l1", name: "l1" }],
+        }),
+      ],
+      lists,
+    )
+    expect(usage.get("a")).toEqual({ timesPlayed: 1, lastPlayedOn: "2026-10-01", eventsAgo: 0 })
   })
 
   it("counts a song once per event, even across two of its lists", () => {

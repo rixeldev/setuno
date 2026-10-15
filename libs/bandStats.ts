@@ -3,6 +3,7 @@ import type { Performance } from "@/interfaces/performance"
 import type { Setlist } from "@/interfaces/setlist"
 import type { Song } from "@/interfaces/song"
 import { toDate } from "@/interfaces/timestamp"
+import { isGig } from "@/libs/performances"
 import { buildSongUsage } from "@/libs/songUsage"
 
 /**
@@ -34,9 +35,15 @@ export interface MemberActivity {
 }
 
 export interface BandStats {
-  /** Completed events: the shows that actually happened. */
+  /**
+   * Completed **gigs** — the shows that actually happened. Roadmap #46: a
+   * rehearsal never counts as a show, though its songs still count as played.
+   */
   showsPlayed: number
-  /** Distinct songs the band has played at least once. */
+  /**
+   * Distinct songs the band has played at least once — a completed rehearsal
+   * counts as a play too (#34 counts every completed event).
+   */
   songsPlayed: number
   /** Minutes of music performed across those shows (known durations only). */
   musicMinutes: number
@@ -76,7 +83,7 @@ const countBy = (uids: Iterable<string>): Map<string, number> => {
 }
 
 /**
- * Sums each attached setlist's stored duration across `completed` events —
+ * Sums each attached setlist's stored duration across the shows below —
  * once per event (two lists of one show add up, the same list attached twice
  * to one show was still played once) but once per show again, because the
  * same setlist played at two shows was performed twice.
@@ -109,7 +116,12 @@ export const buildBandStats = (
 ): BandStats => {
   const setlistById = new Map(setlists.map((list) => [list.id, list]))
   const songById = new Map(songs.map((song) => [song.id, song]))
-  const completed = performances.filter((performance) => performance.status === "completed")
+  // The show counters below are gigs only (roadmap #46); the usage they are
+  // ranked beside keeps every completed event, rehearsals included — practice
+  // is a play, not a show.
+  const shows = performances.filter(
+    (performance) => performance.status === "completed" && isGig(performance),
+  )
 
   const usage = buildSongUsage(performances, setlists)
   const topSongs: TopSong[] = []
@@ -153,9 +165,9 @@ export const buildBandStats = (
     .sort((a, b) => b.total - a.total || a.displayName.localeCompare(b.displayName))
 
   return {
-    showsPlayed: completed.length,
+    showsPlayed: shows.length,
     songsPlayed: usage.size,
-    musicMinutes: Math.round(performedSeconds(completed, setlistById) / 60),
+    musicMinutes: Math.round(performedSeconds(shows, setlistById) / 60),
     topSongs,
     averageSetMinutes:
       measured.length > 0 ? Math.round(measuredSeconds / measured.length / 60) : null,
@@ -168,8 +180,10 @@ export const buildBandStats = (
  * One calendar year's recap for the shareable card. A show belongs to the
  * year it **started** in (`yyyy-mm-dd` prefix match): a run crossing New
  * Year's Eve is that year's show, not both years'. Scheduled events are
- * promises and cancelled ones never happened, so only `completed` counts —
- * the same rule #34 builds usage with.
+ * promises, cancelled ones never happened, and — since roadmap #46 — a
+ * rehearsal is not a show either: only **completed gigs** recap, every
+ * number inside included. The card tells the story of the stage, not of the
+ * practice room.
  */
 export const buildYearRecap = (
   performances: Performance[],
@@ -181,7 +195,10 @@ export const buildYearRecap = (
   const songById = new Map(songs.map((song) => [song.id, song]))
   const prefix = `${year}-`
   const played = performances.filter(
-    (performance) => performance.status === "completed" && performance.date.startsWith(prefix),
+    (performance) =>
+      performance.status === "completed" &&
+      performance.date.startsWith(prefix) &&
+      isGig(performance),
   )
 
   const playCounts = new Map<string, number>()
