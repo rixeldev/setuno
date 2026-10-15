@@ -65,6 +65,8 @@ export default function AppLayout() {
         <Stack.Screen name="suggestions/[id]" options={modalOptions} />
         <Stack.Screen name="collections" options={modalOptions} />
         <Stack.Screen name="collections/[id]" options={modalOptions} />
+        {/* Derived band stats + the shareable year-in-review card (#35). */}
+        <Stack.Screen name="stats" options={modalOptions} />
         <Stack.Screen name="settings/index" />
         <Stack.Screen name="settings/profile" options={modalOptions} />
         <Stack.Screen name="settings/organization" options={modalOptions} />

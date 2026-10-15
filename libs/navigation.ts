@@ -9,6 +9,7 @@ import {
   MusicIcon,
   OrganizationIcon,
   SettingsIcon,
+  StatsIcon,
   UsersIcon,
 } from "@/components/ui/Icons"
 
@@ -37,6 +38,7 @@ export const SIDEBAR_NAV: NavItem[] = [
   { href: "/suggestions", label: "nav.suggestions", icon: ChatIcon, badge: "suggestions" },
   { href: "/members", label: "nav.members", icon: UsersIcon },
   { href: "/collections", label: "nav.collections", icon: LibraryIcon },
+  { href: "/stats", label: "nav.stats", icon: StatsIcon },
   { href: "/settings", label: "nav.settings", icon: SettingsIcon },
 ]
 
@@ -65,6 +67,12 @@ export const MORE_NAV: NavItem[] = [
     label: "nav.collections",
     icon: LibraryIcon,
     description: "nav.collectionsHint",
+  },
+  {
+    href: "/stats",
+    label: "nav.stats",
+    icon: StatsIcon,
+    description: "nav.statsHint",
   },
   {
     href: "/organizations",
