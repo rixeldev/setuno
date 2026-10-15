@@ -344,6 +344,12 @@ const createStyles = () =>
     fieldMultilineBox: { alignItems: "flex-start", paddingVertical: Theme.spacing.m },
     input: {
       flex: 1,
+      // Browsers floor a flex item at `min-width: auto` — for the <input> that
+      // is the intrinsic ~20ch the browser gives it — so `flex: 1` alone could
+      // not shrink it and a long placeholder or typed text spilled out of the
+      // field on web (Yoga defaults min-width to 0, which is why native never
+      // showed it). One token lets the whole container/field chain shrink.
+      minWidth: 0,
       color: Theme.colors.text,
       fontSize: Theme.sizes.h4,
       fontFamily: Theme.fonts.onest,
@@ -383,5 +389,7 @@ const createStyles = () =>
     },
     optionActive: { backgroundColor: Theme.colors.primarySoft },
     optionPressed: { backgroundColor: Theme.colors.surfaceHigh },
-    selectText: { flex: 1 },
+    // Same floor as `input`: a value without spaces (an email, a long title)
+    // would otherwise set the row's min-content and defeat `numberOfLines`.
+    selectText: { flex: 1, minWidth: 0 },
   })
