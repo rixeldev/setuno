@@ -49,15 +49,19 @@ export default {
       "expo-router",
       "expo-font",
       "@react-native-google-signin/google-signin",
-      // Playback only (the metronome's clicks): no microphone, no background
-      // service. `enableBackgroundPlayback: false` is deliberate — a practice
-      // tool that stops when the app leaves the foreground needs no service,
-      // and the defaults would enable both.
+      // Playback stays background-free (`enableBackgroundPlayback: false` is
+      // deliberate — a practice tool that stops when the app leaves the
+      // foreground needs no service), but the tuner spike (#13) needs the
+      // microphone: the permission strings are declared here so a dev build
+      // can request them at runtime; nothing asks for the mic until the tuner
+      // screen opens. The tuner ship decision lives in
+      // `docs/tuner_spike_memo.md`.
       [
         "expo-audio",
         {
-          microphonePermission: false,
-          recordAudioAndroid: false,
+          microphonePermission:
+            "Allow $(PRODUCT_NAME) to listen to your microphone while the tuner is open.",
+          recordAudioAndroid: true,
           enableBackgroundPlayback: false,
         },
       ],

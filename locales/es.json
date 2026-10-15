@@ -1184,6 +1184,23 @@
     "cardNewSongs": "Canciones nuevas",
     "cardMostPlayed": "Más tocada"
   },
+  "tuner": {
+    "title": "Afinador",
+    "prototype": "Prototipo de investigación — detección de tono",
+    "start": "Empezar",
+    "stop": "Detener",
+    "listening": "Escuchando…",
+    "playAStructure": "Toca una sola cuerda",
+    "denied": "Acceso al micrófono denegado",
+    "error": "No se pudo abrir el micrófono",
+    "inTune": "Afinado",
+    "sharp": "{{cents}}¢ sostenido",
+    "flat": "{{cents}}¢ bemol",
+    "sharpWord": "sostenido",
+    "flatWord": "bemol",
+    "measurement": "{{hertz}} Hz · claridad {{clarity}}%",
+    "readoutA11y": "Afinador: {{note}}, {{cents}} centésimas, {{hertz}} hercios, {{state}}"
+  },
   "settings": {
     "settings": "Ajustes",
     "profile": "Perfil",

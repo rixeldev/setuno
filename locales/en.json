@@ -1333,6 +1333,23 @@
     "cardNewSongs": "New songs",
     "cardMostPlayed": "Most played"
   },
+  "tuner": {
+    "title": "Tuner",
+    "prototype": "Research spike — pitch detection prototype",
+    "start": "Start",
+    "stop": "Stop",
+    "listening": "Listening…",
+    "playAStructure": "Play a single string",
+    "denied": "Microphone access denied",
+    "error": "Could not open the microphone",
+    "inTune": "In tune",
+    "sharp": "{{cents}}¢ sharp",
+    "flat": "{{cents}}¢ flat",
+    "sharpWord": "sharp",
+    "flatWord": "flat",
+    "measurement": "{{hertz}} Hz · clarity {{clarity}}%",
+    "readoutA11y": "Tuner: {{note}}, {{cents}} cents, {{hertz}} hertz, {{state}}"
+  },
   "settings": {
     "settings": "Settings",
     "profile": "Profile",
