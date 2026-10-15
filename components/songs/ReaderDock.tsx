@@ -7,7 +7,14 @@ import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { useResponsive } from "@/hooks/useResponsive"
 import { AppText } from "@/components/ui/AppText"
 import { IconButton } from "@/components/ui/Button"
-import { ChevronUpIcon, FullscreenIcon, MetronomeIcon, MusicIcon, PauseIcon, PlayFilledIcon } from "@/components/ui/Icons"
+import {
+  ChevronUpIcon,
+  FullscreenIcon,
+  MetronomeIcon,
+  MusicIcon,
+  PauseIcon,
+  PlayFilledIcon,
+} from "@/components/ui/Icons"
 
 /**
  * Height of the shut dock. The reader's bottom padding and the corner arrows
@@ -140,7 +147,12 @@ export function ReaderDock({
 
       <Animated.View style={[styles.divider, { opacity: openProgress }]} />
 
-      <View style={[styles.row, { paddingHorizontal: gutter, maxWidth: contentMaxWidth }]}>
+      <View
+        style={[
+          styles.row,
+          { paddingHorizontal: gutter, maxWidth: contentMaxWidth },
+        ]}
+      >
         {open ? null : (
           <IconButton
             label={autoscrollLabel}
@@ -166,7 +178,11 @@ export function ReaderDock({
           style={({ pressed }) => [styles.summary, pressed && styles.pressed]}
         >
           <MusicIcon size={15} color={Theme.colors.primary} />
-          <AppText variant="bodyStrong" numberOfLines={1} style={styles.summaryText}>
+          <AppText
+            variant="bodyStrong"
+            numberOfLines={1}
+            style={styles.summaryText}
+          >
             {summary}
           </AppText>
         </Pressable>
@@ -181,7 +197,9 @@ export function ReaderDock({
           icon={
             <MetronomeIcon
               size={17}
-              color={metronomeActive ? Theme.colors.primary : Theme.colors.textMuted}
+              color={
+                metronomeActive ? Theme.colors.primary : Theme.colors.textMuted
+              }
             />
           }
         />
@@ -198,7 +216,11 @@ export function ReaderDock({
           size={36}
           onPress={onToggle}
           icon={
-            <Animated.View style={{ transform: [{ rotate: interpolateRotation(openProgress) }] }}>
+            <Animated.View
+              style={{
+                transform: [{ rotate: interpolateRotation(openProgress) }],
+              }}
+            >
               <ChevronUpIcon size={17} color={Theme.colors.textMuted} />
             </Animated.View>
           }
@@ -249,6 +271,12 @@ const createStyles = () =>
       alignItems: "center",
       gap: Theme.spacing.xs,
       width: "100%",
+      // Centered like every other capped column (`ScreenContainer`'s `body`,
+      // `SongControls`' `inner`): width fills, `maxWidth` caps it, and the
+      // cross axis centers the result — so on desktop the tray lands on the
+      // same gutter-padded column the lyrics use. No-op on phones, where the
+      // row already is the full width.
+      alignSelf: "center",
       minHeight: READER_DOCK_HEIGHT,
       paddingVertical: 5,
     },
