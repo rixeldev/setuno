@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import type { Performance, PerformanceStatus } from "@/interfaces/performance"
+import type { Performance } from "@/interfaces/performance"
 import type { TimestampLike } from "@/interfaces/timestamp"
 import {
   CALENDAR_STATUSES,

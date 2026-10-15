@@ -179,7 +179,8 @@ npx expo-doctor         # diagnose dependency and config issues
 
 - `vitest.config.mts` defines two projects: `unit` and `integration`. Put pure-logic tests in `tests/unit/`, Firestore-rules tests in `tests/integration/`.
 - Tests that would import React Native must read the source file as text instead. The existing guards: `routes.test.ts` (every nav href maps to a route module with a default export), `i18n.test.ts` (locale parity + static keys exist) and `rnwDeprecations.test.ts` (no `pointerEvents` props).
-- Integration tests run against the Firebase emulator — see `tests/integration/README.md`.
+- Integration tests run against the Firebase emulator — see `tests/integration/README.md`. The seed rules suite (`firestoreRules.test.ts` + `storageRules.test.ts`, through `@firebase/rules-unit-testing`) is easiest to run as `npx firebase-tools@latest emulators:exec --only firestore,storage "pnpm test:integration"` — it needs **Java 21+** (the CLI refuses older JVMs; Gradle still wants JDK 17, so point `JAVA_HOME` at Android Studio's bundled JBR for this one). The integration project sets `fileParallelism: false`: the emulator is a single shared data store, never run its files side by side.
+- **CI runs the same gates** (`.github/workflows/ci.yml`, roadmap #74): every push to `main` and every PR gets `verify` (typecheck → **`pnpm exec eslint .`** → unit tests), `web` (`pnpm export:web`) and `rules` (the emulator suite above; Node 22, pnpm 12, Java 21). The lint step bypasses `pnpm lint` deliberately — `expo lint` has been known to exit 0 while eslint reports real findings; `pnpm exec eslint .` is the truth-teller. `db/firebaseConfig.ts` is not in git, so CI generates it from placeholder `FIREBASE_*` env vars through `scripts/ensure-firebase-config.mjs` before typechecking — if the config grows, extend that script's variable list **and** the workflow's `env` together.
 
 ## Building with EAS
 

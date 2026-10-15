@@ -6,13 +6,21 @@ emulator is not part of the normal test run.
 
 ## Prerequisites
 
-1. Install and start the emulators (requires the Firebase CLI and Java 11+):
+1. Install and start the emulators (requires the Firebase CLI and **Java 21+** — the CLI refuses
+   older JVMs; Android Studio's bundled JBR works, and Gradle keeps using JDK 17 separately):
 
    ```bash
    firebase emulators:start --only auth,firestore,storage
    ```
 
-2. Point the app at the emulator:
+   Or start them, run the suite and tear them down in one command — this is what CI runs:
+
+   ```bash
+   firebase emulators:exec --only firestore,storage "pnpm test:integration"
+   ```
+
+2. Point the app at the emulator (only needed with `emulators:start`; `emulators:exec` exports
+   these for you):
 
    ```bash
    FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import {
-  ANNOTATION_MARKERS_LIMIT,
-  ANNOTATION_NOTES_LIMIT,
-} from "@/libs/annotations"
+import { ANNOTATION_NOTES_LIMIT } from "@/libs/annotations"
 import {
   annotationSnapshot,
   duplicateSongTitle,

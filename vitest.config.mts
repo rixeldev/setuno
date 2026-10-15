@@ -34,6 +34,10 @@ export default defineConfig({
           environment: "node",
           include: ["tests/integration/**/*.test.ts"],
           testTimeout: 30_000,
+          // The emulator holds one shared data store: files must never run side
+          // by side, or one file's clearFirestore()/clearStorage() would wipe
+          // another file's fixtures mid-test.
+          fileParallelism: false,
         },
       },
     ],

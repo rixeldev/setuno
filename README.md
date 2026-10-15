@@ -14,6 +14,7 @@
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white">
   <img alt="Firebase" src="https://img.shields.io/badge/Firebase-Firestore-FFCA28?logo=firebase&logoColor=black">
   <img alt="i18n" src="https://img.shields.io/badge/i18n-EN%20%7C%20ES-8A2BE2">
+  <a href="https://github.com/rixeldev/setuno/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/rixeldev/setuno/actions/workflows/ci.yml/badge.svg"></a>
 </p>
 
 ---
