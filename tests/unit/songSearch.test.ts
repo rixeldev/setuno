@@ -145,6 +145,32 @@ describe("filterSongs — favorites only (roadmap #33)", () => {
     expect(countActiveFilters({ ...EMPTY_FILTERS, favoritesOnly: true })).toBe(1)
     expect(isFiltered({ ...EMPTY_FILTERS, favoritesOnly: true })).toBe(true)
   })
+
+  it("keeps only the ids the usage set passes (roadmap #34)", () => {
+    const passed = new Set(["1", "3"])
+    expect(
+      filterSongs(library, { ...EMPTY_FILTERS, usage: "never" }, undefined, passed).map((s) => s.id),
+    ).toEqual(["1", "3"])
+    // Same contract as favorites: the chip on without a set excludes everything
+    // instead of letting the whole library through.
+    expect(filterSongs(library, { ...EMPTY_FILTERS, usage: "never" })).toEqual([])
+    expect(
+      filterSongs(library, { ...EMPTY_FILTERS, usage: "notRecent" }, undefined, new Set()),
+    ).toEqual([])
+  })
+
+  it("intersects usage with favorites and counts towards the badge", () => {
+    expect(
+      filterSongs(
+        library,
+        { ...EMPTY_FILTERS, favoritesOnly: true, usage: "never" },
+        new Set(["1", "3"]),
+        new Set(["2"]),
+      ).map((s) => s.id),
+    ).toEqual([])
+    expect(countActiveFilters({ ...EMPTY_FILTERS, usage: "notRecent" })).toBe(1)
+    expect(isFiltered({ ...EMPTY_FILTERS, usage: "notRecent" })).toBe(true)
+  })
 })
 
 describe("songFacets", () => {

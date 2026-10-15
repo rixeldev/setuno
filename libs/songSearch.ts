@@ -1,4 +1,5 @@
 import type { ChordPosition, Song } from "@/interfaces/song"
+import type { SongUsageFilter } from "@/libs/songUsage"
 import { estimateDurationSec } from "@/libs/songUtils"
 
 /** Tempo buckets offered by the advanced search (roadmap #36). */
@@ -20,6 +21,8 @@ export interface SongFilters {
   duration: DurationBucket | null
   /** Only this user's starred songs (roadmap #33) — personal, never band data. */
   favoritesOnly: boolean
+  /** Derived usage chips (roadmap #34): never played, or not played recently. */
+  usage: SongUsageFilter | null
 }
 
 export const EMPTY_FILTERS: SongFilters = {
@@ -32,6 +35,7 @@ export const EMPTY_FILTERS: SongFilters = {
   bpm: null,
   duration: null,
   favoritesOnly: false,
+  usage: null,
 }
 
 /** Tempo buckets in ascending order; the filter dialog renders them in turn. */
@@ -123,6 +127,7 @@ export const isFiltered = (filters: SongFilters): boolean =>
   normalize(filters.search).length > 0 ||
   progressionTokens(filters.progression).length > 0 ||
   filters.favoritesOnly ||
+  filters.usage !== null ||
   hasFacetFilters(filters)
 
 /**
@@ -156,11 +161,18 @@ export const isFiltered = (filters: SongFilters): boolean =>
  * when `filters.favoritesOnly` is set: the filter stays pure over songs, the
  * personal set rides along as context — and with the flag on but no set given,
  * everything is excluded rather than let through.
+ *
+ * `usage` (roadmap #34) is the companion set for `filters.usage`: the ids that
+ * pass the derived "never played / not played recently" chip, precomputed once
+ * per render by `usagePassIds` so this function never touches the performance
+ * history itself. Same contract as favorites — flag on with no set given
+ * excludes everything rather than letting it all through.
  */
 export const filterSongs = (
   songs: Song[],
   filters: SongFilters,
   favorites?: ReadonlySet<string>,
+  usage?: ReadonlySet<string>,
 ): Song[] => {
   const term = normalize(filters.search)
   const terms = term.length > 0 ? term.split(/\s+/) : []
@@ -168,6 +180,7 @@ export const filterSongs = (
 
   const filtered = songs.filter((song) => {
     if (filters.favoritesOnly && !favorites?.has(song.id)) return false
+    if (filters.usage !== null && !usage?.has(song.id)) return false
     if (filters.artist !== null && song.artist !== filters.artist) return false
     if (filters.genre !== null && song.genre !== filters.genre) return false
     if (filters.key !== null && song.key !== filters.key) return false
@@ -270,4 +283,5 @@ export const countActiveFilters = (filters: SongFilters): number =>
     (value) => value !== null,
   ).length +
   (progressionTokens(filters.progression).length > 0 ? 1 : 0) +
-  (filters.favoritesOnly ? 1 : 0)
+  (filters.favoritesOnly ? 1 : 0) +
+  (filters.usage !== null ? 1 : 0)

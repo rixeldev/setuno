@@ -157,6 +157,7 @@ describe("sanitizeSongbook", () => {
         bpm: "slow" as const,
         duration: "long" as const,
         favoritesOnly: false,
+        usage: null,
       },
       sort: "artist" as const,
       views: [],
@@ -195,6 +196,14 @@ describe("sanitizeSongbook", () => {
     expect(sanitizeSongbook({ filters: { favoritesOnly: true } }).filters.favoritesOnly).toBe(true)
     expect(sanitizeSongbook({ filters: { favoritesOnly: "yes" } }).filters.favoritesOnly).toBe(false)
     expect(sanitizeSongbook({}).filters.favoritesOnly).toBe(false)
+  })
+
+  it("keeps the usage chip only while the app still offers it (roadmap #34)", () => {
+    expect(sanitizeSongbook({ filters: { usage: "never" } }).filters.usage).toBe("never")
+    expect(sanitizeSongbook({ filters: { usage: "notRecent" } }).filters.usage).toBe("notRecent")
+    // A value from a version that dropped the chip must not filter by nothing.
+    expect(sanitizeSongbook({ filters: { usage: "once" } }).filters.usage).toBeNull()
+    expect(sanitizeSongbook({}).filters.usage).toBeNull()
   })
 
   it("rebuilds every field when storage gives back a partial entry", () => {

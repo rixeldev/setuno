@@ -136,8 +136,12 @@ export default function SongScreen() {
 
   const { profile } = useAuth()
   const { organizationId, isAdmin } = useOrganization()
-  const { songLibrary, songs, setlists, suggestions, performances, loading } = useOrgData()
+  const { songLibrary, songs, setlists, suggestions, performances, loading, songUsage } = useOrgData()
   const [song, setSong] = useState(songId ? (songLibrary.get(songId) ?? null) : null)
+  // Derived usage (roadmap #34): only a song the band has actually played
+  // carries the footer line — never-played songs stay silent here, because the
+  // songbook's "Never played" filter is where that state is acted on.
+  const usage = song ? songUsage.get(song.id) : undefined
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
@@ -1065,8 +1069,24 @@ export default function SongScreen() {
               </View>
             ) : null}
 
+            {/* Derived from completed events (roadmap #34): "played N times ·
+                last played X events ago", straight from the setlists those
+                events already carry. */}
+            {usage ? (
+              <AppText variant="caption" tone="muted">
+                {`${t("songs.played", { count: usage.timesPlayed })} · ${
+                  usage.eventsAgo === 0
+                    ? t("songs.lastPlayedLatest")
+                    : t("songs.lastPlayedAgo", { count: usage.eventsAgo })
+                }`}
+              </AppText>
+            ) : null}
+
             <AppText variant="caption" tone="faint">
-              Added by {song.createdByName || "an admin"} · updated {formatRelativeTime(toDate(song.updatedAt))}
+              {t("songs.addedUpdated", {
+                name: song.createdByName || t("songs.anAdmin"),
+                when: formatRelativeTime(toDate(song.updatedAt)),
+              })}
             </AppText>
 
             <View style={styles.footerActions}>

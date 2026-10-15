@@ -33,6 +33,7 @@ import {
 } from "@/libs/songSearch"
 import { SONG_SORTS, sortSongs, type SongSort } from "@/libs/songbookSort"
 import { MAX_SONGBOOK_VIEWS } from "@/libs/songbookState"
+import { SONG_USAGE_FILTERS, usagePassIds, type SongUsageFilter } from "@/libs/songUsage"
 import type { SongFacets } from "@/interfaces"
 
 type FacetKey = "artist" | "genre" | "key" | "tag"
@@ -68,6 +69,12 @@ const DURATION_LABELS: Record<DurationBucket, string> = {
   long: "songs.durationLong",
 }
 
+/** Usage chips (roadmap #34), derived from the band's completed events. */
+const USAGE_LABELS: Record<SongUsageFilter, string> = {
+  never: "songs.usageNever",
+  notRecent: "songs.usageNotRecent",
+}
+
 /** Sort labels are i18n keys, resolved where they are rendered. */
 const SORT_LABELS: Record<SongSort, string> = {
   title: "songs.sortTitle",
@@ -86,7 +93,7 @@ export default function SongsScreen() {
   const router = useRouter()
   const { isAdmin, organizationId } = useOrganization()
   const uid = useUserId()
-  const { songs, facets, loading, error } = useOrgData()
+  const { songs, facets, loading, error, songUsage } = useOrgData()
   // Filters and order are remembered per band and per user (roadmap #37), so a
   // member's facets never follow them into another band's library.
   const { filters, setFilters, sort, setSort, views, saveView, applyView, deleteView } =
@@ -100,9 +107,16 @@ export default function SongsScreen() {
   const [savingView, setSavingView] = useState(false)
   const [viewName, setViewName] = useState("")
 
+  // Usage (roadmap #34) is the same contract as favorites: the derived
+  // performance walk is resolved to the id set the filter keeps, once per
+  // render, so filterSongs stays a pure pass over songs.
+  const usagePass = useMemo(
+    () => (filters.usage ? usagePassIds(songs, filters.usage, songUsage) : undefined),
+    [songs, filters.usage, songUsage],
+  )
   const results = useMemo(
-    () => sortSongs(filterSongs(songs, filters, favoriteSet), sort),
-    [songs, filters, favoriteSet, sort],
+    () => sortSongs(filterSongs(songs, filters, favoriteSet, usagePass), sort),
+    [songs, filters, favoriteSet, usagePass, sort],
   )
   const activeCount = countActiveFilters(filters)
   const progression = filters.progression.trim()
@@ -117,6 +131,10 @@ export default function SongsScreen() {
 
   const toggleDuration = (value: DurationBucket): void => {
     setFilters((current) => ({ ...current, duration: current.duration === value ? null : value }))
+  }
+
+  const toggleUsage = (value: SongUsageFilter): void => {
+    setFilters((current) => ({ ...current, usage: current.usage === value ? null : value }))
   }
 
   const facetOptions: string[] = facet ? FACET_SOURCES[facet](facets) : []
@@ -211,6 +229,15 @@ export default function SongsScreen() {
                   size="sm"
                   onPress={() => setFilters((current) => ({ ...current, favoritesOnly: false }))}
                   accessibilityLabel={t("songs.removeFilter", { filter: t("songs.favoritesOnly") })}
+                />
+              ) : null}
+              {filters.usage !== null ? (
+                <Chip
+                  label={t(USAGE_LABELS[filters.usage])}
+                  tone="primary"
+                  size="sm"
+                  onPress={() => setFilters((current) => ({ ...current, usage: null }))}
+                  accessibilityLabel={t("songs.removeFilter", { filter: t("songs.usage") })}
                 />
               ) : null}
               {progression.length > 0 ? (
@@ -433,6 +460,22 @@ export default function SongsScreen() {
                 setFilters((current) => ({ ...current, favoritesOnly: !current.favoritesOnly }))
               }
             />
+          </View>
+        </View>
+
+        <View style={styles.facetGroup}>
+          <AppText variant="label" tone="muted">
+            {t("songs.usage")}
+          </AppText>
+          <View style={styles.facetOptions}>
+            {SONG_USAGE_FILTERS.map((option) => (
+              <Chip
+                key={option}
+                label={t(USAGE_LABELS[option])}
+                selected={filters.usage === option}
+                onPress={() => toggleUsage(option)}
+              />
+            ))}
           </View>
         </View>
       </Dialog>

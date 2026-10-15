@@ -16,6 +16,7 @@ import { subscribeSuggestions } from "@/services/suggestions"
 import { subscribeSetlists } from "@/services/setlists"
 import { songFacets } from "@/libs/songSearch"
 import { partitionTrashed } from "@/libs/songTrash"
+import { buildSongUsage, type SongUsage } from "@/libs/songUsage"
 import { countUnreadActivity } from "@/libs/activityUnread"
 import { toFriendlyError } from "@/services/errors"
 import type {
@@ -48,6 +49,8 @@ interface OrgDataContextValue {
   markActivityRead: () => void
   /** Songs indexed by id (memoised lookup for setlists). */
   songLibrary: Map<string, Song>
+  /** Derived play counts from completed events (roadmap #34) — never stored. */
+  songUsage: Map<string, SongUsage>
   facets: SongFacets
   stats: SongStats
   nextShow: Performance | null
@@ -188,6 +191,10 @@ export function OrgDataProvider({ children }: { children: React.ReactNode }) {
     // that is in the trash.
     const { visible, trashed } = partitionTrashed(current.songs)
     const songLibrary = new Map(current.songs.map((song) => [song.id, song]))
+    // Roadmap #34: usage history is derived from the events and setlists that
+    // are already subscribed — recomputed here so every screen (songbook
+    // filters, the reader footer) sees the same numbers from one walk.
+    const songUsage = buildSongUsage(current.performances, current.setlists)
     return {
       songs: visible,
       trashedSongs: trashed,
@@ -203,6 +210,7 @@ export function OrgDataProvider({ children }: { children: React.ReactNode }) {
       unreadActivityCount: countUnreadActivity(current.activity, activityReadAt),
       markActivityRead: markRead,
       songLibrary,
+      songUsage,
       facets: songFacets(visible),
       stats: computeSongStats(visible),
       nextShow: nextPerformance(current.performances),

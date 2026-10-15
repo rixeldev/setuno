@@ -1,5 +1,6 @@
 import { BPM_BUCKETS, DURATION_BUCKETS, EMPTY_FILTERS, type BpmBucket, type DurationBucket, type SongFilters } from "@/libs/songSearch"
 import { DEFAULT_SORT, SONG_SORTS, type SongSort } from "@/libs/songbookSort"
+import { SONG_USAGE_FILTERS, type SongUsageFilter } from "@/libs/songUsage"
 
 /**
  * What the songbook remembers between visits (roadmap #37): the filters that
@@ -77,6 +78,8 @@ export const sanitizeFilters = (raw: unknown): SongFilters => {
     duration: bucket<DurationBucket>(stored.duration, DURATION_BUCKETS),
     // A boolean that only ever restores as `true` — anything else means off.
     favoritesOnly: stored.favoritesOnly === true,
+    // A chip the app no longer offers must not survive storage (empty = off).
+    usage: bucket<SongUsageFilter>(stored.usage, SONG_USAGE_FILTERS),
   }
 }
 
