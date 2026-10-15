@@ -33,6 +33,7 @@ import {
   PlayFilledIcon,
   PrintIcon,
   SuggestIcon,
+  SwapIcon,
   TrashIcon,
 } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
@@ -46,6 +47,7 @@ import { SongControls } from "@/components/songs/SongControls"
 import { AutoscrollBar } from "@/components/songs/AutoscrollBar"
 import { LiveShowBar } from "@/components/songs/LiveShowBar"
 import { SongNavArrows } from "@/components/songs/SongNavArrows"
+import { MergeSongsDialog } from "@/components/songs/MergeSongsDialog"
 import { PrintSheet } from "@/components/songs/PrintSheet"
 import { ReaderDock, READER_DOCK_HEIGHT } from "@/components/songs/ReaderDock"
 import { AnnotationsBlock } from "@/components/annotations/AnnotationsBlock"
@@ -64,7 +66,8 @@ import { useFontSizeShortcuts } from "@/hooks/useFontSizeShortcuts"
 import { useReaderKeys } from "@/hooks/useReaderKeys"
 import { useAnnotations } from "@/hooks/useAnnotations"
 import { usePaletteCommands } from "@/hooks/usePaletteCommands"
-import { deleteSong, subscribeSong } from "@/services/songs"
+import { deleteSong, duplicateSong, subscribeSong } from "@/services/songs"
+import { mergeSongs } from "@/services/songMerge"
 import { saveReaderState, type ReaderState } from "@/services/readerState"
 import { updatePreferences } from "@/services/users"
 import { updateCachedPreferences, usePreferences } from "@/services/prefs"
@@ -125,10 +128,12 @@ export default function SongScreen() {
 
   const { profile } = useAuth()
   const { organizationId, isAdmin } = useOrganization()
-  const { songLibrary, setlists, performances, loading } = useOrgData()
+  const { songLibrary, songs, setlists, suggestions, performances, loading } = useOrgData()
   const [song, setSong] = useState(songId ? (songLibrary.get(songId) ?? null) : null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [mergeOpen, setMergeOpen] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
   // The control tray ships shut: the lyrics are the screen, everything else is
   // one tap away (roadmap redesign of the song screen).
@@ -545,7 +550,7 @@ export default function SongScreen() {
   const nextSongId = step?.nextId ?? null
   const previousSongId = step?.previousId ?? null
   useReaderKeys({
-    enabled: chordHelp === null && !notesOpen && !confirmDelete,
+    enabled: chordHelp === null && !notesOpen && !confirmDelete && !mergeOpen,
     onNext: nextSongId ? () => openSong(nextSongId) : null,
     onPrevious: previousSongId ? () => openSong(previousSongId) : null,
     onTranspose: (delta) => changeSemitones(semitones + delta),
@@ -599,6 +604,50 @@ export default function SongScreen() {
     } finally {
       setDeleting(false)
     }
+  }
+
+  // Roadmap #32 — a copy under a fresh id, then straight into its editor so
+  // the variant can be renamed and reshaped right away.
+  const duplicate = async (): Promise<void> => {
+    if (!song || duplicating) return
+    setDuplicating(true)
+    try {
+      const id = await duplicateSong(organizationId ?? "", song.id, t("songs.copySuffix"), {
+        id: profile?.uid ?? "",
+        name: profile?.displayName || "An admin",
+      })
+      toast.showSuccess(t("songs.duplicated"))
+      router.push(`/songs/${id}/edit`)
+    } catch (error) {
+      toast.showError(toFriendlyError(error, t("songs.duplicateFailed")))
+    } finally {
+      setDuplicating(false)
+    }
+  }
+
+  // The dialog owns its spinner: success closes it here, a failure is shown
+  // here and re-thrown so it clears the spinner and stays open for a retry.
+  const runMerge = async (masterId: string, loserId: string): Promise<void> => {
+    try {
+      await mergeSongs(
+        organizationId ?? "",
+        { masterId, loserId },
+        {
+          id: profile?.uid ?? "",
+          name: profile?.displayName || "An admin",
+        },
+      )
+    } catch (error) {
+      toast.showError(toFriendlyError(error, t("songs.mergeFailed")))
+      throw error
+    }
+
+    const master = masterId === song?.id ? song : songs.find((item) => item.id === masterId)
+    const loser = loserId === song?.id ? song : songs.find((item) => item.id === loserId)
+    setMergeOpen(false)
+    toast.showSuccess(t("songs.merged", { master: master?.title ?? "", loser: loser?.title ?? "" }))
+    // When the song on screen is the one that went away, follow the keeper.
+    if (loserId === song?.id) router.replace(`/songs/${masterId}`)
   }
 
   if (!songId) {
@@ -1026,17 +1075,50 @@ export default function SongScreen() {
               </Pressable>
 
               {isAdmin ? (
-                <Pressable
-                  onPress={() => setConfirmDelete(true)}
-                  accessibilityRole="button"
-                  accessibilityLabel={t("songs.deleteSong")}
-                  style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
-                >
-                  <TrashIcon size={15} color={Theme.colors.danger} />
-                  <AppText variant="caption" tone="danger">
-                    {t("songs.deleteSong")}
-                  </AppText>
-                </Pressable>
+                <>
+                  <Pressable
+                    onPress={() => {
+                      if (!duplicating) void duplicate()
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("songs.duplicateA11y")}
+                    accessibilityState={{ disabled: duplicating }}
+                    style={({ pressed }) => [
+                      styles.footerLink,
+                      duplicating && { opacity: 0.5 },
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <CopyIcon size={15} color={Theme.colors.textMuted} />
+                    <AppText variant="caption" tone="muted">
+                      {t("songs.duplicate")}
+                    </AppText>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => setMergeOpen(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("songs.mergeA11y")}
+                    style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
+                  >
+                    <SwapIcon size={15} color={Theme.colors.textMuted} />
+                    <AppText variant="caption" tone="muted">
+                      {t("songs.mergeWith")}
+                    </AppText>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => setConfirmDelete(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("songs.deleteSong")}
+                    style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
+                  >
+                    <TrashIcon size={15} color={Theme.colors.danger} />
+                    <AppText variant="caption" tone="danger">
+                      {t("songs.deleteSong")}
+                    </AppText>
+                  </Pressable>
+                </>
               ) : null}
             </View>
           </View>
@@ -1096,6 +1178,18 @@ export default function SongScreen() {
         confirmLoading={deleting}
         onConfirm={() => void remove()}
       />
+
+      {mergeOpen && song ? (
+        <MergeSongsDialog
+          visible={mergeOpen}
+          current={song}
+          songs={songs}
+          setlists={setlists}
+          suggestions={suggestions}
+          onClose={() => setMergeOpen(false)}
+          onMerge={runMerge}
+        />
+      ) : null}
 
       <PrintSheet
         visible={printOpen}

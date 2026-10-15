@@ -11,6 +11,8 @@ export type ActivityType =
   | "invitation_revoked"
   | "song_created"
   | "song_updated"
+  | "song_duplicated"
+  | "song_merged"
   | "song_deleted"
   | "suggestion_created"
   | "suggestion_accepted"

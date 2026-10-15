@@ -24,6 +24,7 @@ import { logActivity } from "@/services/activity"
 import { ValidationError } from "@/services/errors"
 import { countSongChords, countSongLines, clampSectionBars, normalizeSectionLabels } from "@/libs/songUtils"
 import { normalizeSongLinks } from "@/libs/songLinks"
+import { duplicateSongTitle } from "@/libs/songMerge"
 
 const mapChords = (raw: unknown): LyricLine["chords"] => {
   if (!Array.isArray(raw)) return []
@@ -229,6 +230,60 @@ export const updateSong = async (
     targetType: "song",
     targetId: songId,
   })
+}
+
+/**
+ * A copy of an existing song under a fresh id (roadmap #32) — the start of a
+ * variant. Sections keep their ids on purpose: a duplicate is the same music,
+ * so private annotations anchored to those sections stay valid on both songs.
+ * The `suffix` comes localized from the caller (`" (copy)"` / `" (copia)"`),
+ * same as `duplicateSetlist`.
+ */
+export const duplicateSong = async (
+  organizationId: string,
+  songId: string,
+  suffix: string,
+  author: { id: string; name: string },
+): Promise<string> => {
+  const uid = requireUserId()
+  const source = await fetchSong(organizationId, songId)
+  if (!source) throw new ValidationError("Song not found.", "songId")
+
+  const reference = doc(collection(firestore, paths.songs(organizationId)))
+  const now = serverTimestamp()
+  const title = duplicateSongTitle(source.title, suffix)
+
+  await setDoc(reference, {
+    organizationId,
+    title,
+    artist: source.artist,
+    key: source.key,
+    originalKey: source.originalKey,
+    capo: source.capo,
+    bpm: source.bpm,
+    durationSec: source.durationSec,
+    genre: source.genre,
+    notes: source.notes,
+    tags: source.tags,
+    sections: source.sections,
+    links: source.links,
+    createdBy: uid,
+    createdByName: author.name,
+    createdAt: now,
+    updatedAt: now,
+  })
+
+  void logActivity({
+    organizationId,
+    type: "song_duplicated",
+    message: `${author.name} duplicated "${source.title}"`,
+    actorId: uid,
+    actorName: author.name,
+    targetType: "song",
+    targetId: reference.id,
+  })
+
+  return reference.id
 }
 
 export const deleteSong = async (
