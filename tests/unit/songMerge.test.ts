@@ -68,6 +68,8 @@ const song = (id: string, overrides: Partial<Song> = {}): Song => ({
   sections: [],
   links: { youtube: "", spotify: "", appleMusic: "" },
   status: "active",
+  deletedAt: null,
+  deletedBy: null,
   createdBy: "uid-1",
   createdByName: "Rixel",
   createdAt: TIMESTAMP,

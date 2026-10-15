@@ -91,6 +91,9 @@ const mapSong = (data: Record<string, unknown>, id: string): Song =>
     id,
     organizationId: String(data.organizationId ?? ""),
     ...mapSongInput(data),
+    // Trash (roadmap #31): absent or null = live.
+    deletedAt: (data.deletedAt as Song["deletedAt"]) ?? null,
+    deletedBy: data.deletedBy ? String(data.deletedBy) : null,
     createdBy: String(data.createdBy ?? ""),
     createdByName: String(data.createdByName ?? ""),
     createdAt: data.createdAt as Song["createdAt"],
@@ -312,7 +315,69 @@ export const duplicateSong = async (
   return reference.id
 }
 
-export const deleteSong = async (
+/**
+ * Soft delete (roadmap #31): the band's "delete" is a move to the trash — the
+ * document stays with who trashed it and when, and every screen derives "gone"
+ * from those two fields. Stamped with **client** time, exactly like a version's
+ * `savedAt`: a `serverTimestamp` is null while an offline write queues, and a
+ * trashed song must vanish from the songbook immediately, not when the queue
+ * flushes. Not an edit, so no version is written and `updatedAt` is untouched.
+ */
+export const trashSong = async (
+  organizationId: string,
+  songId: string,
+  actor: { id: string; name: string },
+): Promise<void> => {
+  const uid = requireUserId()
+  const song = await fetchSong(organizationId, songId)
+  await updateDoc(doc(firestore, paths.song(organizationId, songId)), {
+    deletedAt: new Date(),
+    deletedBy: uid,
+  })
+
+  void logActivity({
+    organizationId,
+    type: "song_trashed",
+    message: `${actor.name} moved "${song?.title ?? "a song"}" to the trash`,
+    actorId: uid,
+    actorName: actor.name,
+    targetType: "song",
+    targetId: songId,
+  })
+}
+
+/** Puts a trashed song back into circulation (roadmap #31). */
+export const restoreSong = async (
+  organizationId: string,
+  songId: string,
+  actor: { id: string; name: string },
+): Promise<void> => {
+  const uid = requireUserId()
+  const song = await fetchSong(organizationId, songId)
+  // `null` rather than removing the keys: `diff().affectedKeys()` reports both
+  // the same way, and one shape is easier to reason about offline.
+  await updateDoc(doc(firestore, paths.song(organizationId, songId)), {
+    deletedAt: null,
+    deletedBy: null,
+  })
+
+  void logActivity({
+    organizationId,
+    type: "song_restored",
+    message: `${actor.name} restored "${song?.title ?? "a song"}"`,
+    actorId: uid,
+    actorName: actor.name,
+    targetType: "song",
+    targetId: songId,
+  })
+}
+
+/**
+ * The **hard** delete (roadmap #31): the document and its version history are
+ * gone for good. Songs leave the band through `trashSong` — this is only the
+ * trash's "delete forever" and a merge's loser, which must not linger.
+ */
+export const purgeSong = async (
   organizationId: string,
   songId: string,
   actor: { id: string; name: string },

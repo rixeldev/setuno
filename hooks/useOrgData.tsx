@@ -11,6 +11,7 @@ import { computeSongStats, subscribeSongs, type SongStats } from "@/services/son
 import { subscribeSuggestions } from "@/services/suggestions"
 import { subscribeSetlists } from "@/services/setlists"
 import { songFacets } from "@/libs/songSearch"
+import { partitionTrashed } from "@/libs/songTrash"
 import { toFriendlyError } from "@/services/errors"
 import type {
   ActivityEvent,
@@ -26,6 +27,8 @@ import { useOrganization } from "@/hooks/useOrganization"
 
 interface OrgDataContextValue {
   songs: Song[]
+  /** Soft-deleted songs (roadmap #31) — hidden from every screen but the trash view. */
+  trashedSongs: Song[]
   setlists: Setlist[]
   performances: Performance[]
   suggestions: SongSuggestion[]
@@ -146,9 +149,15 @@ export function OrgDataProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<OrgDataContextValue>(() => {
     const { upcoming, past } = partitionPerformances(current.performances)
+    // One seam for "trashed songs are hidden everywhere" (roadmap #31): every
+    // screen reads `songs`, only the trash view asks for `trashedSongs`, and
+    // the library keeps both so setlists and annotations still resolve a song
+    // that is in the trash.
+    const { visible, trashed } = partitionTrashed(current.songs)
     const songLibrary = new Map(current.songs.map((song) => [song.id, song]))
     return {
-      songs: current.songs,
+      songs: visible,
+      trashedSongs: trashed,
       setlists: current.setlists,
       performances: current.performances,
       suggestions: current.suggestions,
@@ -158,8 +167,8 @@ export function OrgDataProvider({ children }: { children: React.ReactNode }) {
       invitations: isAdmin ? current.invitations : EMPTY.invitations,
       activity: current.activity,
       songLibrary,
-      facets: songFacets(current.songs),
-      stats: computeSongStats(current.songs),
+      facets: songFacets(visible),
+      stats: computeSongStats(visible),
       nextShow: nextPerformance(current.performances),
       upcomingPerformances: upcoming,
       pastPerformances: past,

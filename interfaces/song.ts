@@ -57,6 +57,13 @@ export interface Song {
   links: SongLinks
   /** Repertoire status (roadmap #30): absent documents read as `active`. */
   status: SongStatus
+  /**
+   * Trash (roadmap #31): `null`/absent = live, a timestamp = soft-deleted.
+   * Client time, so an offline trash is visible before the write flushes.
+   */
+  deletedAt: TimestampLike | null
+  /** Who trashed it (roadmap #31); cleared together with `deletedAt`. */
+  deletedBy: string | null
   createdBy: string
   createdByName: string
   createdAt: TimestampLike

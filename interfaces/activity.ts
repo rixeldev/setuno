@@ -14,6 +14,8 @@ export type ActivityType =
   | "song_duplicated"
   | "song_merged"
   | "song_deleted"
+  | "song_trashed"
+  | "song_restored"
   | "suggestion_created"
   | "suggestion_accepted"
   | "suggestion_rejected"

@@ -397,7 +397,7 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'title', 'artist', 'key', 'originalKey', 'capo', 'bpm', 'durationSec',
             'genre', 'notes', 'tags', 'sections', 'links', 'status',
-            'authorId', 'authorName', 'updatedAt'
+            'deletedAt', 'deletedBy', 'authorId', 'authorName', 'updatedAt'
           ]);
         allow delete: if isAdmin(organizationId);
 

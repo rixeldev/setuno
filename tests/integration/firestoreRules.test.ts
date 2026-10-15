@@ -150,6 +150,18 @@ describe("songs are written by admins only", () => {
       alice().firestore().doc(songPath()).update({ status: "retired", metadata: { source: "import" } }),
     )
   })
+
+  it("lets an admin move a song to the trash", async () => {
+    await assertSucceeds(
+      alice().firestore().doc(songPath()).update({ deletedAt: new Date(), deletedBy: "alice" }),
+    )
+  })
+
+  it("lets an admin restore a trashed song", async () => {
+    await assertSucceeds(
+      alice().firestore().doc(songPath()).update({ deletedAt: null, deletedBy: null }),
+    )
+  })
 })
 
 describe("suggestions are member-written and admin-reviewed", () => {

@@ -69,7 +69,7 @@ import { useFontSizeShortcuts } from "@/hooks/useFontSizeShortcuts"
 import { useReaderKeys } from "@/hooks/useReaderKeys"
 import { useAnnotations } from "@/hooks/useAnnotations"
 import { usePaletteCommands } from "@/hooks/usePaletteCommands"
-import { deleteSong, duplicateSong, subscribeSong } from "@/services/songs"
+import { duplicateSong, subscribeSong, trashSong } from "@/services/songs"
 import { mergeSongs } from "@/services/songMerge"
 import { saveReaderState, type ReaderState } from "@/services/readerState"
 import { updatePreferences } from "@/services/users"
@@ -595,16 +595,18 @@ export default function SongScreen() {
     else toast.showError(t("songs.exportFailed"))
   }
 
+  // Roadmap #31: "delete" moves the song to the trash — it can be restored
+  // from there, and only the trash's "delete forever" really removes it.
   const remove = async (): Promise<void> => {
     if (!song) return
     setDeleting(true)
     try {
-      await deleteSong(organizationId ?? "", song.id, {
+      await trashSong(organizationId ?? "", song.id, {
         id: profile?.uid ?? "",
         name: profile?.displayName || "An admin",
       })
       setConfirmDelete(false)
-      toast.showSuccess(`"${song.title}" was deleted.`)
+      toast.showSuccess(t("songs.trashedToast", { title: song.title }))
       router.replace("/songs")
     } catch (error) {
       toast.showError(toFriendlyError(error, t("songs.couldNotDelete")))
@@ -1131,12 +1133,12 @@ export default function SongScreen() {
                   <Pressable
                     onPress={() => setConfirmDelete(true)}
                     accessibilityRole="button"
-                    accessibilityLabel={t("songs.deleteSong")}
+                    accessibilityLabel={t("songs.moveToTrash")}
                     style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
                   >
                     <TrashIcon size={15} color={Theme.colors.danger} />
                     <AppText variant="caption" tone="danger">
-                      {t("songs.deleteSong")}
+                      {t("songs.moveToTrash")}
                     </AppText>
                   </Pressable>
                 </>
@@ -1195,9 +1197,9 @@ export default function SongScreen() {
       <Dialog
         visible={confirmDelete}
         onClose={() => setConfirmDelete(false)}
-        title={t("songs.deleteSongConfirm", { title: song.title })}
-        description={t("songs.deleteSongDescription")}
-        confirmLabel={t("songs.deleteSong")}
+        title={t("songs.moveToTrashConfirm", { title: song.title })}
+        description={t("songs.moveToTrashDescription")}
+        confirmLabel={t("songs.moveToTrash")}
         tone="danger"
         confirmLoading={deleting}
         onConfirm={() => void remove()}

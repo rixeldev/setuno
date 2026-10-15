@@ -27,6 +27,8 @@ const song = (overrides: Partial<Song> & Pick<Song, "id" | "title">): Song => ({
   sections: overrides.sections ?? [],
   links: EMPTY_SONG_LINKS,
   status: overrides.status ?? "active",
+  deletedAt: null,
+  deletedBy: null,
   createdBy: "uid",
   createdByName: "Admin",
   createdAt: timestamp,
