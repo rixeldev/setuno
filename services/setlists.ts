@@ -51,6 +51,8 @@ const mapSetlist = (data: Record<string, unknown>, id: string): Setlist => {
     songs,
     estimatedDurationSec:
       typeof data.estimatedDurationSec === "number" ? data.estimatedDurationSec : 0,
+    // Written before this field existed, so absence means "an ordinary list".
+    template: data.template === true,
     createdBy: String(data.createdBy ?? ""),
     createdAt: data.createdAt as Setlist["createdAt"],
     updatedAt: data.updatedAt as Setlist["updatedAt"],
@@ -163,6 +165,7 @@ export const createSetlist = async (
     notes: normalized.notes,
     songs,
     estimatedDurationSec: estimateSetlistDuration(songs, library),
+    template: false,
     createdBy: uid,
     createdAt: now,
     updatedAt: now,
@@ -256,6 +259,7 @@ export const duplicateSetlist = async (
     notes: source.notes,
     songs: source.songs,
     estimatedDurationSec: source.estimatedDurationSec,
+    template: source.template,
     createdBy: uid,
     createdAt: now,
     updatedAt: now,
@@ -272,6 +276,84 @@ export const duplicateSetlist = async (
   })
 
   return reference.id
+}
+
+/**
+ * Saves a copy of a setlist as a **template** (roadmap #41): a new document
+ * flagged `template`, with the date cleared, because a template is for *any*
+ * event rather than one day. The source is left exactly as it was — turning a
+ * running order that an event is already using into a template would pull the
+ * gig's list out from under it.
+ */
+export const saveSetlistAsTemplate = async (
+  organizationId: string,
+  setlistId: string,
+  name: string,
+  author: { id: string; name: string },
+): Promise<string> => {
+  const uid = requireUserId()
+  const source = await fetchSetlist(organizationId, setlistId)
+  if (!source) throw new ValidationError("That setlist no longer exists.")
+
+  const trimmed = name.trim()
+  const templateName = trimmed.length > 0 ? trimmed.slice(0, 80) : source.name.slice(0, 80)
+  const reference = doc(collection(firestore, paths.setlists(organizationId)))
+  const now = serverTimestamp()
+
+  await setDoc(reference, {
+    organizationId,
+    name: templateName,
+    description: source.description,
+    date: null,
+    notes: source.notes,
+    songs: source.songs,
+    estimatedDurationSec: source.estimatedDurationSec,
+    template: true,
+    createdBy: uid,
+    createdAt: now,
+    updatedAt: now,
+  })
+
+  void logActivity({
+    organizationId,
+    type: "setlist_created",
+    message: `${author.name} saved "${templateName}" as a template`,
+    actorId: uid,
+    actorName: author.name,
+    targetType: "setlist",
+    targetId: reference.id,
+  })
+
+  return reference.id
+}
+
+/** Moves a setlist in or out of the templates section (roadmap #41). */
+export const setSetlistTemplate = async (
+  organizationId: string,
+  setlistId: string,
+  template: boolean,
+  actor: { id: string; name: string },
+): Promise<void> => {
+  const uid = requireUserId()
+  const setlist = await fetchSetlist(organizationId, setlistId)
+  if (!setlist) throw new ValidationError("That setlist no longer exists.")
+
+  await updateDoc(doc(firestore, paths.setlist(organizationId, setlistId)), {
+    template,
+    updatedAt: serverTimestamp(),
+  })
+
+  void logActivity({
+    organizationId,
+    type: "setlist_updated",
+    message: template ?
+      `${actor.name} saved "${setlist.name}" as a template`
+    : `${actor.name} removed "${setlist.name}" from templates`,
+    actorId: uid,
+    actorName: actor.name,
+    targetType: "setlist",
+    targetId: setlistId,
+  })
 }
 
 /** Reorders the songs of a setlist (docs §14: songs must be reorderable). */

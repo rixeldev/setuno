@@ -414,7 +414,7 @@ service cloud.firestore {
           && request.resource.data.organizationId == organizationId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'name', 'description', 'date', 'notes', 'songs',
-            'estimatedDurationSec', 'updatedAt'
+            'estimatedDurationSec', 'template', 'updatedAt'
           ]);
         allow delete: if isAdmin(organizationId);
       }

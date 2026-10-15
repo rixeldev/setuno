@@ -906,7 +906,19 @@
     "moreShows_one": "+{{count}} more event",
     "moreShows_other": "+{{count}} more events",
     "withoutEvent": "Not attached to an event",
-    "print": "Print the setlist"
+    "print": "Print the setlist",
+    "templates": "Templates",
+    "templateBadge": "Template",
+    "saveAsTemplate": "Save as template",
+    "saveAsTemplateHint": "Keeps a reusable copy — no date, no event.",
+    "templateName": "Template name",
+    "templateNamePlaceholder": "45-minute set",
+    "templateSaved": "\"{{name}}\" was saved as a template.",
+    "couldNotSaveTemplate": "We couldn't save that template.",
+    "removeFromTemplates": "Remove from templates",
+    "templateRemoved": "\"{{name}}\" is no longer a template.",
+    "couldNotUpdateTemplate": "We couldn't update the template.",
+    "copySuffix": " (copy)"
   },
   "liveShow": {
     "title": "Live show",

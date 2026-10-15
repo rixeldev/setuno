@@ -13,22 +13,17 @@ import { ChevronRightIcon, ListIcon, PlusIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
-import { formatDateRange, formatDurationLong } from "@/libs/format"
-import type { Setlist } from "@/interfaces"
-
-interface SetlistGroup {
-  key: string
-  title: string
-  subtitle?: string
-  eventId?: string
-  lists: Setlist[]
-}
+import { formatDurationLong } from "@/libs/format"
+import { groupSetlists } from "@/libs/setlistGroups"
 
 /**
  * Setlists live with their events (docs §20): each upcoming event lists the
  * running orders attached to it, and lists whose event already passed or was
  * completed disappear from here (they remain reachable from the event itself).
- * Only drafts that are not attached to any event stay in their own section.
+ * Lists not attached to anything keep their own section — and **templates sit
+ * outside events entirely** (roadmap #41), in a section of their own.
+ *
+ * The grouping itself is `libs/setlistGroups.ts`, pure and tested.
  */
 export default function SetlistsScreen() {
   const { t, i18n } = useTranslation()
@@ -37,36 +32,18 @@ export default function SetlistsScreen() {
   const { isAdmin } = useOrganization()
   const { setlists, performances, upcomingPerformances, loading, error } = useOrgData()
 
-  const groups = useMemo<SetlistGroup[]>(() => {
-    const byId = new Map(setlists.map((entry) => [entry.id, entry]))
-
-    const eventGroups: SetlistGroup[] = upcomingPerformances
-      .filter((performance) => performance.status === "scheduled")
-      .map((performance) => ({
-        key: performance.id,
-        title: performance.name,
-        subtitle: formatDateRange(performance.date, performance.endDate, i18n.language),
-        eventId: performance.id,
-        lists: performance.setlists
-          .map((reference) => byId.get(reference.id))
-          .filter((entry) => entry !== undefined),
-      }))
-      .filter((group) => group.lists.length > 0)
-
-    const unattached = setlists.filter(
-      (setlist) =>
-        !performances.some((performance) =>
-          performance.setlists.some((reference) => reference.id === setlist.id),
-        ),
-    )
-
-    return [
-      ...eventGroups,
-      ...(unattached.length > 0
-        ? [{ key: "unattached", title: t("setlists.withoutEvent"), lists: unattached }]
-        : []),
-    ]
-  }, [i18n.language, performances, setlists, t, upcomingPerformances])
+  const groups = useMemo(
+    () =>
+      groupSetlists({
+        setlists,
+        performances,
+        upcomingPerformances,
+        language: i18n.language,
+        templatesTitle: t("setlists.templates"),
+        unattachedTitle: t("setlists.withoutEvent"),
+      }),
+    [i18n.language, performances, setlists, t, upcomingPerformances],
+  )
 
   const visibleCount = groups.reduce((total, group) => total + group.lists.length, 0)
 

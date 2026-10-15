@@ -21,6 +21,14 @@ export interface Setlist {
   songs: SetlistSong[]
   /** Sum of known song durations, in seconds. */
   estimatedDurationSec: number
+  /**
+   * A reusable starting point (roadmap #41: "45-min, acoustic, wedding")
+   * rather than a running order built for one event. Templates carry no date
+   * and get their own section on the setlists screen, outside the events that
+   * group every other list. Absent on documents written before this shipped,
+   * so it reads as `false`.
+   */
+  template: boolean
   createdBy: string
   createdAt: TimestampLike
   updatedAt: TimestampLike

@@ -11,7 +11,7 @@ import { Button, IconButton } from "@/components/ui/Button"
 import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
 import { Dialog } from "@/components/ui/Dialog"
 import { EmptyState } from "@/components/ui/States"
-import { SearchInput } from "@/components/ui/Input"
+import { Input, SearchInput } from "@/components/ui/Input"
 import { useToast } from "@/components/ui/Toast"
 import { CloseIcon, DotsIcon, MusicIcon, PlusIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
@@ -23,7 +23,9 @@ import { useOrgData } from "@/hooks/useOrgData"
 import {
   deleteSetlist,
   duplicateSetlist,
+  saveSetlistAsTemplate,
   setlistSongKeys,
+  setSetlistTemplate,
   updateSetlist,
   updateSetlistSongKey,
 } from "@/services/setlists"
@@ -73,6 +75,10 @@ export default function SetlistDetail() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
+  // "Save as template" asks what to call the template, the way the songbook's
+  // saved views do — the name is what the band will look for later.
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [templateName, setTemplateName] = useState("")
   // Song whose play key is being chosen, and whether it is being added from
   // the picker or changed from the running order.
   const [keyTarget, setKeyTarget] = useState<{
@@ -205,13 +211,46 @@ export default function SetlistDetail() {
       const id = await duplicateSetlist(
         organizationId ?? "",
         setlist.id,
-        "copy",
+        t("setlists.copySuffix"),
         actor,
       )
       toast.showSuccess(t("setlists.duplicated"))
       router.replace(`/setlists/${id}`)
     } catch (error) {
       toast.showError(toFriendlyError(error, t("setlists.couldNotDuplicate")))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Saves a copy flagged as a template; the list on screen is left alone. */
+  const saveTemplate = async (): Promise<void> => {
+    if (!setlist) return
+    const name = templateName.trim()
+    if (name.length === 0) return
+    setBusy(true)
+    try {
+      const id = await saveSetlistAsTemplate(organizationId ?? "", setlist.id, name, actor)
+      setSavingTemplate(false)
+      setTemplateName("")
+      toast.showSuccess(t("setlists.templateSaved", { name }))
+      router.replace(`/setlists/${id}`)
+    } catch (error) {
+      // The dialog stays open: the name the user typed is still worth keeping.
+      toast.showError(toFriendlyError(error, t("setlists.couldNotSaveTemplate")))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const dropTemplate = async (): Promise<void> => {
+    if (!setlist) return
+    setBusy(true)
+    try {
+      await setSetlistTemplate(organizationId ?? "", setlist.id, false, actor)
+      toast.showSuccess(t("setlists.templateRemoved", { name: setlist.name }))
+    } catch (error) {
+      toast.showError(toFriendlyError(error, t("setlists.couldNotUpdateTemplate")))
     } finally {
       setBusy(false)
     }
@@ -266,6 +305,10 @@ export default function SetlistDetail() {
   const dateLabel = setlist.date
     ? formatRelativeDay(parseIsoDate(setlist.date), dayLabels)
     : ""
+  // A template has no date, so this reads "Template · 12 songs · 45 min".
+  const subtitle = [setlist.template ? t("setlists.templateBadge") : "", dateLabel, runsLabel]
+    .filter(Boolean)
+    .join(" · ")
   const hasNotes =
     setlist.description.trim().length > 0 || setlist.notes.trim().length > 0
 
@@ -273,7 +316,7 @@ export default function SetlistDetail() {
     <ScreenContainer
       back
       title={setlist.name}
-      subtitle={[dateLabel, runsLabel].filter(Boolean).join(" · ")}
+      subtitle={subtitle}
       large
       titleLines={2}
       headerRight={
@@ -520,6 +563,25 @@ export default function SetlistDetail() {
             void duplicate()
           }}
         />
+        {setlist.template ? (
+          <SheetOptionRow
+            label={t("setlists.removeFromTemplates")}
+            onPress={() => {
+              setMenuOpen(false)
+              void dropTemplate()
+            }}
+          />
+        ) : (
+          <SheetOptionRow
+            label={t("setlists.saveAsTemplate")}
+            hint={t("setlists.saveAsTemplateHint")}
+            onPress={() => {
+              setMenuOpen(false)
+              setTemplateName(setlist.name)
+              setSavingTemplate(true)
+            }}
+          />
+        )}
         <SheetOptionRow
           label={t("setlists.print")}
           onPress={() => {
@@ -608,6 +670,25 @@ export default function SetlistDetail() {
           label={t("common.done")}
           variant="secondary"
           onPress={() => setPickerOpen(false)}
+        />
+      </Dialog>
+
+      <Dialog
+        visible={savingTemplate}
+        onClose={() => setSavingTemplate(false)}
+        title={t("setlists.saveAsTemplate")}
+        description={t("setlists.saveAsTemplateHint")}
+        confirmLabel={t("common.save")}
+        confirmDisabled={templateName.trim().length === 0}
+        confirmLoading={busy}
+        onConfirm={() => void saveTemplate()}
+      >
+        <Input
+          label={t("setlists.templateName")}
+          placeholder={t("setlists.templateNamePlaceholder")}
+          value={templateName}
+          onChangeText={setTemplateName}
+          autoFocus
         />
       </Dialog>
 

@@ -811,7 +811,19 @@
     "moreShows_one": "+{{count}} evento más",
     "moreShows_other": "+{{count}} eventos más",
     "withoutEvent": "Sin evento",
-    "print": "Imprimir la lista"
+    "print": "Imprimir la lista",
+    "templates": "Plantillas",
+    "templateBadge": "Plantilla",
+    "saveAsTemplate": "Guardar como plantilla",
+    "saveAsTemplateHint": "Guarda una copia reutilizable, sin fecha ni evento.",
+    "templateName": "Nombre de la plantilla",
+    "templateNamePlaceholder": "Set de 45 minutos",
+    "templateSaved": "\"{{name}}\" se guardó como plantilla.",
+    "couldNotSaveTemplate": "No pudimos guardar esa plantilla.",
+    "removeFromTemplates": "Quitar de plantillas",
+    "templateRemoved": "\"{{name}}\" ya no es una plantilla.",
+    "couldNotUpdateTemplate": "No pudimos actualizar la plantilla.",
+    "copySuffix": " (copia)"
   },
   "liveShow": {
     "title": "En directo",
