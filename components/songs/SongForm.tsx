@@ -43,8 +43,9 @@ import { parseTags, validateBpm, validateCapo, validateDuration, validateRequire
 import { parseDurationInput } from "@/libs/format"
 import { parseChordPro } from "@/libs/chordpro"
 import { findDuplicateSongs, type SongDuplicate } from "@/libs/songSearch"
+import { SONG_STATUSES, SONG_STATUS_LABEL_KEYS } from "@/libs/songStatus"
 import { EMPTY_SONG_LINKS } from "@/interfaces/song"
-import type { SongInput, SongLinks, SongSection, Song } from "@/interfaces"
+import type { SongInput, SongLinks, SongSection, Song, SongStatus } from "@/interfaces"
 
 interface SongFormProps {
   /** Provided when editing an existing song. */
@@ -69,6 +70,7 @@ interface SongFormState {
   tags: string
   notes: string
   links: SongLinks
+  status: SongStatus
   sections: SongSection[]
 }
 
@@ -89,6 +91,7 @@ const formStateFrom = (
   tags: song?.tags.join(", ") ?? "",
   notes: song?.notes ?? "",
   links: song?.links ?? EMPTY_SONG_LINKS,
+  status: song?.status ?? "active",
   sections: song?.sections ?? fallbackSections,
 })
 
@@ -121,6 +124,7 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, tourHint
   const [tags, setTags] = useState(song?.tags.join(", ") ?? "")
   const [notes, setNotes] = useState(song?.notes ?? "")
   const [links, setLinks] = useState<SongLinks>(song?.links ?? EMPTY_SONG_LINKS)
+  const [status, setStatus] = useState<SongStatus>(song?.status ?? "active")
   // A brand-new song opens with one blank line, so the editor is immediately
   // usable instead of showing an empty section with nothing to type into.
   const [sectionTemplate] = useState<SongSection[]>(() => [
@@ -175,6 +179,7 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, tourHint
     setTags(song.tags.join(", "))
     setNotes(song.notes)
     setLinks(song.links)
+    setStatus(song.status)
     sectionsHistory.reset(song.sections)
     setErrors({})
     setFormError(null)
@@ -192,6 +197,7 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, tourHint
     tags,
     notes,
     links,
+    status,
     sections,
   }
   // `saving` is included so the navigation that follows a successful save is
@@ -328,6 +334,7 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, tourHint
         tags: parseTags(tags),
         sections,
         links,
+        status,
       }
 
       const actor = { id: profile?.uid ?? "", name: profile?.displayName || "An admin" }
@@ -486,6 +493,27 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, tourHint
 
           {detailsOpen ? (
             <View style={styles.detailsBody}>
+              <View style={styles.linksBlock}>
+                <View style={styles.linksHeader}>
+                  <AppText variant="label" tone="faint">
+                    {t("songs.status")}
+                  </AppText>
+                  <AppText variant="caption" tone="muted">
+                    {t("songs.statusHelp")}
+                  </AppText>
+                </View>
+                <View style={styles.statusRow}>
+                  {SONG_STATUSES.map((value) => (
+                    <Chip
+                      key={value}
+                      label={t(SONG_STATUS_LABEL_KEYS[value])}
+                      selected={status === value}
+                      onPress={() => setStatus(value)}
+                      accessibilityLabel={t(SONG_STATUS_LABEL_KEYS[value])}
+                    />
+                  ))}
+                </View>
+              </View>
               <Input
                 label={t("songs.genre")}
                 value={genre}
@@ -749,6 +777,7 @@ const createStyles = () =>
     detailsBody: { gap: Theme.spacing.m },
     linksBlock: { gap: Theme.spacing.m },
     linksHeader: { gap: 2 },
+    statusRow: { flexDirection: "row", flexWrap: "wrap", gap: Theme.spacing.s },
     footer: {
       paddingTop: Theme.spacing.m,
       paddingBottom: Theme.spacing.m,

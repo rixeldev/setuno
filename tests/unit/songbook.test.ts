@@ -38,6 +38,7 @@ const song = (id: string, patch: Partial<Song> = {}): Song => ({
   tags: [],
   sections: [],
   links: EMPTY_SONG_LINKS,
+  status: "active",
   createdBy: "uid",
   createdByName: "Admin",
   createdAt: timestamp(0),

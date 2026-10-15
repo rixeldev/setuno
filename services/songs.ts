@@ -25,6 +25,7 @@ import { deleteVersions, writeVersion } from "@/services/songVersions"
 import { ValidationError } from "@/services/errors"
 import { countSongChords, countSongLines, clampSectionBars, normalizeSectionLabels } from "@/libs/songUtils"
 import { songVersionData } from "@/libs/songHistory"
+import { normalizeSongStatus } from "@/libs/songStatus"
 import { normalizeSongLinks } from "@/libs/songLinks"
 import { duplicateSongTitle } from "@/libs/songMerge"
 
@@ -81,6 +82,8 @@ export const mapSongInput = (data: Record<string, unknown>): SongInput => ({
   tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
   sections: mapSections(data.sections),
   links: normalizeSongLinks(data.links),
+  // Absence (a document written before #30) reads back as active — no migration.
+  status: normalizeSongStatus(data.status),
 })
 
 const mapSong = (data: Record<string, unknown>, id: string): Song =>
@@ -129,6 +132,7 @@ export const normalizeSongInput = (input: SongInput): SongInput => {
     tags: Array.from(new Set(input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean))).slice(0, 12),
     sections,
     links: normalizeSongLinks(input.links),
+    status: normalizeSongStatus(input.status),
   }
 }
 
@@ -288,6 +292,7 @@ export const duplicateSong = async (
     tags: source.tags,
     sections: source.sections,
     links: source.links,
+    status: source.status,
     createdBy: uid,
     createdByName: author.name,
     createdAt: now,

@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next"
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
-import { Badge, Card } from "@/components/ui/Card"
+import { Badge, Card, Chip } from "@/components/ui/Card"
 import { Button, IconButton } from "@/components/ui/Button"
 import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
 import { Dialog } from "@/components/ui/Dialog"
@@ -34,6 +34,7 @@ import {
 } from "@/services/setlists"
 import { toFriendlyError } from "@/services/errors"
 import { filterSongs, EMPTY_FILTERS } from "@/libs/songSearch"
+import { isPickableForSetlist } from "@/libs/songStatus"
 import { setlistPrintHtml } from "@/libs/songPrint"
 import type { RelativeDayLabels } from "@/libs/format"
 import {
@@ -90,6 +91,9 @@ export default function SetlistDetail() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [search, setSearch] = useState("")
+  // Retired songs are hidden from the picker by default (roadmap #30); the
+  // chip below only shows up once there is actually something to reveal.
+  const [showRetired, setShowRetired] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
@@ -396,9 +400,10 @@ export default function SetlistDetail() {
     )
   }
 
-  const candidates = filterSongs(songs, { ...EMPTY_FILTERS, search }).filter(
-    (song) => !setlist.songs.some((entry) => entry.songId === song.id),
-  )
+  const hasRetired = songs.some((song) => song.status === "retired")
+  const candidates = filterSongs(songs, { ...EMPTY_FILTERS, search })
+    .filter((song) => !setlist.songs.some((entry) => entry.songId === song.id))
+    .filter((song) => isPickableForSetlist(song, showRetired))
   const runsLabel = t("setlists.songsCount", {
     count: setlist.songs.length,
     duration: formatDurationLong(setlist.estimatedDurationSec),
@@ -849,6 +854,14 @@ export default function SetlistDetail() {
           onChangeText={setSearch}
           onClear={() => setSearch("")}
         />
+        {hasRetired ? (
+          <Chip
+            label={t("setlists.includeRetired")}
+            selected={showRetired}
+            onPress={() => setShowRetired((value) => !value)}
+            accessibilityLabel={t("setlists.includeRetired")}
+          />
+        ) : null}
         <FlatList
           data={candidates}
           keyExtractor={(item) => item.id}
@@ -889,6 +902,9 @@ export default function SetlistDetail() {
                   {item.artist || t("common.unknownArtist")}
                 </AppText>
               </View>
+              {showRetired && item.status === "retired" ? (
+                <Badge label={t("songs.statusRetired")} tone="default" />
+              ) : null}
               <Badge
                 label={item.key ? displayKey(item.key, notation) : "—"}
                 tone="accent"

@@ -140,6 +140,16 @@ describe("songs are written by admins only", () => {
   it("lets an admin edit the band's song", async () => {
     await assertSucceeds(alice().firestore().doc(songPath()).update({ title: "Renamed" }))
   })
+
+  it("lets an admin change a song's status", async () => {
+    await assertSucceeds(alice().firestore().doc(songPath()).update({ status: "retired" }))
+  })
+
+  it("still rejects an update carrying a field outside the whitelist", async () => {
+    await assertFails(
+      alice().firestore().doc(songPath()).update({ status: "retired", metadata: { source: "import" } }),
+    )
+  })
 })
 
 describe("suggestions are member-written and admin-reviewed", () => {

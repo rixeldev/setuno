@@ -49,6 +49,8 @@ export function SongVersionDiff({ diff, before, after }: SongVersionDiffProps) {
         return t("songs.notes")
       case "tags":
         return t("songs.tags")
+      case "status":
+        return t("songs.status")
     }
   }
 

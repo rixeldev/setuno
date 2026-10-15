@@ -67,6 +67,7 @@ const song = (id: string, overrides: Partial<Song> = {}): Song => ({
   tags: [],
   sections: [],
   links: { youtube: "", spotify: "", appleMusic: "" },
+  status: "active",
   createdBy: "uid-1",
   createdByName: "Rixel",
   createdAt: TIMESTAMP,

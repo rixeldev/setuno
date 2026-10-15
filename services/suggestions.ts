@@ -263,6 +263,7 @@ export const acceptSuggestion = async (
         tags: [],
         sections: sectionsFromLyrics(change.lyrics),
         links: EMPTY_SONG_LINKS,
+        status: "active",
       },
       { id: uid, name: reviewer.name },
     )
@@ -312,6 +313,8 @@ export const acceptSuggestion = async (
       tags: next.tags,
       sections: next.sections,
       links: next.links,
+      // A suggestion changes the music, never the repertoire status.
+      status: next.status,
     }, reviewer)
 
     await updateDoc(doc(firestore, paths.suggestion(organizationId, suggestionId)), {

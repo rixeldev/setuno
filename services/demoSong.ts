@@ -45,6 +45,7 @@ export const seedDemoSongOnce = async (options: DemoSeedOptions): Promise<boolea
         "Canción de ejemplo creada una sola vez para que veas el lector. Prueba a transponerla, cambiar el capo o editar los acordes de la intro. Puedes borrarla: no volverá a aparecer.",
       tags: ["demo", "ejemplo"],
       sections: demoSongSections(),
+      status: "active",
       createdBy: options.uid,
       createdByName: options.authorName,
       createdAt: now,

@@ -35,6 +35,7 @@ const songInput = (overrides: Partial<SongInput> = {}): SongInput => ({
   tags: [],
   sections: [section("s1", "Verse 1")],
   links: { youtube: "", spotify: "", appleMusic: "" },
+  status: "active",
   ...overrides,
 })
 
@@ -121,6 +122,19 @@ describe("versionDiff", () => {
     const key = diff.fields.find((field) => field.field === "key")
     expect(key?.segments.some((segment) => segment.kind === "removed" && segment.text.includes("G"))).toBe(true)
     expect(key?.segments.some((segment) => segment.kind === "added" && segment.text.includes("D"))).toBe(true)
+  })
+
+  it("reports a status change like any other field", () => {
+    const diff = versionDiff(
+      songInput({ status: "draft" }),
+      songInput({ status: "retired" }),
+    )
+
+    expect(diff.changed).toBe(true)
+    expect(diff.fields).toHaveLength(1)
+    expect(diff.fields[0].field).toBe("status")
+    expect(diff.fields[0].segments.some((segment) => segment.kind === "removed")).toBe(true)
+    expect(diff.fields[0].segments.some((segment) => segment.kind === "added")).toBe(true)
   })
 
   it("marks an edited lyric line inside a paired section", () => {

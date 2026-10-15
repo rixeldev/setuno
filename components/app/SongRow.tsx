@@ -1,5 +1,6 @@
 import React from "react"
 import { StyleSheet, View } from "react-native"
+import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -9,6 +10,7 @@ import { ChevronRightIcon, MusicIcon } from "@/components/ui/Icons"
 import { formatDuration, formatRelativeTime, pluralize } from "@/libs/format"
 import { toDate } from "@/interfaces/timestamp"
 import { countSongChords, countSongLines, estimateDurationSec } from "@/libs/songUtils"
+import { SONG_STATUS_LABEL_KEYS } from "@/libs/songStatus"
 import { displayKey } from "@/libs/chords"
 import { usePreferences } from "@/services/prefs"
 import type { Song } from "@/interfaces"
@@ -25,16 +27,20 @@ interface SongRowProps {
 /** One song in a list: title, artist, key and quick stats (docs §19). */
 export function SongRow({ song, onPress, right, dense = false }: SongRowProps) {
   const styles = useThemedStyles(createStyles)
+  const { t } = useTranslation()
   // Keys are stored in letters; the reader settings decide how they are spelled.
   const notation = usePreferences().chordNotation ?? "letters"
   const duration = song.durationSec ?? (song.sections.length > 0 ? estimateDurationSec(song.sections) : null)
   const keyLabel = song.key ? displayKey(song.key, notation) : ""
+  // `active` is the default and the overwhelming majority — only the two
+  // exceptions earn a badge (roadmap #30).
+  const statusLabel = song.status === "active" ? null : t(SONG_STATUS_LABEL_KEYS[song.status])
 
   return (
     <Card
       padded={false}
       onPress={onPress}
-      accessibilityLabel={`${song.title}${song.artist ? ` by ${song.artist}` : ""}, key ${keyLabel || "unknown"}`}
+      accessibilityLabel={`${song.title}${song.artist ? ` by ${song.artist}` : ""}, key ${keyLabel || "unknown"}${statusLabel ? `, ${statusLabel}` : ""}`}
       style={dense ? styles.dense : undefined}
     >
       <View style={styles.row}>
@@ -47,6 +53,9 @@ export function SongRow({ song, onPress, right, dense = false }: SongRowProps) {
             <AppText variant="bodyStrong" numberOfLines={1} style={styles.title}>
               {song.title}
             </AppText>
+            {statusLabel ? (
+              <Badge label={statusLabel} tone={song.status === "draft" ? "warning" : "default"} />
+            ) : null}
             {keyLabel ? <Badge label={keyLabel} tone="accent" /> : null}
           </View>
 

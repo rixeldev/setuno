@@ -37,6 +37,7 @@ export const songVersionData = (song: Song): SongInput => ({
   tags: song.tags,
   sections: song.sections,
   links: song.links,
+  status: song.status,
 })
 
 interface VersionStamp {
@@ -79,6 +80,7 @@ export type VersionDiffFieldKey =
   | "genre"
   | "notes"
   | "tags"
+  | "status"
 
 export interface VersionDiffField {
   field: VersionDiffFieldKey
@@ -120,6 +122,7 @@ const DIFF_FIELDS: VersionDiffFieldKey[] = [
   "genre",
   "notes",
   "tags",
+  "status",
 ]
 
 const fieldText = (data: SongInput, field: VersionDiffFieldKey): string => {
@@ -140,6 +143,8 @@ const fieldText = (data: SongInput, field: VersionDiffFieldKey): string => {
       return data.notes
     case "tags":
       return data.tags.join(", ")
+    case "status":
+      return data.status
   }
 }
 

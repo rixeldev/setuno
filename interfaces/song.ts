@@ -55,6 +55,8 @@ export interface Song {
   sections: SongSection[]
   /** Optional external references (roadmap #16). */
   links: SongLinks
+  /** Repertoire status (roadmap #30): absent documents read as `active`. */
+  status: SongStatus
   createdBy: string
   createdByName: string
   createdAt: TimestampLike
@@ -72,6 +74,13 @@ export type SongLinks = Record<SongLinkProvider, string>
 
 export const EMPTY_SONG_LINKS: SongLinks = { youtube: "", spotify: "", appleMusic: "" }
 
+/**
+ * Where a song sits in the band's repertoire (roadmap #30). Absence in a
+ * stored document reads back as `active`, so documents written before #30
+ * need no migration.
+ */
+export type SongStatus = "draft" | "active" | "retired"
+
 /** Fields an admin can edit; identity/audit fields are managed by the service. */
 export interface SongInput {
   title: string
@@ -86,6 +95,12 @@ export interface SongInput {
   tags: string[]
   sections: SongSection[]
   links: SongLinks
+  /**
+   * Required, not optional: `updateSong` writes the whole input, so an
+   * omitted optional would silently reset every song to active on save
+   * (#42's trap).
+   */
+  status: SongStatus
 }
 
 /**
