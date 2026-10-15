@@ -423,6 +423,10 @@ export const MusicIcon = ({ size = 24, color = Theme.colors.text, ...rest }: Ico
   <Ionicons name="musical-notes" size={size} color={color} {...rest} />
 )
 
+export const MetronomeIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="metronome" size={size} color={color} {...rest} />
+)
+
 export const NoteIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
   <Ionicons name="musical-note" size={size} color={color} {...rest} />
 )

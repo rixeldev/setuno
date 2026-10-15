@@ -66,6 +66,7 @@ a sidebar layout on the web.
 | **Chord notation & layout** | Spell chords as letters (C F#m), solfège (Do Fa#m) or Nashville numbers (1 4 5, relative to the song's key); show chords above the lyrics, lyrics only, or a chords-only chart |
 | **Stage mode** | Full-screen reading with adjustable font size and chord visibility that survives stepping to the next song; holds a screen wake lock (toggleable) so the display never sleeps mid-show |
 | **Autoscroll** | Hands-free reading with a start delay, a speed in lyric lines per minute and a resume button; manual scrolling pauses it, and each song remembers its own speed (per user) |
+| **Metronome** | Practice at the song's tempo without leaving the reader: BPM from the song (or tapped by ear), bar size, downbeat accent, count-in and a beat pulse you feel in your pocket |
 | **Personal notes** | Private cues per song ("I come in here", "second chorus only") — a free-form notes block plus inline notes anchored to a section/line, visible only to you and synced across your devices |
 | **Resume where you left off** | Each song reopens at the spot, key and capo you left it in (per user, synced across devices); the refresh button is a one-tap reset to the top, original key and no capo |
 | **Per-song text size** | Pinch the lyrics to resize (or Ctrl/Cmd +/- on the desktop); each song remembers its own size, synced across your devices |

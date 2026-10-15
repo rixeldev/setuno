@@ -7,7 +7,7 @@ import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { useResponsive } from "@/hooks/useResponsive"
 import { AppText } from "@/components/ui/AppText"
 import { IconButton } from "@/components/ui/Button"
-import { ChevronUpIcon, FullscreenIcon, MusicIcon, PauseIcon, PlayFilledIcon } from "@/components/ui/Icons"
+import { ChevronUpIcon, FullscreenIcon, MetronomeIcon, MusicIcon, PauseIcon, PlayFilledIcon } from "@/components/ui/Icons"
 
 /**
  * Height of the shut dock. The reader's bottom padding and the corner arrows
@@ -32,6 +32,10 @@ interface ReaderDockProps {
   /** 0..1 travelled, drawn as a hairline on the tray's leading edge (`null`: idle). */
   autoscrollProgress: number | null
   onAutoscrollToggle: () => void
+  /** Opens the metronome; lit while a run is going. */
+  metronomeActive: boolean
+  metronomeLabel: string
+  onMetronome: () => void
   stageLabel: string
   onStage: () => void
   /** The full controls (`SongControls` + `AutoscrollBar`). Always passed: the panel stays mounted so its height is known before the first tap. */
@@ -66,6 +70,9 @@ export function ReaderDock({
   autoscrollLabel,
   autoscrollProgress,
   onAutoscrollToggle,
+  metronomeActive,
+  metronomeLabel,
+  onMetronome,
   stageLabel,
   onStage,
   children,
@@ -164,6 +171,20 @@ export function ReaderDock({
           </AppText>
         </Pressable>
 
+        <IconButton
+          label={metronomeLabel}
+          variant="ghost"
+          size={36}
+          onPress={onMetronome}
+          // Lit while a run is going: the sheet may be closed, but the clicks
+          // (and the beat haptics) keep sounding, and the dock says so.
+          icon={
+            <MetronomeIcon
+              size={17}
+              color={metronomeActive ? Theme.colors.primary : Theme.colors.textMuted}
+            />
+          }
+        />
         <IconButton
           label={stageLabel}
           variant="ghost"

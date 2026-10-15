@@ -49,6 +49,18 @@ export default {
       "expo-router",
       "expo-font",
       "@react-native-google-signin/google-signin",
+      // Playback only (the metronome's clicks): no microphone, no background
+      // service. `enableBackgroundPlayback: false` is deliberate — a practice
+      // tool that stops when the app leaves the foreground needs no service,
+      // and the defaults would enable both.
+      [
+        "expo-audio",
+        {
+          microphonePermission: false,
+          recordAudioAndroid: false,
+          enableBackgroundPlayback: false,
+        },
+      ],
       [
         "expo-image-picker",
         {

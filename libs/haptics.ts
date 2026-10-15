@@ -51,3 +51,24 @@ export const hapticSuccess = (): void => {
 export const hapticError = (): void => {
   run(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error))
 }
+
+/**
+ * Rhythm tick for the metronome (roadmap #11): a firmer pulse on the accent
+ * so the downbeat is felt in the pocket as well as heard. Kept short — at
+ * 240 BPM this fires eight times a second.
+ */
+export const hapticBeat = (accent: boolean): void => {
+  if (Platform.OS === "android") {
+    run(() =>
+      Haptics.performAndroidHapticsAsync(
+        accent ? Haptics.AndroidHaptics.Keyboard_Tap : Haptics.AndroidHaptics.Segment_Tick,
+      ),
+    )
+    return
+  }
+  run(() =>
+    Haptics.impactAsync(
+      accent ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light,
+    ),
+  )
+}

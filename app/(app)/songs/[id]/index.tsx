@@ -48,6 +48,7 @@ import { AutoscrollBar } from "@/components/songs/AutoscrollBar"
 import { LiveShowBar } from "@/components/songs/LiveShowBar"
 import { SongNavArrows } from "@/components/songs/SongNavArrows"
 import { MergeSongsDialog } from "@/components/songs/MergeSongsDialog"
+import { MetronomeSheet } from "@/components/songs/MetronomeSheet"
 import { PrintSheet } from "@/components/songs/PrintSheet"
 import { ReaderDock, READER_DOCK_HEIGHT } from "@/components/songs/ReaderDock"
 import { AnnotationsBlock } from "@/components/annotations/AnnotationsBlock"
@@ -59,6 +60,7 @@ import { useOrgData } from "@/hooks/useOrgData"
 import { readImmersiveMode, setReaderDirection, writeImmersiveMode } from "@/hooks/useReaderSession"
 import { useWakeLock } from "@/hooks/useWakeLock"
 import { useAutoscroll } from "@/hooks/useAutoscroll"
+import { useMetronome } from "@/hooks/useMetronome"
 import { useReaderState } from "@/hooks/useReaderState"
 import { useReadingPosition } from "@/hooks/useReadingPosition"
 import { useFontSizePinch } from "@/hooks/useFontSizePinch"
@@ -138,6 +140,10 @@ export default function SongScreen() {
   // The control tray ships shut: the lyrics are the screen, everything else is
   // one tap away (roadmap redesign of the song screen).
   const [controlsOpen, setControlsOpen] = useState(false)
+  const [metronomeOpen, setMetronomeOpen] = useState(false)
+  // Session practice transport (roadmap #11): seeds from the song's BPM, dies
+  // with the screen — stepping to the next song starts a fresh visit.
+  const metronome = useMetronome(song?.bpm ?? null)
 
   // Live document: reflects admin edits and accepted suggestions immediately.
   useEffect(() => subscribeSong(organizationId, songId, setSong), [organizationId, songId])
@@ -550,7 +556,7 @@ export default function SongScreen() {
   const nextSongId = step?.nextId ?? null
   const previousSongId = step?.previousId ?? null
   useReaderKeys({
-    enabled: chordHelp === null && !notesOpen && !confirmDelete && !mergeOpen,
+    enabled: chordHelp === null && !notesOpen && !confirmDelete && !mergeOpen && !metronomeOpen,
     onNext: nextSongId ? () => openSong(nextSongId) : null,
     onPrevious: previousSongId ? () => openSong(previousSongId) : null,
     onTranspose: (delta) => changeSemitones(semitones + delta),
@@ -1150,6 +1156,9 @@ export default function SongScreen() {
           autoscrollRunning || autoscroll.status === "paused" ? autoscroll.progress : null
         }
         onAutoscrollToggle={autoscroll.toggle}
+        metronomeActive={metronome.running}
+        metronomeLabel={t("songs.metronome")}
+        onMetronome={() => setMetronomeOpen(true)}
         stageLabel={t("songs.stageMode")}
         onStage={enterImmersive}
       >
@@ -1196,6 +1205,23 @@ export default function SongScreen() {
         onClose={() => setPrintOpen(false)}
         title={song.title}
         render={(options) => songPrintHtml(song, options)}
+      />
+
+      <MetronomeSheet
+        visible={metronomeOpen}
+        onClose={() => setMetronomeOpen(false)}
+        bpm={metronome.bpm}
+        beatsPerMeasure={metronome.beatsPerMeasure}
+        accent={metronome.accent}
+        countIn={metronome.countIn}
+        running={metronome.running}
+        beat={metronome.beat}
+        onTap={metronome.tap}
+        onBpmChange={metronome.changeBpm}
+        onBeatsPerMeasureChange={metronome.changeBeatsPerMeasure}
+        onAccentChange={metronome.changeAccent}
+        onCountInChange={metronome.changeCountIn}
+        onToggle={metronome.toggle}
       />
       {chordSheet}
     </View>
