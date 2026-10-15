@@ -87,14 +87,19 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - name: Cache the emulator binaries
+      - name: Cache the emulator binaries and firebase-tools' npm download
         uses: actions/cache@v6
         with:
-          path: ~/.cache/firebase/emulators
-          key: firebase-emulators-${{ runner.os }}
-      - run: npm install -g firebase-tools
+          path: |
+            ~/.cache/firebase/emulators
+            ~/.npm
+          key: firebase-ci-${{ runner.os }}
       - run: pnpm install --frozen-lockfile
-      # Starts the emulators, exports their host variables, runs the suite and
-      # tears everything down. The integration project runs its files serially
+      # Through npx, the same convention as package.json's deploy:* scripts:
+      # run 1 proved that `npm install -g firebase-tools` succeeds while its
+      # global bin directory stays off PATH (exit code 127 on `firebase`), and
+      # npx resolves the binary itself with no PATH assumption. It starts the
+      # emulators, exports their host variables, runs the suite and tears
+      # everything down. The integration project runs its files serially
       # (vitest.config.mts) because they share one data store.
-      - run: firebase emulators:exec --only firestore,storage 'pnpm test:integration'
+      - run: npx -y firebase-tools@latest emulators:exec --only firestore,storage 'pnpm test:integration'
