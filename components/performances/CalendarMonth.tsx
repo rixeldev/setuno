@@ -1,11 +1,14 @@
 import React, { useMemo } from "react"
-import { Pressable, StyleSheet, View } from "react-native"
+import { Pressable, View } from "react-native"
 import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { ChevronRightIcon } from "@/components/ui/Icons"
+import { DayCell } from "@/components/performances/DayCell"
+import { calendarChromeStyles } from "@/components/performances/calendarStyles"
+import { weekdayLabels } from "@/libs/calendarView"
 import { startOfDay } from "@/libs/format"
 
 const toIso = (date: Date): string =>
@@ -40,16 +43,12 @@ export function CalendarMonth({
   onSelectDay,
 }: CalendarMonthProps) {
   const { t, i18n } = useTranslation()
-  const styles = useThemedStyles(createStyles)
+  const styles = useThemedStyles(calendarChromeStyles)
   const monthLabel = useMemo(
     () => new Intl.DateTimeFormat(i18n.language, { month: "long", year: "numeric" }).format(month),
     [i18n.language, month],
   )
-  const weekdayLabels = useMemo(() => {
-    const formatter = new Intl.DateTimeFormat(i18n.language, { weekday: "short" })
-    // 2024-01-01 was a Monday, which matches the Monday-first grid below.
-    return Array.from({ length: 7 }, (_, index) => formatter.format(new Date(2024, 0, 1 + index)))
-  }, [i18n.language])
+  const labels = useMemo(() => weekdayLabels(i18n.language), [i18n.language])
 
   const cells = useMemo<Cell[]>(() => {
     const year = month.getFullYear()
@@ -115,8 +114,8 @@ export function CalendarMonth({
       </View>
 
       <View style={styles.weekRow}>
-        {weekdayLabels.map((day, index) => (
-          <AppText key={`${day}-${index}`} variant="caption" tone="faint" style={styles.cell}>
+        {labels.map((day, index) => (
+          <AppText key={`${day}-${index}`} variant="caption" tone="faint" style={styles.cellLabel}>
             {day}
           </AppText>
         ))}
@@ -125,79 +124,25 @@ export function CalendarMonth({
       <View style={styles.grid}>
         {cells.map((cell) => {
           const count = counts[cell.iso] ?? 0
-          const isSelected = cell.iso === selected
-          const isToday = cell.iso === todayIso
           return (
-            <Pressable
+            <DayCell
               key={cell.iso}
-              accessibilityRole="button"
-              accessibilityLabel={count > 0 ? t("calendar.dayShows", { count, date: cell.iso }) : t("calendar.dayNoShows", { date: cell.iso })}
-              accessibilityState={{ selected: isSelected }}
-              onPress={() => onSelectDay(cell.iso)}
-              style={({ pressed }) => [styles.cellButton, pressed && styles.pressed]}
-            >
-              <View
-                style={[
-                  styles.dayCircle,
-                  isSelected && styles.daySelected,
-                  isToday && !isSelected && styles.dayToday,
-                ]}
-              >
-                <AppText
-                  variant="caption"
-                  tone={isSelected ? "inverse" : cell.inMonth ? "default" : "faint"}
-                >
-                  {cell.day}
-                </AppText>
-              </View>
-
-              <View style={styles.dots}>
-                {count > 0 ? (
-                  <View
-                    style={[
-                      styles.dot,
-                      count > 1 && styles.dotStrong,
-                      isSelected && styles.dotSelected,
-                    ]}
-                  />
-                ) : null}
-              </View>
-            </Pressable>
+              day={cell.day}
+              iso={cell.iso}
+              outside={!cell.inMonth}
+              count={count}
+              selected={cell.iso === selected}
+              today={cell.iso === todayIso}
+              label={
+                count > 0 ?
+                  t("calendar.dayShows", { count, date: cell.iso })
+                : t("calendar.dayNoShows", { date: cell.iso })
+              }
+              onSelect={onSelectDay}
+            />
           )
         })}
       </View>
     </View>
   )
 }
-
-const createStyles = () =>
-  StyleSheet.create({
-    host: { gap: Theme.spacing.s },
-    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: Theme.spacing.s },
-    navButton: {
-      width: 36,
-      height: 36,
-      borderRadius: Theme.radii.s,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: Theme.colors.background2,
-    },
-    weekRow: { flexDirection: "row" },
-    grid: { flexDirection: "row", flexWrap: "wrap" },
-    cell: { width: `${100 / 7}%`, textAlign: "center" },
-    cellButton: { width: `${100 / 7}%`, alignItems: "center", paddingVertical: 3, gap: 3 },
-    dayCircle: {
-      width: 34,
-      height: 34,
-      borderRadius: Theme.radii.pill,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    daySelected: { backgroundColor: Theme.colors.primary },
-    dayToday: { borderWidth: 1, borderColor: Theme.colors.primary },
-    dots: { height: 6, flexDirection: "row", gap: 2 },
-    dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: Theme.colors.accent },
-    dotStrong: { backgroundColor: Theme.colors.primary },
-    dotSelected: { backgroundColor: Theme.colors.onPrimary },
-    pressed: { opacity: 0.7 },
-  })
