@@ -31,6 +31,10 @@ interface SetlistFormProps {
   /** Present when editing. */
   setlist?: Setlist | null
   onSaved?: (setlistId: string) => void
+  /** Name pre-filled from a private collection the draft starts from (roadmap #33). */
+  draftName?: string
+  /** Songs the draft starts with — the form itself never edits them. */
+  draftSongIds?: string[]
 }
 
 interface SetlistFormState {
@@ -46,8 +50,8 @@ interface SetlistFormState {
 /** Stable snapshot used to detect unsaved changes. */
 const serializeForm = (state: SetlistFormState): string => JSON.stringify(state)
 
-const formStateFrom = (setlist: Setlist | null | undefined): SetlistFormState => ({
-  name: setlist?.name ?? "",
+const formStateFrom = (setlist: Setlist | null | undefined, draftName = ""): SetlistFormState => ({
+  name: setlist?.name ?? draftName,
   description: setlist?.description ?? "",
   date: setlist?.date ?? "",
   notes: setlist?.notes ?? "",
@@ -58,7 +62,7 @@ const formStateFrom = (setlist: Setlist | null | undefined): SetlistFormState =>
 })
 
 /** Create/edit form for a setlist (docs §20), presented as a modal. Songs are added on the detail screen. */
-export function SetlistForm({ setlist, onSaved }: SetlistFormProps) {
+export function SetlistForm({ setlist, onSaved, draftName, draftSongIds }: SetlistFormProps) {
   const { t } = useTranslation()
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
@@ -68,9 +72,11 @@ export function SetlistForm({ setlist, onSaved }: SetlistFormProps) {
   const { songLibrary } = useOrgData()
 
   // Read once: the same snapshot seeds both the goal fields and the baseline
-  // the leave guard compares against.
-  const initial = formStateFrom(setlist)
-  const [name, setName] = useState(setlist?.name ?? "")
+  // the leave guard compares against. `draftName` seeds a collection draft
+  // (roadmap #33) — it is part of the baseline, so opening with it filled in
+  // never counts as an edit.
+  const initial = formStateFrom(setlist, draftName)
+  const [name, setName] = useState(initial.name)
   const [description, setDescription] = useState(setlist?.description ?? "")
   const [date, setDate] = useState(setlist?.date ?? "")
   const [notes, setNotes] = useState(setlist?.notes ?? "")
@@ -106,7 +112,7 @@ export function SetlistForm({ setlist, onSaved }: SetlistFormProps) {
       description: description.trim(),
       date: date.trim().length > 0 ? date.trim() : null,
       notes: notes.trim(),
-      songIds: setlist?.songs.map((entry) => entry.songId) ?? [],
+      songIds: setlist?.songs.map((entry) => entry.songId) ?? draftSongIds ?? [],
       // Parsed here so the field stays free text while typing: "45 min" and
       // "9999" both land as a sensible number instead of an error to fix.
       targetMinutes: parseGoalMinutes(targetMinutes, MAX_GOAL_MINUTES),

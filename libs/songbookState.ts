@@ -75,6 +75,8 @@ export const sanitizeFilters = (raw: unknown): SongFilters => {
     progression: typeof stored.progression === "string" ? stored.progression : "",
     bpm: bucket<BpmBucket>(stored.bpm, BPM_BUCKETS),
     duration: bucket<DurationBucket>(stored.duration, DURATION_BUCKETS),
+    // A boolean that only ever restores as `true` — anything else means off.
+    favoritesOnly: stored.favoritesOnly === true,
   }
 }
 

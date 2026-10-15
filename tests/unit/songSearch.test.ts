@@ -120,6 +120,33 @@ describe("filterSongs", () => {
   })
 })
 
+describe("filterSongs — favorites only (roadmap #33)", () => {
+  const favorites = new Set(["1", "3"])
+
+  it("keeps only the starred songs", () => {
+    expect(
+      filterSongs(library, { ...EMPTY_FILTERS, favoritesOnly: true }, favorites).map((s) => s.id),
+    ).toEqual(["1", "3"])
+  })
+
+  it("returns nothing when no set is given instead of everything", () => {
+    expect(filterSongs(library, { ...EMPTY_FILTERS, favoritesOnly: true })).toEqual([])
+    expect(filterSongs(library, { ...EMPTY_FILTERS, favoritesOnly: true }, new Set())).toEqual([])
+  })
+
+  it("stacks with the other filters and counts towards the badge", () => {
+    expect(
+      filterSongs(
+        library,
+        { ...EMPTY_FILTERS, favoritesOnly: true, tag: "acoustic" },
+        favorites,
+      ).map((s) => s.id),
+    ).toEqual(["3"])
+    expect(countActiveFilters({ ...EMPTY_FILTERS, favoritesOnly: true })).toBe(1)
+    expect(isFiltered({ ...EMPTY_FILTERS, favoritesOnly: true })).toBe(true)
+  })
+})
+
 describe("songFacets", () => {
   it("lists the distinct values available in the library, sorted", () => {
     expect(songFacets(library)).toEqual({

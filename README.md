@@ -73,6 +73,7 @@ a sidebar layout on the web.
 | **Autoscroll** | Hands-free reading with a start delay, a speed in lyric lines per minute and a resume button; manual scrolling pauses it, and each song remembers its own speed (per user) |
 | **Metronome** | Practice at the song's tempo without leaving the reader: BPM from the song (or tapped by ear), bar size, downbeat accent, count-in and a beat pulse you feel in your pocket |
 | **Personal notes** | Private cues per song ("I come in here", "second chorus only") — a free-form notes block plus inline notes anchored to a section/line, visible only to you and synced across your devices |
+| **Favourites & collections** | Star the songs you always want in the setlist from the reader footer and filter the songbook to favourites only; file songs into private collections only you can see, then turn one into a real band setlist in a single step |
 | **Resume where you left off** | Each song reopens at the spot, key and capo you left it in (per user, synced across devices); the refresh button is a one-tap reset to the top, original key and no capo |
 | **Per-song text size** | Pinch the lyrics to resize (or Ctrl/Cmd +/- on the desktop); each song remembers its own size, synced across your devices |
 | **Keyboard & pedal** | On web/desktop the reader answers the keyboard: arrows/space/PageUp/PageDown turn the page (Bluetooth page-turner pedals send these same keys), up/down transpose, `f` toggles stage mode, `p` autoscroll |

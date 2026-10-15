@@ -17,6 +17,7 @@ import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { SongRow } from "@/components/app/SongRow"
 import { useToast } from "@/components/ui/Toast"
 import { useUserId } from "@/hooks/useAuth"
+import { useFavorites } from "@/hooks/useFavorites"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { useSongbookState } from "@/hooks/useSongbookState"
@@ -90,12 +91,19 @@ export default function SongsScreen() {
   // member's facets never follow them into another band's library.
   const { filters, setFilters, sort, setSort, views, saveView, applyView, deleteView } =
     useSongbookState(organizationId, uid)
+  // Favorites are personal (roadmap #33): the set rides into filterSongs as
+  // context, so the list and the active-filter count can never disagree about
+  // what the star facet is showing.
+  const { favoriteSet } = useFavorites()
   const [facet, setFacet] = useState<FacetKey | null>(null)
   const [sortOpen, setSortOpen] = useState(false)
   const [savingView, setSavingView] = useState(false)
   const [viewName, setViewName] = useState("")
 
-  const results = useMemo(() => sortSongs(filterSongs(songs, filters), sort), [songs, filters, sort])
+  const results = useMemo(
+    () => sortSongs(filterSongs(songs, filters, favoriteSet), sort),
+    [songs, filters, favoriteSet, sort],
+  )
   const activeCount = countActiveFilters(filters)
   const progression = filters.progression.trim()
 
@@ -194,6 +202,15 @@ export default function SongsScreen() {
                   size="sm"
                   onPress={() => setFilters((current) => ({ ...current, duration: null }))}
                   accessibilityLabel={t("songs.removeFilter", { filter: t("songs.duration") })}
+                />
+              ) : null}
+              {filters.favoritesOnly ? (
+                <Chip
+                  label={t("songs.favoritesOnly")}
+                  tone="primary"
+                  size="sm"
+                  onPress={() => setFilters((current) => ({ ...current, favoritesOnly: false }))}
+                  accessibilityLabel={t("songs.removeFilter", { filter: t("songs.favoritesOnly") })}
                 />
               ) : null}
               {progression.length > 0 ? (
@@ -401,6 +418,21 @@ export default function SongsScreen() {
                 onPress={() => toggleDuration(bucket)}
               />
             ))}
+          </View>
+        </View>
+
+        <View style={styles.facetGroup}>
+          <AppText variant="label" tone="muted">
+            {t("songs.favorites")}
+          </AppText>
+          <View style={styles.facetOptions}>
+            <Chip
+              label={t("songs.favoritesOnly")}
+              selected={filters.favoritesOnly}
+              onPress={() =>
+                setFilters((current) => ({ ...current, favoritesOnly: !current.favoritesOnly }))
+              }
+            />
           </View>
         </View>
       </Dialog>

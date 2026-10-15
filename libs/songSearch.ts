@@ -18,6 +18,8 @@ export interface SongFilters {
   progression: string
   bpm: BpmBucket | null
   duration: DurationBucket | null
+  /** Only this user's starred songs (roadmap #33) — personal, never band data. */
+  favoritesOnly: boolean
 }
 
 export const EMPTY_FILTERS: SongFilters = {
@@ -29,6 +31,7 @@ export const EMPTY_FILTERS: SongFilters = {
   progression: "",
   bpm: null,
   duration: null,
+  favoritesOnly: false,
 }
 
 /** Tempo buckets in ascending order; the filter dialog renders them in turn. */
@@ -115,10 +118,11 @@ export const hasFacetFilters = (filters: SongFilters): boolean =>
   filters.bpm !== null ||
   filters.duration !== null
 
-/** Any narrowing at all: the search box and the chord progression count too. */
+/** Any narrowing at all: the search box, the chord progression and the star facet count too. */
 export const isFiltered = (filters: SongFilters): boolean =>
   normalize(filters.search).length > 0 ||
   progressionTokens(filters.progression).length > 0 ||
+  filters.favoritesOnly ||
   hasFacetFilters(filters)
 
 /**
@@ -147,13 +151,23 @@ export const isFiltered = (filters: SongFilters): boolean =>
  * few thousand songs the progression walk is the first thing to feel sluggish,
  * and the fix is a chord index computed once per snapshot from `songChordLines`
  * rather than per keystroke — no songbook has needed it yet.
+ *
+ * `favorites` (roadmap #33) is the acting user's starred ids and only matters
+ * when `filters.favoritesOnly` is set: the filter stays pure over songs, the
+ * personal set rides along as context — and with the flag on but no set given,
+ * everything is excluded rather than let through.
  */
-export const filterSongs = (songs: Song[], filters: SongFilters): Song[] => {
+export const filterSongs = (
+  songs: Song[],
+  filters: SongFilters,
+  favorites?: ReadonlySet<string>,
+): Song[] => {
   const term = normalize(filters.search)
   const terms = term.length > 0 ? term.split(/\s+/) : []
   const progression = progressionTokens(filters.progression)
 
   const filtered = songs.filter((song) => {
+    if (filters.favoritesOnly && !favorites?.has(song.id)) return false
     if (filters.artist !== null && song.artist !== filters.artist) return false
     if (filters.genre !== null && song.genre !== filters.genre) return false
     if (filters.key !== null && song.key !== filters.key) return false
@@ -254,4 +268,6 @@ export const songFacets = (songs: Song[]): {
 export const countActiveFilters = (filters: SongFilters): number =>
   [filters.artist, filters.genre, filters.key, filters.tag, filters.bpm, filters.duration].filter(
     (value) => value !== null,
-  ).length + (progressionTokens(filters.progression).length > 0 ? 1 : 0)
+  ).length +
+  (progressionTokens(filters.progression).length > 0 ? 1 : 0) +
+  (filters.favoritesOnly ? 1 : 0)

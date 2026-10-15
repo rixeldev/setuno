@@ -156,6 +156,7 @@ describe("sanitizeSongbook", () => {
         progression: "Am F C G",
         bpm: "slow" as const,
         duration: "long" as const,
+        favoritesOnly: false,
       },
       sort: "artist" as const,
       views: [],
@@ -188,6 +189,12 @@ describe("sanitizeSongbook", () => {
     expect(result.filters.artist).toBeNull()
     expect(result.filters.genre).toBeNull()
     expect(result.filters.key).toBeNull()
+  })
+
+  it("restores the star facet only when it was really switched on", () => {
+    expect(sanitizeSongbook({ filters: { favoritesOnly: true } }).filters.favoritesOnly).toBe(true)
+    expect(sanitizeSongbook({ filters: { favoritesOnly: "yes" } }).filters.favoritesOnly).toBe(false)
+    expect(sanitizeSongbook({}).filters.favoritesOnly).toBe(false)
   })
 
   it("rebuilds every field when storage gives back a partial entry", () => {

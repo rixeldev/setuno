@@ -4,6 +4,7 @@ import {
   CalendarIcon,
   ChatIcon,
   GridIcon,
+  LibraryIcon,
   ListIcon,
   MusicIcon,
   OrganizationIcon,
@@ -35,6 +36,7 @@ export const SIDEBAR_NAV: NavItem[] = [
   { href: "/calendar", label: "nav.calendar", icon: CalendarIcon, secondary: true },
   { href: "/suggestions", label: "nav.suggestions", icon: ChatIcon, badge: "suggestions" },
   { href: "/members", label: "nav.members", icon: UsersIcon },
+  { href: "/collections", label: "nav.collections", icon: LibraryIcon },
   { href: "/settings", label: "nav.settings", icon: SettingsIcon },
 ]
 
@@ -58,6 +60,12 @@ export const MORE_NAV: NavItem[] = [
     badge: "suggestions",
   },
   { href: "/members", label: "nav.members", icon: UsersIcon, description: "nav.membersHint" },
+  {
+    href: "/collections",
+    label: "nav.collections",
+    icon: LibraryIcon,
+    description: "nav.collectionsHint",
+  },
   {
     href: "/organizations",
     label: "nav.switchBand",

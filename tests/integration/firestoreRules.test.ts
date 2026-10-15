@@ -292,6 +292,51 @@ describe("the activity read marker is a private stamp", () => {
   })
 })
 
+describe("favorites and collections are private to their owner", () => {
+  const starPath = (songId: string) => `users/alice/favorites/${songId}`
+  const collectionPath = "users/alice/collections/col-1"
+  const collection = (overrides: Record<string, unknown> = {}) => ({
+    name: "Sunday gig",
+    songIds: ["s1", "s2"],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  })
+
+  it("hides one member's star from another", async () => {
+    await assertFails(bob().firestore().doc(starPath("s1")).get())
+  })
+
+  it("accepts the owner's star", async () => {
+    await assertSucceeds(alice().firestore().doc(starPath("s1")).set({ songId: "s1" }))
+  })
+
+  it("lets the owner remove a star", async () => {
+    await assertSucceeds(alice().firestore().doc(starPath("s1")).set({ songId: "s1" }))
+    await assertSucceeds(alice().firestore().doc(starPath("s1")).delete())
+  })
+
+  it("rejects a star whose body claims a different song", async () => {
+    await assertFails(alice().firestore().doc(starPath("s1")).set({ songId: "s2" }))
+  })
+
+  it("hides one member's collections from another", async () => {
+    await assertFails(bob().firestore().doc(collectionPath).get())
+  })
+
+  it("accepts the owner's collection", async () => {
+    await assertSucceeds(alice().firestore().doc(collectionPath).set(collection()))
+  })
+
+  it("rejects a collection carrying extra fields", async () => {
+    await assertFails(alice().firestore().doc(collectionPath).set(collection({ shared: true })))
+  })
+
+  it("rejects an empty collection name", async () => {
+    await assertFails(alice().firestore().doc(collectionPath).set(collection({ name: "" })))
+  })
+})
+
 describe("song versions are an admin-written, member-readable history", () => {
   /** The shape `services/songVersions.ts` writes — one immutable snapshot. */
   const version = (savedBy: string, overrides: Record<string, unknown> = {}) => ({

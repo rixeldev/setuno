@@ -10,6 +10,8 @@
  */
 import {
   Timestamp,
+  arrayRemove,
+  arrayUnion,
   collection,
   collectionGroup,
   deleteDoc,
@@ -43,6 +45,8 @@ import { createFirestore } from "@/db/firestoreInstance"
 
 export {
   Timestamp,
+  arrayRemove,
+  arrayUnion,
   collection,
   collectionGroup,
   deleteDoc,
@@ -91,6 +95,12 @@ export const paths = {
   userAnnotation: (uid: string, songId: string) => `users/${uid}/annotations/${songId}`,
   /** Personal read marker of a band's activity feed (roadmap #53). */
   userActivityRead: (uid: string, orgId: string) => `users/${uid}/activityRead/${orgId}`,
+  /** Personal favorite songs, one doc per star (roadmap #33), owner-only. */
+  userFavorites: (uid: string) => `users/${uid}/favorites`,
+  userFavorite: (uid: string, songId: string) => `users/${uid}/favorites/${songId}`,
+  /** Private per-user collections, personal setlist drafts (roadmap #33). */
+  userCollections: (uid: string) => `users/${uid}/collections`,
+  userCollection: (uid: string, collectionId: string) => `users/${uid}/collections/${collectionId}`,
   organizations: "organizations",
   organization: (orgId: string) => `organizations/${orgId}`,
   members: (orgId: string) => `organizations/${orgId}/members`,

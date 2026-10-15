@@ -28,11 +28,14 @@ import {
   ExportIcon,
   FullscreenExitIcon,
   KeepAwakeIcon,
+  LibraryIcon,
   MusicIcon,
   NoteIcon,
   PauseIcon,
   PlayFilledIcon,
   PrintIcon,
+  StarFilledIcon,
+  StarIcon,
   SuggestIcon,
   SwapIcon,
   TrashIcon,
@@ -51,6 +54,7 @@ import { SongNavArrows } from "@/components/songs/SongNavArrows"
 import { MergeSongsDialog } from "@/components/songs/MergeSongsDialog"
 import { MetronomeSheet } from "@/components/songs/MetronomeSheet"
 import { PrintSheet } from "@/components/songs/PrintSheet"
+import { AddToCollectionSheet } from "@/components/collections/AddToCollectionSheet"
 import { ReaderDock, READER_DOCK_HEIGHT } from "@/components/songs/ReaderDock"
 import { AnnotationsBlock } from "@/components/annotations/AnnotationsBlock"
 import { useToast } from "@/components/ui/Toast"
@@ -68,6 +72,7 @@ import { useFontSizePinch } from "@/hooks/useFontSizePinch"
 import { useFontSizeShortcuts } from "@/hooks/useFontSizeShortcuts"
 import { useReaderKeys } from "@/hooks/useReaderKeys"
 import { useAnnotations } from "@/hooks/useAnnotations"
+import { useFavorites } from "@/hooks/useFavorites"
 import { usePaletteCommands } from "@/hooks/usePaletteCommands"
 import { duplicateSong, subscribeSong, trashSong } from "@/services/songs"
 import { mergeSongs } from "@/services/songMerge"
@@ -138,6 +143,7 @@ export default function SongScreen() {
   const [mergeOpen, setMergeOpen] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
+  const [addToCollection, setAddToCollection] = useState(false)
   // The control tray ships shut: the lyrics are the screen, everything else is
   // one tap away (roadmap redesign of the song screen).
   const [controlsOpen, setControlsOpen] = useState(false)
@@ -289,6 +295,9 @@ export default function SongScreen() {
   // Personal notes (#3): inline markers plus the end-of-song block, both
   // owner-only under `users/{uid}/annotations/{songId}`.
   const annotations = useAnnotations(profile?.uid ?? null, songId)
+  // Favorites are personal (roadmap #33): every member stars their own list,
+  // and nothing about it ever touches the shared song document.
+  const { isFavorite, setFavorite } = useFavorites()
   const currentAnnotations = annotations?.songId === songId ? annotations : null
   const openAnnotations = useCallback((): void => {
     if (!song) return
@@ -557,7 +566,7 @@ export default function SongScreen() {
   const nextSongId = step?.nextId ?? null
   const previousSongId = step?.previousId ?? null
   useReaderKeys({
-    enabled: chordHelp === null && !notesOpen && !confirmDelete && !mergeOpen && !metronomeOpen,
+    enabled: chordHelp === null && !notesOpen && !confirmDelete && !mergeOpen && !metronomeOpen && !addToCollection,
     onNext: nextSongId ? () => openSong(nextSongId) : null,
     onPrevious: previousSongId ? () => openSong(previousSongId) : null,
     onTranspose: (delta) => changeSemitones(semitones + delta),
@@ -572,6 +581,20 @@ export default function SongScreen() {
       songLyricsText(song.sections, (_section, index) => sectionLabelFor(song.sections, index, t)),
     )
     toast.showSuccess(t("songs.lyricsCopied"))
+  }
+
+  /**
+   * Toggle the star (roadmap #33). The icon itself is driven by the
+   * subscription snapshot, so a rejected write (rules not deployed yet) simply
+   * leaves the star as it was — the error is only surfaced when it can actually
+   * be acted on.
+   */
+  const toggleFavorite = (): void => {
+    if (!song) return
+    const favorite = !isFavorite(song.id)
+    setFavorite(song.id, favorite).catch((cause: unknown) => {
+      toast.showError(toFriendlyError(cause, t("songs.favoriteFailed")))
+    })
   }
 
   /** Hands the song off as a ChordPro file (roadmap #18). */
@@ -1048,6 +1071,37 @@ export default function SongScreen() {
 
             <View style={styles.footerActions}>
               <Pressable
+                onPress={toggleFavorite}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isFavorite(song.id) }}
+                accessibilityLabel={
+                  isFavorite(song.id) ? t("songs.unfavoriteA11y") : t("songs.favoriteA11y")
+                }
+                style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
+              >
+                {isFavorite(song.id) ? (
+                  <StarFilledIcon size={15} color={Theme.colors.primary} />
+                ) : (
+                  <StarIcon size={15} color={Theme.colors.textMuted} />
+                )}
+                <AppText variant="caption" tone={isFavorite(song.id) ? "primary" : "muted"}>
+                  {t("songs.favorite")}
+                </AppText>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setAddToCollection(true)}
+                accessibilityRole="button"
+                accessibilityLabel={t("songs.addToCollectionA11y", { title: song.title })}
+                style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
+              >
+                <LibraryIcon size={15} color={Theme.colors.textMuted} />
+                <AppText variant="caption" tone="muted">
+                  {t("songs.addToCollection")}
+                </AppText>
+              </Pressable>
+
+              <Pressable
                 onPress={() => void copyLyrics()}
                 accessibilityRole="button"
                 accessibilityLabel={t("songs.copyA11y")}
@@ -1222,6 +1276,12 @@ export default function SongScreen() {
         onClose={() => setPrintOpen(false)}
         title={song.title}
         render={(options) => songPrintHtml(song, options)}
+      />
+
+      <AddToCollectionSheet
+        visible={addToCollection}
+        onClose={() => setAddToCollection(false)}
+        song={song}
       />
 
       <MetronomeSheet
