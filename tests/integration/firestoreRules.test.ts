@@ -648,6 +648,138 @@ describe("date polls are member-proposed and admin-closed (#48)", () => {
   })
 })
 
+describe("reusable checklists are member-maintained (#49)", () => {
+  const pathFor = (id: string) => `organizations/${orgId}/checklists/${id}`
+
+  const checklist = (createdBy: string, over: Record<string, unknown> = {}) => ({
+    organizationId: orgId,
+    name: "Full rig",
+    kind: "gear",
+    items: ["2 x powered speakers", "DI boxes", "Speaker stands"],
+    createdBy,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...over,
+  })
+
+  const seedChecklist = async (
+    createdBy = "alice",
+    over: Record<string, unknown> = {},
+  ): Promise<string> => {
+    const id = createId("checklist")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(pathFor(id)).set(checklist(createdBy, over))
+    })
+    return id
+  }
+
+  it("lets any member maintain the band's checklists — logistics, not an admin job", async () => {
+    await assertSucceeds(
+      bob().firestore().doc(pathFor(createId("checklist"))).set(checklist("bob")),
+    )
+  })
+
+  it("rejects an empty name, an unknown kind and an empty item list", async () => {
+    await assertFails(
+      bob().firestore().doc(pathFor(createId("checklist"))).set(checklist("bob", { name: "   " })),
+    )
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(pathFor(createId("checklist")))
+        .set(checklist("bob", { kind: "backline" })),
+    )
+    await assertFails(
+      bob().firestore().doc(pathFor(createId("checklist"))).set(checklist("bob", { items: [] })),
+    )
+  })
+
+  it("rejects a checklist too big for an event's whole task budget", async () => {
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(pathFor(createId("checklist")))
+        .set(
+          checklist("bob", {
+            items: Array.from({ length: 51 }, (_, index) => `Item ${index}`),
+          }),
+        ),
+    )
+  })
+
+  it("rejects a checklist filed under somebody else's name or carrying extra fields", async () => {
+    await assertFails(
+      bob().firestore().doc(pathFor(createId("checklist"))).set(checklist("alice")),
+    )
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(pathFor(createId("checklist")))
+        .set(checklist("bob", { shared: true })),
+    )
+  })
+
+  it("lets a member edit the content while the author never moves", async () => {
+    const id = await seedChecklist("bob")
+    await assertSucceeds(
+      bob()
+        .firestore()
+        .doc(pathFor(id))
+        .update({
+          name: "Full rig — summer",
+          kind: "setup",
+          items: ["Amps"],
+          updatedAt: new Date(),
+        }),
+    )
+    await assertFails(
+      bob().firestore().doc(pathFor(id)).update({ createdBy: "alice", updatedAt: new Date() }),
+    )
+    await assertFails(
+      bob().firestore().doc(pathFor(id)).update({ kind: "backline", updatedAt: new Date() }),
+    )
+  })
+
+  it("refuses to empty the list through an edit", async () => {
+    const id = await seedChecklist()
+    await assertFails(
+      bob().firestore().doc(pathFor(id)).update({ items: [], updatedAt: new Date() }),
+    )
+  })
+
+  it("keeps the band's reading open and signed-out visitors out", async () => {
+    const id = await seedChecklist()
+    const snapshot = await assertSucceeds(bob().firestore().doc(pathFor(id)).get())
+    expect(snapshot.exists).toBe(true)
+    await assertFails(guest().firestore().doc(pathFor(id)).get())
+  })
+
+  it("keeps deletion with its creator or an admin, never a bystander", async () => {
+    const bobsId = await seedChecklist("bob")
+    const othersId = await seedChecklist("alice")
+    await assertFails(bob().firestore().doc(pathFor(othersId)).delete())
+    await assertSucceeds(bob().firestore().doc(pathFor(bobsId)).delete())
+    await assertSucceeds(alice().firestore().doc(pathFor(othersId)).delete())
+  })
+
+  it("stamps an attach's tasks with no new rule — #47's own shape", async () => {
+    const id = await seedChecklist("bob")
+    await assertSucceeds(
+      bob()
+        .firestore()
+        .doc(`organizations/${orgId}/performances/perf-1/tasks/task-${id}`)
+        .set({
+          title: "2 x powered speakers",
+          assignedTo: "",
+          done: false,
+          createdBy: "bob",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+    )
+  })
+})
+
 describe("suggestions are member-written and admin-reviewed", () => {
   it("lets a member file a pending suggestion", async () => {
     const id = createId("suggestion")

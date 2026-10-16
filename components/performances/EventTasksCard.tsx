@@ -1,5 +1,6 @@
 import React, { useState } from "react"
 import { Pressable, StyleSheet, View } from "react-native"
+import { useRouter } from "expo-router"
 import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
@@ -11,8 +12,9 @@ import { Dialog } from "@/components/ui/Dialog"
 import { Input } from "@/components/ui/Input"
 import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
 import { useToast } from "@/components/ui/Toast"
-import { CheckCircleIcon, PlusIcon, TrashIcon } from "@/components/ui/Icons"
-import type { EventTask, OrganizationMember } from "@/interfaces"
+import { CheckCircleIcon, ListIcon, PlusIcon, TrashIcon } from "@/components/ui/Icons"
+import type { ChecklistTemplate, EventTask, OrganizationMember } from "@/interfaces"
+import { CHECKLIST_KIND_KEYS } from "@/interfaces/checklist"
 import { TASK_TITLE_MAX } from "@/libs/eventLogistics"
 import {
   createEventTask,
@@ -20,6 +22,8 @@ import {
   toggleEventTask,
   updateEventTask,
 } from "@/services/eventLogistics"
+import { attachChecklistToEvent } from "@/services/checklists"
+import { useChecklists } from "@/hooks/useChecklists"
 import { toFriendlyError } from "@/services/errors"
 
 interface EventTasksCardProps {
@@ -38,6 +42,8 @@ interface EventTasksCardProps {
  * admin job. Tapping the title rewrites it, tapping the assignee chip reassigns
  * it (the bottom sheet is the repo's short-picker pattern), and only the
  * creator or an admin gets the delete button, behind its usual confirmation.
+ * Its footer also stamps a band checklist onto the event (roadmap #49): one
+ * task document per item in a single batch — exactly this card's own shape.
  */
 export function EventTasksCard({
   organizationId,
@@ -50,8 +56,11 @@ export function EventTasksCard({
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
   const toast = useToast()
+  const router = useRouter()
+  const { lists: checklists, loading: checklistsLoading } = useChecklists(organizationId)
 
   const [busy, setBusy] = useState(false)
+  const [attachOpen, setAttachOpen] = useState(false)
   const [dialog, setDialog] = useState<
     { mode: "add" } | { mode: "edit"; task: EventTask } | null
   >(null)
@@ -72,6 +81,21 @@ export function EventTasksCard({
     } finally {
       setBusy(false)
     }
+  }
+
+  /**
+   * Stamps a checklist onto the event (roadmap #49): the batch is #47's own
+   * task shape, so the sheet closes, `run` owns the busy flag and the toast
+   * reports how many rows landed (or why none did).
+   */
+  const attach = (list: ChecklistTemplate) => {
+    setAttachOpen(false)
+    run(
+      attachChecklistToEvent(organizationId, performanceId, list).then((count) => {
+        toast.showSuccess(t("checklists.attached", { count }))
+      }),
+      t("checklists.couldNotAttach"),
+    )
   }
 
   const submitDialog = () => {
@@ -177,16 +201,29 @@ export function EventTasksCard({
         )
       })}
 
-      <Button
-        variant="secondary"
-        size="sm"
-        label={t("performances.taskAdd")}
-        icon={<PlusIcon size={18} color={Theme.colors.text} />}
-        onPress={() => {
-          setDraftTitle("")
-          setDialog({ mode: "add" })
-        }}
-      />
+      <View style={styles.actions}>
+        <Button
+          variant="secondary"
+          size="sm"
+          label={t("performances.taskAdd")}
+          icon={<PlusIcon size={18} color={Theme.colors.text} />}
+          disabled={busy}
+          style={styles.action}
+          onPress={() => {
+            setDraftTitle("")
+            setDialog({ mode: "add" })
+          }}
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          label={t("checklists.attachButton")}
+          icon={<ListIcon size={18} color={Theme.colors.text} />}
+          disabled={busy}
+          style={styles.action}
+          onPress={() => setAttachOpen(true)}
+        />
+      </View>
 
       <Dialog
         visible={dialog !== null}
@@ -252,6 +289,37 @@ export function EventTasksCard({
         ))}
       </BottomSheet>
 
+      <BottomSheet
+        visible={attachOpen}
+        onClose={() => setAttachOpen(false)}
+        title={t("checklists.attachSheet")}
+      >
+        {checklistsLoading ? <AppText tone="muted">{t("checklists.attachLoading")}</AppText> : null}
+
+        {!checklistsLoading && checklists.length === 0 ? (
+          <AppText tone="muted">{t("checklists.attachEmpty")}</AppText>
+        ) : null}
+
+        {checklists.map((list) => (
+          <SheetOptionRow
+            key={list.id}
+            label={list.name}
+            hint={`${t(CHECKLIST_KIND_KEYS[list.kind])} · ${t("checklists.itemsCount", {
+              count: list.items.length,
+            })}`}
+            onPress={() => attach(list)}
+          />
+        ))}
+
+        <SheetOptionRow
+          label={t(checklists.length === 0 ? "checklists.newChecklist" : "checklists.manage")}
+          onPress={() => {
+            setAttachOpen(false)
+            router.push(checklists.length === 0 ? "/checklists/new" : "/checklists")
+          }}
+        />
+      </BottomSheet>
+
       <Dialog
         visible={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
@@ -293,4 +361,6 @@ const createStyles = () =>
       borderColor: Theme.colors.border,
     },
     doneTitle: { textDecorationLine: "line-through" },
+    actions: { flexDirection: "row", gap: Theme.spacing.s },
+    action: { flex: 1 },
   })

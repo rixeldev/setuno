@@ -18,6 +18,7 @@ rules_version = '2';
  *   organizations/{organizationId}/performances/{performanceId}/tasks
  *   organizations/{organizationId}/datePolls
  *   organizations/{organizationId}/datePolls/{pollId}/votes
+ *   organizations/{organizationId}/checklists
  *   organizations/{organizationId}/suggestions
  *   organizations/{organizationId}/activity
  *   organizations/{organizationId}/invitations/{lowercased email}
@@ -657,6 +658,51 @@ service cloud.firestore {
           allow delete: if isMember(organizationId)
             && request.auth.uid == voterUid;
         }
+      }
+
+      // ---------------------------------------------------- reusable checklists
+
+      match /checklists/{checklistId} {
+        allow read: if isMember(organizationId);
+
+        // Any member maintains the band's reusable checklists — logistics is
+        // not an admin job (#47's rule again) — and one is born under its
+        // author's name. `items` is a list of plain titles (gear, setup,
+        // payments…); rules cannot iterate a list, so its document-level
+        // shape (1..50 entries) is pinned here and each title is sanitized
+        // client-side in `libs/checklistTemplates.ts` — the annotations'
+        // `markers` precedent exactly. Attaching a checklist writes #47's
+        // task documents, so that side needs no rule at all.
+        allow create: if isMember(organizationId)
+          && request.resource.data.keys().hasOnly([
+            'organizationId', 'name', 'kind', 'items', 'createdBy',
+            'createdAt', 'updatedAt'
+          ])
+          && request.resource.data.organizationId == organizationId
+          && request.resource.data.name is string
+          && request.resource.data.name.trim().size() > 0
+          && request.resource.data.name.size() <= 80
+          && request.resource.data.kind in ['gear', 'setup', 'payments', 'custom']
+          && request.resource.data.items is list
+          && request.resource.data.items.size() >= 1
+          && request.resource.data.items.size() <= 50
+          && request.resource.data.createdBy == request.auth.uid;
+
+        // Members edit the content (fix a typo, grow the list); the author
+        // and the stamps never move, so the whitelist carries neither.
+        allow update: if (isMember(organizationId)
+                          && request.resource.data.organizationId == organizationId
+                          && request.resource.data.diff(resource.data).affectedKeys()
+                               .hasOnly(['name', 'kind', 'items', 'updatedAt'])
+                          && request.resource.data.name is string
+                          && request.resource.data.name.trim().size() > 0
+                          && request.resource.data.name.size() <= 80
+                          && request.resource.data.kind in ['gear', 'setup', 'payments', 'custom']
+                          && request.resource.data.items is list
+                          && request.resource.data.items.size() >= 1
+                          && request.resource.data.items.size() <= 50);
+        allow delete: if isAdmin(organizationId)
+          || resource.data.createdBy == request.auth.uid;
       }
 
       // ------------------------------------------------------------- suggestions

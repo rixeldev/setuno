@@ -126,6 +126,10 @@ export const paths = {
     `organizations/${orgId}/datePolls/${pollId}/votes`,
   datePollVote: (orgId: string, pollId: string, uid: string) =>
     `organizations/${orgId}/datePolls/${pollId}/votes/${uid}`,
+  /** Reusable checklists stamped onto events as #47 tasks (roadmap #49). */
+  checklists: (orgId: string) => `organizations/${orgId}/checklists`,
+  checklist: (orgId: string, checklistId: string) =>
+    `organizations/${orgId}/checklists/${checklistId}`,
   suggestions: (orgId: string) => `organizations/${orgId}/suggestions`,
   suggestion: (orgId: string, id: string) => `organizations/${orgId}/suggestions/${id}`,
   activity: (orgId: string) => `organizations/${orgId}/activity`,

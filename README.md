@@ -92,6 +92,7 @@ a sidebar layout on the web.
 | **Performances** | Schedule the band's events — **gigs and rehearsals**: the type is picked when creating one, a rehearsal carries its own **goals** instead of notes, both filter lists (and the calendar) by type, and only rehearsals wear the badge |
 | **RSVP & gig tasks** | Answer any event (going / maybe / can't) and see who's coming at a glance; the event also carries a live **"who brings what"** checklist — assign each task to a member or to anyone, tick it off together, and the whole band sees it update |
 | **Date polls** | Propose candidate dates and let the band tick the nights they can make; an admin closes the poll on the winner (most votes, ties to the earliest date) and turns it into a real event in one tap |
+| **Reusable checklists** | Save your per-type lists once — gear, setup, payments or anything custom — and stamp any of them onto an event from its task card in one tap, where they become ordinary tasks anyone can tick |
 | **Calendar** | Month, week and agenda views of upcoming and past events, filtered by status and by gig/rehearsal |
 | **Calendar export** | Save the band calendar or a single event as an `.ics` file — share sheet on mobile, download on web — with stable UIDs so re-imports update instead of duplicating |
 | **Dashboard** | Next show, quick actions, library stats, recent activity feed |

@@ -135,6 +135,9 @@ const FOCUS_ROUTES: RegExp[] = [
   /^\/performances\/[^/]+\/edit$/,
   // The poll form has a draft (title + dates) like every other create flow.
   /^\/polls\/new$/,
+  // So do the checklist forms (name + kind + item titles).
+  /^\/checklists\/new$/,
+  /^\/checklists\/[^/]+$/,
 ]
 
 export const isFocusRoute = (pathname: string): boolean =>

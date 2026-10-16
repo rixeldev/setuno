@@ -64,6 +64,10 @@ export default function AppLayout() {
         <Stack.Screen name="polls/index" options={modalOptions} />
         <Stack.Screen name="polls/new" options={modalOptions} />
         <Stack.Screen name="polls/[id]" options={modalOptions} />
+        {/* Reusable checklists (roadmap #49): a band library stamped onto events. */}
+        <Stack.Screen name="checklists/index" options={modalOptions} />
+        <Stack.Screen name="checklists/new" options={modalOptions} />
+        <Stack.Screen name="checklists/[id]" options={modalOptions} />
         <Stack.Screen name="calendar" />
         <Stack.Screen name="members" options={modalOptions} />
         <Stack.Screen name="suggestions/index" options={modalOptions} />
