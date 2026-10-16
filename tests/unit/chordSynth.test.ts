@@ -5,6 +5,7 @@ import {
   CHORD_SAMPLE_RATE,
   STRUM_SPREAD_SECONDS,
   chordDurationMs,
+  strumVelocities,
   synthesizeChord,
 } from "@/libs/chordSynth"
 import { yinPitch } from "@/libs/pitchDetection"
@@ -100,7 +101,7 @@ const spectralShare = (
 
 describe("synthesizeChord", () => {
   it("runs for the ring time plus the strum spread", () => {
-    // Five strings: the ring plus four 30 ms steps between them.
+    // Five strings: the ring plus four 40 ms steps between them.
     const pluck = synthesizeChord([48, 52, 55, 60, 64], "pluck")
     expect(pluck.length).toBe(
       Math.ceil((CHORD_RING_SECONDS + STRUM_SPREAD_SECONDS * 4) * CHORD_SAMPLE_RATE)
@@ -109,8 +110,43 @@ describe("synthesizeChord", () => {
     const piano = synthesizeChord([48, 52, 55], "piano")
     const pluckThree = synthesizeChord([48, 52, 55], "pluck")
     expect(piano.length).toBeLessThan(pluckThree.length)
-    expect(chordDurationMs(5)).toBeGreaterThan(2700)
-    expect(chordDurationMs(5)).toBeLessThan(2800)
+    // 2.4 s ring + four steps + the UI's half-second of slack (250 ms).
+    expect(chordDurationMs(5)).toBeGreaterThan(2790)
+    expect(chordDurationMs(5)).toBeLessThan(2850)
+  })
+
+  it("rasgueos: strings arrive one behind the other, each with its own force", () => {
+    // The owner's queued request: "strings one behind the other, like a real
+    // strum". The stagger existed from day one — the test above pins its
+    // arithmetic — but a sweep that strikes every string with *identical*
+    // force still reads as one event, so each string now carries a
+    // deterministic ±25 % of force, seeded by the chord's own midis.
+    const midis = [43, 50, 55, 59, 62, 67]
+    const velocities = strumVelocities(midis, "pluck")
+    expect(velocities).toHaveLength(midis.length)
+    for (const velocity of velocities) {
+      expect(velocity).toBeGreaterThan(0.74)
+      expect(velocity).toBeLessThan(1.26)
+    }
+    // Not machine-gun: the sweep has a strongest and a weakest string.
+    expect(Math.max(...velocities) / Math.min(...velocities)).toBeGreaterThan(1.1)
+    // Deterministic per chord; a different chord gets its own sweep.
+    expect(strumVelocities(midis, "pluck")).toEqual(velocities)
+    expect(strumVelocities([44, 50, 55], "pluck")).not.toEqual(velocities)
+    // A lone note is not a strum; a piano is one gesture, struck together.
+    expect(strumVelocities([60], "pluck")).toEqual([1])
+    expect(strumVelocities(midis, "piano")).toEqual(midis.map(() => 1))
+    // And the rendered chord really accumulates string by string: the window
+    // around the fourth string's onset carries more than the opening one.
+    const chord = synthesizeChord(midis, "pluck", { seconds: 2 })
+    const opening = rmsOf(chord, 0, 0.02, CHORD_SAMPLE_RATE)
+    const fourth = rmsOf(
+      chord,
+      3 * STRUM_SPREAD_SECONDS,
+      3 * STRUM_SPREAD_SECONDS + 0.02,
+      CHORD_SAMPLE_RATE
+    )
+    expect(fourth).toBeGreaterThan(opening)
   })
 
   it("is audible but never clips", () => {
@@ -137,11 +173,15 @@ describe("synthesizeChord", () => {
   })
 
   it("is deterministic: the same request sounds exactly the same", () => {
-    expect(synthesizeChord([43, 50, 55], "pluck")).toEqual(
-      synthesizeChord([43, 50, 55], "pluck")
+    // Short window on purpose: the property is request → waveform, not length
+    // (pinned above), and a 2.4 s comparison of two ~106k-sample arrays blew
+    // the 5 s timeout under the suite's parallel load.
+    const options = { seconds: 0.6 }
+    expect(synthesizeChord([43, 50, 55], "pluck", options)).toEqual(
+      synthesizeChord([43, 50, 55], "pluck", options)
     )
-    expect(synthesizeChord([43, 50, 55], "piano")).toEqual(
-      synthesizeChord([43, 50, 55], "piano")
+    expect(synthesizeChord([43, 50, 55], "piano", options)).toEqual(
+      synthesizeChord([43, 50, 55], "piano", options)
     )
   })
 

@@ -24,7 +24,11 @@ import { midiToFrequency } from "@/libs/pitchDetection"
  *   for a 33 Hz bass note it was also plainly the *wrong instrument*: white
  *   noise hands every partial equal energy, so a note with ~660 partials up to
  *   Nyquist still had 59 % of its sound above 1 kHz and played back as a
- *   metallic ping.
+ *   metallic ping. A chord is a **strum**, not a unison hit: the strings
+ *   arrive one ~40 ms behind the other, in string order, and each carries its
+ *   own deterministic ±25 % of force — spacing alone still read as one event
+ *   (the owner's queued rasgueo request), the per-string dynamics are what
+ *   let the ear count the strings.
  * - **`piano`** — a struck tone is not a plucked one, so piano gets a decaying
  *   stack of slightly inharmonic partials instead.
  *
@@ -44,8 +48,21 @@ export interface ChordSound {
 export const CHORD_SAMPLE_RATE = 44100
 /** How long the last string rings before the sound ends. */
 export const CHORD_RING_SECONDS = 2.4
-/** Strings are plucked in sequence, never all at once. */
-export const STRUM_SPREAD_SECONDS = 0.03
+/** Strings are plucked in sequence, never all at once: the midis arrive in
+ * string order, and a downstroke crossing them one ~40 ms apart is slow
+ * enough for the ear to count — the stagger the owner asked for in the
+ * queued rasgueo request ("one string behind the other, like a strum"). */
+export const STRUM_SPREAD_SECONDS = 0.04
+/**
+ * How far a strum's strings may stray from equal force (± fraction). A hand
+ * sweeping the strings never strikes two of them identically, and identical
+ * velocities are exactly what made a correctly *staggered* strum still read
+ * as one event: the sequence needs dynamics as much as spacing. Seeded by
+ * the chord itself, so the same preview sounds the same on every tap; a
+ * single note is not a strum and never gets one, and the piano — one gesture,
+ * keys struck together — is untouched.
+ */
+const STRUM_VELOCITY_JITTER = 0.25
 /** Piano keys are struck together; a whisper of spread keeps it from buzzing. */
 export const PIANO_SPREAD_SECONDS = 0.004
 /** Time in which every string loses half its amplitude. A plain constant
@@ -234,6 +251,18 @@ function pianoNote(frequency: number, length: number, sampleRate: number): Float
 }
 
 /**
+ * Per-string force of a strum, in string order: `1 ± STRUM_VELOCITY_JITTER`,
+ * deterministic in the chord's own midis — the same preview always sweeps the
+ * same way, a different chord gets its own sweep. A lone note is not a strum
+ * and a piano is one gesture, so both get equal weight everywhere.
+ */
+export const strumVelocities = (midis: readonly number[], timbre: ChordTimbre): number[] => {
+  if (timbre === "piano" || midis.length < 2) return midis.map(() => 1)
+  const state = { seed: (midis.reduce((sum, midi) => sum + Math.round(midi * 100), 0) ^ 0x51ed270b) >>> 0 }
+  return midis.map(() => 1 + STRUM_VELOCITY_JITTER * noise(state))
+}
+
+/**
  * Sound a chord: each midi pluck/struck in turn, summed, peak-limited and
  * faded at the end. Returns an empty array for an empty (or degenerate)
  * request, which both seams treat as "nothing to play".
@@ -251,6 +280,11 @@ export function synthesizeChord(
   const total = Math.ceil((ringSeconds + spread * (midis.length - 1)) * sampleRate)
   const out = new Float32Array(total)
 
+  // A piano is one gesture: keys struck together, equal weight. A strum gives
+  // every string its own force, and that per-string dynamic is what makes the
+  // staggered onsets read as one string after another instead of a single
+  // event — same request, same sequence, every time.
+  const velocities = strumVelocities(midis, timbre)
   midis.forEach((midi, order) => {
     const frequency = midiToFrequency(midi)
     if (!(frequency > 0)) return
@@ -259,7 +293,8 @@ export function synthesizeChord(
     if (length <= 0) return
     const note =
       timbre === "piano" ? pianoNote(frequency, length, sampleRate) : pluckedString(frequency, length, sampleRate)
-    for (let i = 0; i < length; i++) out[offset + i] += note[i]
+    const velocity = velocities[order] ?? 1
+    for (let i = 0; i < length; i++) out[offset + i] += note[i] * velocity
   })
 
   let peak = 0
