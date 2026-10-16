@@ -208,9 +208,13 @@ export const StatsIcon = (props: any) => (
   <Ionicons name="stats-chart" size={24} color={Theme.colors.text} {...props} />
 )
 
+// `gauge`, not the classic tuning fork: MaterialCommunityIcons has no
+// `tuning-fork` glyph (it is not in the installed glyphmap), and a missing
+// name renders vector-icons' "?" placeholder — which is exactly what the owner
+// saw in the More grid. The needle-in-a-dial is the tuner's own gauge anyway.
 export const TunerIcon = (props: any) => (
   <MaterialCommunityIcons
-    name="tuning-fork"
+    name="gauge"
     size={24}
     color={Theme.colors.text}
     {...props}
