@@ -12,8 +12,11 @@ import { midiToFrequency } from "@/libs/pitchDetection"
  * - **`pluck`** — Karplus-Strong, the classic digital waveguide: a noise burst
  *   circulates an integer delay line through a one-pole averaging filter, and
  *   the string decays exactly like a plucked one. Guitar, ukulele and bass all
- *   get it; only the frequencies differ. The burst is band-limited to the
- *   note's own first partials and re-levelled before it circulates — full-band
+ *   get it; only the frequencies differ. Two pitch-derived rules shape it: the
+ *   burst is band-limited to the note's own first partials — the count growing
+ *   with the string's pitch, so a thick bass string opens on its first handful
+ *   — and the onset ramp spans a fraction of the string's own period, so a low
+ *   string *swells* like a finger pluck instead of clicking like a slap. Full-band
  *   noise at full scale is the "dirty, saturated" onset, and for a 33 Hz bass
  *   note it was also plainly the *wrong instrument*: white noise hands every
  *   partial equal energy, so a note with ~660 partials up to Nyquist still had
@@ -48,16 +51,23 @@ const STRING_HALF_LIFE_SECONDS = 1.8
 /**
  * Brightness of the pluck, in **harmonic count** rather than Hz: the noise
  * burst is low-passed at a fixed multiple of the note itself, so every pitch
- * opens on the same *shape* — the first 20 partials — instead of every pitch
- * opening on the full band. That equality is what the old flat filter broke:
- * white noise hands every partial equal energy, so the partial *count* decided
- * the spectrum — 660 partials of kilohertz content for a 33 Hz bass note (the
- * "saturated metallic ping that isn't a bass" the owner heard) against 66
- * partials of a 330 Hz note, whose bulk already sat low enough to sound fine.
+ * opens on a *shape*. The count caps at the first 20 partials — the bright
+ * shape guitar and ukulele have always had — and slides toward
+ * {@link EXCITATION_HARMONICS_MIN} for thick, low strings at roughly one
+ * partial per {@link EXCITATION_PARTIAL_HZ} Hz of string: a bass finger-pluck
+ * excites its first handful of partials and nothing above them. That equality
+ * is what the old flat filter broke: white noise hands every partial equal
+ * energy, so the partial *count* decided the spectrum — 660 partials of
+ * kilohertz content for a 33 Hz bass note (the "saturated metallic ping that
+ * isn't a bass" the owner heard) against 66 partials of a 330 Hz note, whose
+ * bulk already sat low enough to sound fine.
  */
 const EXCITATION_HARMONICS = 20
+const EXCITATION_HARMONICS_MIN = 8
+/** One partial per 4 Hz of string: E1 (41 Hz) opens on its first 10. */
+const EXCITATION_PARTIAL_HZ = 4
 /** Never strip a low note's partials away entirely. */
-const EXCITATION_CUTOFF_MIN = 400
+const EXCITATION_CUTOFF_MIN = 200
 /** Never shave the top off a high note. */
 const EXCITATION_CUTOFF_MAX = 8000
 /**
@@ -67,8 +77,15 @@ const EXCITATION_CUTOFF_MAX = 8000
  * owner already accepted — only the spectrum moves.
  */
 const EXCITATION_RMS = 0.2
-/** Each note opens on a short ramp: a step from silence to noise is a click. */
-const PLUCK_ATTACK_SECONDS = 0.002
+/** Each note opens on a short ramp: a step from silence to noise is a click.
+ * The ramp spans a fraction of the string's own period — a thick low string
+ * *swells* like a finger pluck (~11 ms at E1, 14 ms at the low B of a
+ * 5-string), a high one speaks almost at once (2 ms) — because a flat 2 ms
+ * onset at every pitch is exactly what makes a bass read as *slap* instead of
+ * deep: slap attacks in milliseconds, a finger-plucked low string blooms. */
+const PLUCK_ATTACK_PERIOD_SHARE = 0.45
+const PLUCK_ATTACK_MIN_SECONDS = 0.002
+const PLUCK_ATTACK_MAX_SECONDS = 0.014
 const PIANO_HARMONICS = 6
 const PIANO_BASE_TAU_SECONDS = 1.1
 const PIANO_ATTACK_SECONDS = 0.004
@@ -96,21 +113,35 @@ function pluckedString(frequency: number, length: number, sampleRate: number): F
   const state = { seed: (Math.round(frequency * 1000) ^ 0x9e3779b9) >>> 0 }
   const delay = new Float32Array(period)
   for (let i = 0; i < period; i++) delay[i] = noise(state)
-  // Band-limit the burst to the note's own first partials (two cascaded
-  // one-poles, −12 dB/oct): a low note must open dark like a thick string,
-  // a high note keeps its glass. Fixed-Hz filtering can only pick one side.
+  // Band-limit the burst to the note's own first partials (one-pole cascades):
+  // a low note must open dark like a thick string, a high note keeps its glass.
+  // Fixed-Hz filtering can only pick one side. The count grows with the pitch
+  // (one partial per 4 Hz) up to the 20-partial cap the bright instruments sit
+  // at, and a reduced count adds a third pole (−18 dB/oct): sub-E2 is the bass
+  // register, and nothing belonging there sounds better above ~500 Hz.
+  const harmonics = Math.min(
+    EXCITATION_HARMONICS,
+    Math.max(EXCITATION_HARMONICS_MIN, Math.round(frequency / EXCITATION_PARTIAL_HZ))
+  )
+  const reduced = harmonics < EXCITATION_HARMONICS
   const cutoff =
     Math.min(
       EXCITATION_CUTOFF_MAX,
-      Math.max(EXCITATION_CUTOFF_MIN, Math.abs(frequency) * EXCITATION_HARMONICS)
+      Math.max(EXCITATION_CUTOFF_MIN, harmonics * frequency)
     ) / sampleRate
   const a = 1 - Math.exp(-2 * Math.PI * cutoff)
   let pole1 = 0
   let pole2 = 0
+  let pole3 = 0
   for (let i = 0; i < period; i++) {
     pole1 += a * (delay[i] - pole1)
     pole2 += a * (pole1 - pole2)
-    delay[i] = pole2
+    if (reduced) {
+      pole3 += a * (pole2 - pole3)
+      delay[i] = pole3
+    } else {
+      delay[i] = pole2
+    }
   }
   // Re-level after filtering (band-limiting a low note costs most of its
   // energy): same loudness for every pitch, only the spectrum differs. The
@@ -127,7 +158,14 @@ function pluckedString(frequency: number, length: number, sampleRate: number): F
   for (let i = 0; i < period; i++) delay[i] *= gain
   // Per-cycle damping for the string's constant *time* half-life.
   const damping = 0.5 ** (1 / (frequency * STRING_HALF_LIFE_SECONDS))
-  const attack = Math.min(Math.max(2, Math.round(PLUCK_ATTACK_SECONDS * sampleRate)), length)
+  const attack = Math.min(
+    Math.max(
+      Math.round(PLUCK_ATTACK_MIN_SECONDS * sampleRate),
+      Math.round((PLUCK_ATTACK_PERIOD_SHARE * sampleRate) / frequency)
+    ),
+    Math.round(PLUCK_ATTACK_MAX_SECONDS * sampleRate),
+    length
+  )
   const out = new Float32Array(length)
   let index = 0
   for (let i = 0; i < length; i++) {

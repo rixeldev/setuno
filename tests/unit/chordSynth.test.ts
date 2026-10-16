@@ -56,6 +56,15 @@ const fft = (re: Float64Array, im: Float64Array): void => {
   }
 }
 
+/** RMS level of a slice of the sound — the envelope side of "how it starts". */
+const rmsOf = (signal: Float32Array, fromSeconds: number, toSeconds: number, sampleRate: number): number => {
+  const from = Math.round(fromSeconds * sampleRate)
+  const to = Math.min(signal.length, Math.round(toSeconds * sampleRate))
+  let energy = 0
+  for (let i = from; i < to; i++) energy += signal[i] * signal[i]
+  return Math.sqrt(energy / Math.max(1, to - from))
+}
+
 /**
  * One window of the sound, read like an analyzer: the share of energy sitting
  * above 1 kHz and the spectral centroid, from a Hann-windowed FFT. This is
@@ -166,13 +175,14 @@ describe("synthesizeChord", () => {
     // excitation hands *every* partial equal energy, so a 33 Hz note with ~660
     // partials up to Nyquist put 59 % of its energy above 1 kHz — and for a
     // low note the loop's averaging filter runs only 33 times a second, too
-    // slowly to ever tame it. The burst is now band-limited to the note's own
-    // first partials (EXCITATION_HARMONICS) and re-levelled, which is the
-    // whole fix: dark onset, low centroid, same loudness, same pitch.
+    // slowly to ever tame it. The burst is band-limited to the note's own
+    // first partials (the count shrinking with the string's pitch below the
+    // 20-partial cap) and re-levelled, which is the whole fix: dark onset, low
+    // centroid, same loudness, same pitch.
     const bass = synthesizeChord([24], "pluck", { seconds: 2 })
     const spectrum = spectralShare(bass, 0.3, CHORD_SAMPLE_RATE)
-    expect(spectrum.highShare).toBeLessThan(0.12)
-    expect(spectrum.centroid).toBeLessThan(800)
+    expect(spectrum.highShare).toBeLessThan(0.05)
+    expect(spectrum.centroid).toBeLessThan(400)
     // The pitch itself stays exact through the new filtering: E1 = 41.20 Hz.
     const e1 = synthesizeChord([28], "pluck", { seconds: 1.5 })
     const frequency = detectedFrequency(e1, 0.4, CHORD_SAMPLE_RATE)
@@ -180,6 +190,24 @@ describe("synthesizeChord", () => {
     if (frequency === null) return
     expect(frequency).toBeGreaterThan(41.2 * 0.985)
     expect(frequency).toBeLessThan(41.2 * 1.015)
+  })
+
+  it("swells into a bass note instead of slapping it", () => {
+    // The owner's third audition: the low end was finally in the right place
+    // but the bass still "sounded like a slap, not something deep". Slap is
+    // an *envelope*: it attacks in a couple of milliseconds. A finger-plucked
+    // thick string swells over a fraction of its own period, so the onset ramp
+    // is now period-scaled — ~11 ms at E1, 14 ms at the low B of a 5-string —
+    // while a high string still speaks almost at once. Measured as the RMS of
+    // the first 8 ms against the note's body (50–300 ms): a bass opens well
+    // under its own body level, a guitar C4 is already at full voice.
+    const ratio = (midi: number): number => {
+      const out = synthesizeChord([midi], "pluck", { seconds: 2 })
+      return rmsOf(out, 0, 0.008, CHORD_SAMPLE_RATE) / rmsOf(out, 0.05, 0.3, CHORD_SAMPLE_RATE)
+    }
+    expect(ratio(23)).toBeLessThan(0.6) // B0, the 5-string low B
+    expect(ratio(28)).toBeLessThan(0.5) // E1
+    expect(ratio(60)).toBeGreaterThan(1) // C4 speaks immediately
   })
 
   it("does not mute the bright instruments while darkening the bass", () => {
