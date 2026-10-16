@@ -12,9 +12,12 @@ import { midiToFrequency } from "@/libs/pitchDetection"
  * - **`pluck`** — Karplus-Strong, the classic digital waveguide: a noise burst
  *   circulates an integer delay line through a one-pole averaging filter, and
  *   the string decays exactly like a plucked one. Guitar, ukulele and bass all
- *   get it; only the frequencies differ. The burst is low-passed and scaled
- *   before it circulates — raw full-band noise at full scale is the "dirty,
- *   saturated" onset that made the previews sound clipped.
+ *   get it; only the frequencies differ. The burst is band-limited to the
+ *   note's own first partials and re-levelled before it circulates — full-band
+ *   noise at full scale is the "dirty, saturated" onset, and for a 33 Hz bass
+ *   note it was also plainly the *wrong instrument*: white noise hands every
+ *   partial equal energy, so a note with ~660 partials up to Nyquist still had
+ *   59 % of its sound above 1 kHz and played back as a metallic ping.
  * - **`piano`** — a struck tone is not a plucked one, so piano gets a decaying
  *   stack of slightly inharmonic partials instead.
  *
@@ -43,14 +46,27 @@ export const PIANO_SPREAD_SECONDS = 0.004
  * not, so the per-cycle factor is derived from this half-life instead. */
 const STRING_HALF_LIFE_SECONDS = 1.8
 /**
- * How strongly the string is excited. Raw ±1 noise is not what a fingertip
- * does, and a full-scale burst of it is exactly the "dirty, saturated" onset
- * this synth used to produce — the burst is scaled down *and* low-passed
- * below (see `EXCITATION_PASSES`), so the string opens on its own partials.
+ * Brightness of the pluck, in **harmonic count** rather than Hz: the noise
+ * burst is low-passed at a fixed multiple of the note itself, so every pitch
+ * opens on the same *shape* — the first 20 partials — instead of every pitch
+ * opening on the full band. That equality is what the old flat filter broke:
+ * white noise hands every partial equal energy, so the partial *count* decided
+ * the spectrum — 660 partials of kilohertz content for a 33 Hz bass note (the
+ * "saturated metallic ping that isn't a bass" the owner heard) against 66
+ * partials of a 330 Hz note, whose bulk already sat low enough to sound fine.
  */
-const EXCITATION_AMPLITUDE = 0.7
-/** Ring-filter passes run over the burst before it is ever heard. */
-const EXCITATION_PASSES = 2
+const EXCITATION_HARMONICS = 20
+/** Never strip a low note's partials away entirely. */
+const EXCITATION_CUTOFF_MIN = 400
+/** Never shave the top off a high note. */
+const EXCITATION_CUTOFF_MAX = 8000
+/**
+ * The level the filtered burst is scaled back to, so cutting brightness never
+ * changes loudness: it is the RMS the previous excitation measured (0.7 white
+ * noise through two averaging passes ≈ 0.2), so previews open at the level the
+ * owner already accepted — only the spectrum moves.
+ */
+const EXCITATION_RMS = 0.2
 /** Each note opens on a short ramp: a step from silence to noise is a click. */
 const PLUCK_ATTACK_SECONDS = 0.002
 const PIANO_HARMONICS = 6
@@ -79,15 +95,36 @@ function pluckedString(frequency: number, length: number, sampleRate: number): F
   const period = Math.max(2, Math.round(sampleRate / frequency))
   const state = { seed: (Math.round(frequency * 1000) ^ 0x9e3779b9) >>> 0 }
   const delay = new Float32Array(period)
-  for (let i = 0; i < period; i++) delay[i] = noise(state) * EXCITATION_AMPLITUDE
-  // Run the burst through the ring filter before it is heard: full-band white
-  // noise as an onset sounds like distortion, while the same burst smoothed
-  // into the string's own bandwidth sounds like a pluck.
-  const smoothed = new Float32Array(period)
-  for (let pass = 0; pass < EXCITATION_PASSES; pass++) {
-    for (let i = 0; i < period; i++) smoothed[i] = 0.5 * (delay[i] + delay[i + 1 === period ? 0 : i + 1])
-    delay.set(smoothed)
+  for (let i = 0; i < period; i++) delay[i] = noise(state)
+  // Band-limit the burst to the note's own first partials (two cascaded
+  // one-poles, −12 dB/oct): a low note must open dark like a thick string,
+  // a high note keeps its glass. Fixed-Hz filtering can only pick one side.
+  const cutoff =
+    Math.min(
+      EXCITATION_CUTOFF_MAX,
+      Math.max(EXCITATION_CUTOFF_MIN, Math.abs(frequency) * EXCITATION_HARMONICS)
+    ) / sampleRate
+  const a = 1 - Math.exp(-2 * Math.PI * cutoff)
+  let pole1 = 0
+  let pole2 = 0
+  for (let i = 0; i < period; i++) {
+    pole1 += a * (delay[i] - pole1)
+    pole2 += a * (pole1 - pole2)
+    delay[i] = pole2
   }
+  // Re-level after filtering (band-limiting a low note costs most of its
+  // energy): same loudness for every pitch, only the spectrum differs. The
+  // mean is removed too — leftover DC in the delay line would bias the loop.
+  let energy = 0
+  for (let i = 0; i < period; i++) energy += delay[i]
+  const mean = energy / period
+  energy = 0
+  for (let i = 0; i < period; i++) {
+    delay[i] -= mean
+    energy += delay[i] * delay[i]
+  }
+  const gain = energy > 0 ? EXCITATION_RMS / Math.sqrt(energy / period) : 0
+  for (let i = 0; i < period; i++) delay[i] *= gain
   // Per-cycle damping for the string's constant *time* half-life.
   const damping = 0.5 ** (1 / (frequency * STRING_HALF_LIFE_SECONDS))
   const attack = Math.min(Math.max(2, Math.round(PLUCK_ATTACK_SECONDS * sampleRate)), length)
