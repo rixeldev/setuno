@@ -5,6 +5,7 @@ import type { Song } from "@/interfaces/song"
 import { toDate } from "@/interfaces/timestamp"
 import { isGig } from "@/libs/performances"
 import { buildSongUsage } from "@/libs/songUsage"
+import { skippedSongIds } from "@/libs/showLog"
 
 /**
  * Band stats and the year-in-review card (roadmap #35): every number here is
@@ -18,7 +19,7 @@ export interface TopSong {
   id: string
   title: string
   artist: string
-  /** Completed events whose setlists include it (once per event, #34's rule). */
+  /** Completed events whose setlists include it (#34's rule, minus #45 skips). */
   timesPlayed: number
 }
 
@@ -87,6 +88,12 @@ const countBy = (uids: Iterable<string>): Map<string, number> => {
  * once per event (two lists of one show add up, the same list attached twice
  * to one show was still played once) but once per show again, because the
  * same setlist played at two shows was performed twice.
+ *
+ * Deliberately the **estimates**, even when a show log (#45) carries measured
+ * times: a visit measures time-on-screen, so it includes the banter between
+ * songs, while `musicMinutes` is meant to be minutes of *music*. The two
+ * clocks live side by side in the post-gig report, which is where comparing
+ * them is the point.
  */
 const performedSeconds = (completed: Performance[], byId: Map<string, Setlist>): number => {
   let seconds = 0
@@ -206,6 +213,12 @@ export const buildYearRecap = (
   for (const performance of played) {
     const seenLists = new Set<string>()
     const seenSongs = new Set<string>()
+    // A song marked `skipped` in the event's show log (#45) was in a list but
+    // was not played, so it is not a sighting — the same refinement #34 makes,
+    // through the same seam. `minutes` still counts the lists' estimates: a
+    // recap minute is programmed music, and the measured clock (banter
+    // included) lives in the post-gig report, not in the year totals.
+    const skipped = skippedSongIds(performance.showLog)
     for (const reference of performance.setlists) {
       if (!seenLists.has(reference.id)) {
         seenLists.add(reference.id)
@@ -216,6 +229,7 @@ export const buildYearRecap = (
       // One sighting per song per show: a song in two lists of the same night
       // was played once, mirroring `buildSongUsage`.
       for (const entry of list.songs) {
+        if (skipped.has(entry.songId)) continue
         if (seenSongs.has(entry.songId)) continue
         seenSongs.add(entry.songId)
         playCounts.set(entry.songId, (playCounts.get(entry.songId) ?? 0) + 1)

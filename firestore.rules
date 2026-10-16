@@ -507,12 +507,34 @@ service cloud.firestore {
           // present value must be one of the two.
           && (!('type' in request.resource.data)
             || request.resource.data.type in ['gig', 'rehearsal']);
-        allow update: if isAdmin(organizationId)
-          && request.resource.data.organizationId == organizationId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'name', 'date', 'endDate', 'startTime', 'endTime', 'venue', 'notes',
-            'setlists', 'status', 'type', 'updatedAt'
-          ]);
+        // Update: admins of this band (full edit) — the whitelist carries the
+        // event fields plus `showLog`, the per-song outcome/time record that
+        // the post-gig report writes (roadmap #45).
+        //
+        // Members get one narrow carve-out: writing `showLog` alone (plus the
+        // `updatedAt` touch that always rides a write). Whoever is running the
+        // show marks songs from the reader even when they are not an admin,
+        // and the log is operational data about the night, not an edit of the
+        // event itself — every other field stays admin-only.
+        //
+        // Rules cannot iterate the list, so the document-level shape (a list,
+        // at most 500 entries) is pinned here and each entry's contents are
+        // sanitized client-side in `libs/showLog.ts` — the annotations'
+        // `markers` precedent exactly.
+        allow update: if (isAdmin(organizationId)
+                          && request.resource.data.organizationId == organizationId
+                          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                            'name', 'date', 'endDate', 'startTime', 'endTime', 'venue', 'notes',
+                            'setlists', 'status', 'type', 'updatedAt', 'showLog'
+                          ])
+                          && (!('showLog' in request.resource.data)
+                              || (request.resource.data.showLog is list
+                                  && request.resource.data.showLog.size() <= 500)))
+          || (isMember(organizationId)
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['showLog', 'updatedAt'])
+              && request.resource.data.showLog is list
+              && request.resource.data.showLog.size() <= 500);
         allow delete: if isAdmin(organizationId);
       }
 

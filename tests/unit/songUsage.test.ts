@@ -46,6 +46,7 @@ const performance = (overrides: Partial<Performance> = {}): Performance => ({
   setlists: [],
   status: "scheduled",
   type: "gig",
+  showLog: [],
   createdBy: "uid-1",
   createdAt: TIMESTAMP,
   updatedAt: TIMESTAMP,
@@ -111,6 +112,63 @@ describe("buildSongUsage", () => {
     const usage = buildSongUsage([completed("show-1", "2026-09-10", ["l1", "l2"])], lists)
     expect(usage.get("a")).toEqual({ timesPlayed: 1, lastPlayedOn: "2026-09-10", eventsAgo: 0 })
     expect(usage.get("b")).toEqual({ timesPlayed: 1, lastPlayedOn: "2026-09-10", eventsAgo: 0 })
+  })
+
+  it("skips a song the show log marked skipped: it was not played (#45)", () => {
+    const lists = [setlist("l1", [entry("a"), entry("b")])]
+    const usage = buildSongUsage(
+      [
+        performance({
+          id: "show-1",
+          date: "2026-10-01",
+          status: "completed",
+          setlists: [{ id: "l1", name: "l1" }],
+          showLog: [
+            { songId: "a", outcome: "played", actualSec: 200, note: "", updatedAt: 1 },
+            { songId: "b", outcome: "skipped", actualSec: 5, note: "no time", updatedAt: 1 },
+          ],
+        }),
+      ],
+      lists,
+    )
+    expect(usage.get("a")).toEqual({ timesPlayed: 1, lastPlayedOn: "2026-10-01", eventsAgo: 0 })
+    // The skipped song has no entry at all — it reads as "never played".
+    expect(usage.has("b")).toBe(false)
+  })
+
+  it("falls back to a skipped song's older plays (#45)", () => {
+    const lists = [setlist("l1", [entry("x")])]
+    const usage = buildSongUsage(
+      [
+        performance({
+          id: "show-2",
+          date: "2026-10-01",
+          status: "completed",
+          setlists: [{ id: "l1", name: "l1" }],
+          showLog: [{ songId: "x", outcome: "skipped", actualSec: 0, note: "", updatedAt: 1 }],
+        }),
+        completed("show-1", "2026-09-01", ["l1"]),
+      ],
+      lists,
+    )
+    expect(usage.get("x")).toEqual({ timesPlayed: 1, lastPlayedOn: "2026-09-01", eventsAgo: 1 })
+  })
+
+  it("counts an improvised song as played (#45)", () => {
+    const lists = [setlist("l1", [entry("a")])]
+    const usage = buildSongUsage(
+      [
+        performance({
+          id: "show-1",
+          date: "2026-10-01",
+          status: "completed",
+          setlists: [{ id: "l1", name: "l1" }],
+          showLog: [{ songId: "a", outcome: "improvised", actualSec: 300, note: "", updatedAt: 1 }],
+        }),
+      ],
+      lists,
+    )
+    expect(usage.get("a")).toEqual({ timesPlayed: 1, lastPlayedOn: "2026-10-01", eventsAgo: 0 })
   })
 
   it("walks newest first: the first sighting carries the last play and the distance", () => {

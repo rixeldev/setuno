@@ -7,16 +7,27 @@ import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { IconButton } from "@/components/ui/Button"
 import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
-import { CheckCircleIcon, PauseIcon, PlayFilledIcon, StopwatchIcon } from "@/components/ui/Icons"
+import {
+  CheckCircleIcon,
+  PauseIcon,
+  PlayFilledIcon,
+  StopwatchIcon,
+  TargetIcon,
+} from "@/components/ui/Icons"
+import { ShowOutcomeSheet } from "@/components/performances/ShowOutcomeSheet"
 import {
   useLiveShow,
   startLiveShow,
   stopLiveShow,
   startBreak,
   endBreak,
+  markShowSong,
 } from "@/hooks/useReaderSession"
 import { breakRemainingSec, formatClock, liveProgressRatio, scheduleDeltaSec } from "@/libs/liveShow"
+import { showEntryFor } from "@/libs/showLog"
+import { SHOW_OUTCOME_KEYS } from "@/interfaces/performance"
 import type { LiveSetEntry } from "@/libs/liveShow"
+import type { ShowLogEntry } from "@/interfaces/performance"
 
 interface LiveShowBarProps {
   /** Setlist being played; must match the one the show was started from. */
@@ -27,6 +38,8 @@ interface LiveShowBarProps {
   index: number
   /** Estimated duration of the whole set, seconds. */
   estimatedSec: number
+  /** The event's stored log, seeded into the session when the show starts. */
+  seedLog: readonly ShowLogEntry[]
 }
 
 /** Break lengths offered in the picker, in minutes. */
@@ -36,11 +49,16 @@ const BREAK_MINUTES = [5, 10, 15, 20]
  * Live show strip (roadmap #7): where the band is in the running order, how far
  * ahead or behind the estimate it is, a peek at the next song and a break
  * countdown. The clock lives in `hooks/useReaderSession.ts` (in memory), so it
- * survives stepping from song to song and never writes to Firebase.
+ * survives stepping from song to song; since roadmap #45 the same session also
+ * carries the show **log** — marks and measured seconds — which the reader
+ * persists to the event through `useShowLogSync`. The strip never writes to
+ * Firestore itself: it only talks to the session store.
  *
  * It is a **strip**, not a panel. The reader's job is the song, so this is one
- * row of captions plus two icon actions, painted straight onto the reader's own
- * background with a single hairline under it. Everything that used to justify a
+ * row of captions plus its icon actions, painted straight onto the reader's own
+ * background with a single hairline under it — break and stop while the show
+ * runs, and since #45 a third (mark, tinted by the song's outcome) whose sheet
+ * is the only thing that ever opens over it. Everything that used to justify a
  * second row is folded in or dropped: the labelled stats block is now inline
  * captions, and the estimate and remaining time are gone — the delta already
  * tells the band whether it is running late, which is the only thing either of
@@ -60,6 +78,7 @@ export function LiveShowBar({
   entries,
   index,
   estimatedSec,
+  seedLog,
 }: LiveShowBarProps) {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
@@ -80,11 +99,13 @@ export function LiveShowBar({
   }, [ticking])
 
   const [breakOpen, setBreakOpen] = useState(false)
+  const [markOpen, setMarkOpen] = useState(false)
 
   const breakLeft = breakRemainingSec(showBreak, now)
   const elapsedSec = running && show.startedAt ? (now - show.startedAt) / 1000 : 0
   const delta = scheduleDeltaSec(elapsedSec, estimatedSec)
   const nextEntry = index >= 0 ? (entries[index + 1] ?? null) : null
+  const currentEntry = index >= 0 ? showEntryFor(show.log, entries[index]?.songId ?? "") : null
   const total = entries.length
   const ratio = liveProgressRatio(index, total)
   const onBreak = showBreak !== null && breakLeft > 0
@@ -93,7 +114,9 @@ export function LiveShowBar({
   const startLabel = t("liveShow.start")
 
   const start = (): void => {
-    startLiveShow(setlistId)
+    // Seeded from the event's stored log (the report's marks survive) and the
+    // first song starts its clock right away (#45).
+    startLiveShow(setlistId, { seed: seedLog, firstSongId: entries[index]?.songId ?? null })
     setNow(Date.now())
   }
 
@@ -167,7 +190,7 @@ export function LiveShowBar({
 
         {onBreak || breakOver ? (
           <Pressable
-            onPress={endBreak}
+            onPress={() => endBreak()}
             accessibilityRole="button"
             accessibilityLabel={t("liveShow.endBreakA11y")}
             style={({ pressed }) => [styles.breakChip, pressed && styles.pressed]}
@@ -196,6 +219,34 @@ export function LiveShowBar({
           />
         )}
 
+        {/* Roadmap #45: mark how the song on the clock went — tinted by the
+            mark already set (skipped = danger, improvised = accent) so the
+            strip shows it without spending a caption on it. */}
+        {running ? (
+          <IconButton
+            label={
+              currentEntry
+                ? `${t("liveShow.markA11y")} · ${t(SHOW_OUTCOME_KEYS[currentEntry.outcome])}`
+                : t("liveShow.markA11y")
+            }
+            variant="ghost"
+            size={30}
+            onPress={() => setMarkOpen(true)}
+            icon={
+              <TargetIcon
+                size={15}
+                color={
+                  currentEntry?.outcome === "skipped"
+                    ? Theme.colors.danger
+                    : currentEntry?.outcome === "improvised"
+                      ? Theme.colors.accent
+                      : Theme.colors.textMuted
+                }
+              />
+            }
+          />
+        ) : null}
+
         {running ? (
           <IconButton
             label={t("liveShow.stop")}
@@ -214,6 +265,14 @@ export function LiveShowBar({
           />
         )}
       </View>
+
+      <ShowOutcomeSheet
+        visible={markOpen}
+        onClose={() => setMarkOpen(false)}
+        songTitle={entries[index]?.title ?? ""}
+        outcome={currentEntry?.outcome ?? null}
+        onSelect={(outcome) => markShowSong(setlistId, outcome)}
+      />
 
       <BottomSheet
         visible={breakOpen}

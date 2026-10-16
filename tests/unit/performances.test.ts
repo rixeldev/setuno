@@ -24,6 +24,7 @@ const performance = (id: string, overrides: Partial<Performance> = {}): Performa
   setlists: [],
   status: "scheduled",
   type: "gig",
+  showLog: [],
   createdBy: "uid-1",
   createdAt: TIMESTAMP,
   updatedAt: TIMESTAMP,

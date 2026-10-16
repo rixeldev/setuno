@@ -57,6 +57,8 @@ export default function AppLayout() {
         <Stack.Screen name="performances/index" options={{ animation: "none" }} />
         <Stack.Screen name="performances/new" options={modalOptions} />
         <Stack.Screen name="performances/[id]/index" />
+        {/* Post-gig show report (#45): write-through review, so a plain push. */}
+        <Stack.Screen name="performances/[id]/report" />
         <Stack.Screen name="performances/[id]/edit" options={modalOptions} />
         <Stack.Screen name="calendar" />
         <Stack.Screen name="members" options={modalOptions} />

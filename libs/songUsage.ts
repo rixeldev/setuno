@@ -1,6 +1,7 @@
 import type { Performance } from "@/interfaces/performance"
 import type { Setlist } from "@/interfaces/setlist"
 import { performanceLastDay } from "@/libs/performances"
+import { skippedSongIds } from "@/libs/showLog"
 
 /**
  * Usage history (roadmap #34): "played N times, last played X events ago"
@@ -38,6 +39,12 @@ export interface SongUsage {
  * events never happened — only `completed` says the band actually played the
  * song, and the event detail screen offers admins exactly that action.
  *
+ * The show log (roadmap #45) refines that: a song the band marked **skipped**
+ * at an event was in a list but was not played, so it counts nowhere — it does
+ * not grow the tally and it does not stamp a "last played" date (an older
+ * play does). `improvised` counts as played, and an event with no log (every
+ * show before #45) keeps exactly today's behaviour.
+ *
  * Events are ordered newest first by their last day (the same ordering
  * `partitionPerformances` uses for past shows), ties broken by id so the same
  * data always derives the same numbers.
@@ -59,11 +66,13 @@ export const buildSongUsage = (
     // One pass per event: a song played in two of its lists was still played
     // once at that event, and the first sighting in this newest-first walk is
     // by definition the *last* time the band played it.
+    const skipped = skippedSongIds(performance.showLog)
     const playedHere = new Set<string>()
     for (const reference of performance.setlists) {
       const setlist = setlistsById.get(reference.id)
       if (!setlist) continue
       for (const entry of setlist.songs) {
+        if (skipped.has(entry.songId)) continue
         if (playedHere.has(entry.songId)) continue
         playedHere.add(entry.songId)
         const existing = usage.get(entry.songId)

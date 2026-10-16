@@ -1096,7 +1096,14 @@
     "breakTitle": "Take a break",
     "breakSubtitle": "How long?",
     "breakMinutes_one": "{{count}} min",
-    "breakMinutes_other": "{{count}} min"
+    "breakMinutes_other": "{{count}} min",
+    "markA11y": "Mark how this song went"
+  },
+  "showLog": {
+    "markTitle": "How did it go?",
+    "outcomePlayed": "Played",
+    "outcomeSkipped": "Skipped",
+    "outcomeImprovised": "Improvised"
   },
   "palette": {
     "placeholder": "Search songs, destinations, actions…",
@@ -1217,7 +1224,21 @@
     "noSetlistsAvailable": "You have no setlists yet. You can still add the event and attach one later.",
     "discardWhat": "changes to this event",
     "attachSetlists": "Attach setlists",
-    "changeSetlists": "Change setlists"
+    "changeSetlists": "Change setlists",
+    "reportTitle": "Show report",
+    "reportAction": "Show report",
+    "reportSummary": "Summary",
+    "reportCounts": "{{played}} played · {{skipped}} skipped · {{improvised}} improvised",
+    "reportTimes": "Real {{real}} · estimated {{estimate}}",
+    "reportRowTimes": "{{estimated}} est · {{real}} real",
+    "reportNotLogged": "Not logged",
+    "reportEmpty": "Nothing logged yet — mark songs during the show or right here.",
+    "reportNoSetlist": "Attach a setlist to this event to log the show.",
+    "reportOrphans": "No longer in the setlists",
+    "reportRemovedSong": "Removed song",
+    "reportNoteTitle": "Note",
+    "reportNotePlaceholder": "e.g. cut short, key change…",
+    "couldNotSaveLog": "We couldn't save the show log."
   },
   "calendar": {
     "calendar": "Calendar",

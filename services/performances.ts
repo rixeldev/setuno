@@ -19,11 +19,17 @@ import {
   type SubscribeErrorHandler,
   type Unsubscribe,
 } from "@/db/Fire"
-import type { Performance, PerformanceInput, PerformanceStatus } from "@/interfaces"
+import type {
+  Performance,
+  PerformanceInput,
+  PerformanceStatus,
+  ShowLogEntry,
+} from "@/interfaces"
 import { logActivity } from "@/services/activity"
 import { ValidationError } from "@/services/errors"
 import { ISO_DATE_PATTERN, TIME_PATTERN, toIsoDate } from "@/libs/validation"
 import { performanceLastDay } from "@/libs/performances"
+import { sanitizeShowLog } from "@/libs/showLog"
 
 const MAX_SETLISTS = 20
 
@@ -68,6 +74,9 @@ const mapPerformance = (data: Record<string, unknown>, id: string): Performance 
     // Roadmap #46: absent (or unrecognised) reads back as `gig`, exactly like
     // `status` above — an older document needs no migration.
     type: data.type === "rehearsal" ? "rehearsal" : "gig",
+    // Roadmap #45: absent on every older document (reads back as no log), and
+    // sanitized on the way in — the rules only pin the list shape.
+    showLog: sanitizeShowLog(data.showLog),
     createdBy: String(data.createdBy ?? ""),
     createdAt: data.createdAt as Performance["createdAt"],
     updatedAt: data.updatedAt as Performance["updatedAt"],
@@ -217,6 +226,26 @@ export const updatePerformance = async (
     actorName: actor.name,
     targetType: "performance",
     targetId: performanceId,
+  })
+}
+
+/**
+ * Writes an event's show log (roadmap #45) as its own field-level update — the
+ * log is deliberately **not** part of `PerformanceInput`, so the event form can
+ * never clobber what the show recorded and the log can never rewrite the event.
+ * Callers pass the whole array (one entry per song, a few hundred bytes at
+ * most): the reader's live sync and the post-gig report both send their full
+ * current state, so the last write simply wins — there is no per-entry merge
+ * to race. No activity event: marks happen mid-gig and the feed would be spam.
+ */
+export const saveShowLog = async (
+  organizationId: string,
+  performanceId: string,
+  showLog: readonly ShowLogEntry[],
+): Promise<void> => {
+  await updateDoc(doc(firestore, paths.performance(organizationId, performanceId)), {
+    showLog: sanitizeShowLog(showLog),
+    updatedAt: serverTimestamp(),
   })
 }
 

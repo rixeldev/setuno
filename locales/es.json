@@ -1001,7 +1001,14 @@
     "breakTitle": "Corte",
     "breakSubtitle": "¿Cuánto?",
     "breakMinutes_one": "{{count}} min",
-    "breakMinutes_other": "{{count}} min"
+    "breakMinutes_other": "{{count}} min",
+    "markA11y": "Marcar cómo fue esta canción"
+  },
+  "showLog": {
+    "markTitle": "¿Cómo salió?",
+    "outcomePlayed": "Tocada",
+    "outcomeSkipped": "Saltada",
+    "outcomeImprovised": "Improvisada"
   },
   "palette": {
     "placeholder": "Busca canciones, destinos, acciones…",
@@ -1122,7 +1129,21 @@
     "noSetlistsAvailable": "Aún no tienes listas. Puedes añadir el evento y adjuntar una más tarde.",
     "discardWhat": "cambios en este evento",
     "attachSetlists": "Adjuntar listas",
-    "changeSetlists": "Cambiar listas"
+    "changeSetlists": "Cambiar listas",
+    "reportTitle": "Informe del show",
+    "reportAction": "Informe del show",
+    "reportSummary": "Resumen",
+    "reportCounts": "{{played}} tocadas · {{skipped}} saltadas · {{improvised}} improvisadas",
+    "reportTimes": "Real {{real}} · estimado {{estimate}}",
+    "reportRowTimes": "{{estimated}} est · {{real}} real",
+    "reportNotLogged": "Sin registrar",
+    "reportEmpty": "Aún no hay registro — marca las canciones durante el show o aquí mismo.",
+    "reportNoSetlist": "Adjunta una lista a este evento para registrar el show.",
+    "reportOrphans": "Ya no están en las listas",
+    "reportRemovedSong": "Canción eliminada",
+    "reportNoteTitle": "Nota",
+    "reportNotePlaceholder": "p. ej. a cortar, cambio de tono…",
+    "couldNotSaveLog": "No pudimos guardar el registro del show."
   },
   "calendar": {
     "calendar": "Calendario",

@@ -58,6 +58,7 @@ const show = (overrides: Partial<Performance> = {}): Performance => ({
   setlists: [],
   status: "completed",
   type: "gig",
+  showLog: [],
   createdBy: "uid-1",
   createdAt: stampAt(2026, 1, 1),
   updatedAt: stampAt(2026, 1, 1),
@@ -307,6 +308,25 @@ describe("buildYearRecap", () => {
     expect(recap.songsPlayed).toBe(2)
     // l1 has no stored duration, l2 contributes its 90 seconds -> 2 minutes.
     expect(recap.minutes).toBe(2)
+  })
+
+  it("drops a skipped song from the sightings but keeps the list's minutes (#45)", () => {
+    const recap = buildYearRecap(
+      [
+        attached("s1", "2026-06-01", ["l1"], {
+          showLog: [{ songId: "b", outcome: "skipped", actualSec: 0, note: "", updatedAt: 1 }],
+        }),
+      ],
+      [list("l1", ["a", "b"], { estimatedDurationSec: 600 })],
+      [song("a"), song("b")],
+      2026,
+    )
+    // b was in the list but the band cut it: one sighting, one song — while
+    // the recap minute stays the programmed estimate, because the measured
+    // clock (banter included) lives in the post-gig report, not in the year.
+    expect(recap.songsPlayed).toBe(1)
+    expect(recap.minutes).toBe(10)
+    expect(recap.topSong?.id).toBe("a")
   })
 
   it("picks the most played song, breaking a tie by title, and stays null when idle", () => {

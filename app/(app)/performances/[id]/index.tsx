@@ -18,6 +18,7 @@ import {
   ClockIcon,
   CloseIcon,
   EditIcon,
+  ListIcon,
   MapPinIcon,
   MusicIcon,
   TrashIcon,
@@ -319,8 +320,20 @@ export default function PerformanceDetail() {
         </AppText>
       ) : null}
 
-      {/* Anyone can drop the show into their own calendar (roadmap #50). */}
+      {/* Anyone can open the post-gig report once a setlist is attached
+          (roadmap #45) — the rules' member carve-out lets non-admins mark the
+          log too — and anyone can drop the show into their own calendar
+          (roadmap #50). */}
       <View style={styles.actions}>
+        {attachedSetlists.length > 0 ? (
+          <Button
+            label={t("performances.reportAction")}
+            variant="secondary"
+            full
+            icon={<ListIcon size={16} color={Theme.colors.text} />}
+            onPress={() => router.push(`/performances/${performance.id}/report`)}
+          />
+        ) : null}
         <Button
           label={t("calendar.exportEvent")}
           variant="secondary"

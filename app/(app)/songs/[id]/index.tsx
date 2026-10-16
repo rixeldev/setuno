@@ -62,7 +62,14 @@ import { useAuth } from "@/hooks/useAuth"
 import { useResponsive } from "@/hooks/useResponsive"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
-import { readImmersiveMode, setReaderDirection, writeImmersiveMode } from "@/hooks/useReaderSession"
+import {
+  readImmersiveMode,
+  releaseShowSong,
+  setReaderDirection,
+  touchShowSong,
+  writeImmersiveMode,
+} from "@/hooks/useReaderSession"
+import { useShowLogSync } from "@/hooks/useShowLogSync"
 import { useWakeLock } from "@/hooks/useWakeLock"
 import { useAutoscroll } from "@/hooks/useAutoscroll"
 import { useMetronome } from "@/hooks/useMetronome"
@@ -102,13 +109,16 @@ import {
 } from "@/libs/readerState"
 import { READER_TOUR } from "@/libs/onboarding"
 import { toDate } from "@/interfaces/timestamp"
-import type { UserPreferences } from "@/interfaces"
+import type { ShowLogEntry, UserPreferences } from "@/interfaces"
 import { songLyricsText, sectionLabelFor } from "@/libs/songUtils"
 import { serializeChordPro } from "@/libs/chordpro"
 import { exportTextFile } from "@/libs/exportFile"
 import { songPrintHtml } from "@/libs/songPrint"
 import { setlistStep } from "@/libs/setlistNavigation"
 import * as Clipboard from "expo-clipboard"
+
+/** Stable empty log for readers of songs that are not part of any event. */
+const EMPTY_SHOW_LOG: ShowLogEntry[] = []
 
 /**
  * Song reader / performance view (docs §12).
@@ -161,20 +171,25 @@ export default function SongScreen() {
 
   // Corner arrows to walk the running order: only for songs opened from a
   // setlist screen, and only when that list really belongs to a live event —
-  // never for the general songbook or a draft list.
+  // never for the general songbook or a draft list. The owning event itself
+  // rides along (roadmap #45): its id and stored show log feed the strip's
+  // seed and the reader's log sync.
   const contextSetlist = useMemo(
     () => (setlistId ? (setlists.find((entry) => entry.id === setlistId) ?? null) : null),
     [setlistId, setlists],
   )
-  const eventSetlist = useMemo(() => {
-    if (!contextSetlist) return null
-    const belongsToEvent = performances.some(
-      (performance) =>
-        performance.status !== "cancelled" &&
-        performance.setlists.some((reference) => reference.id === contextSetlist.id),
-    )
-    return belongsToEvent ? contextSetlist : null
-  }, [contextSetlist, performances])
+  const livePerformance = useMemo(
+    () =>
+      contextSetlist
+        ? (performances.find(
+            (performance) =>
+              performance.status !== "cancelled" &&
+              performance.setlists.some((reference) => reference.id === contextSetlist.id),
+          ) ?? null)
+        : null,
+    [contextSetlist, performances],
+  )
+  const eventSetlist = livePerformance ? contextSetlist : null
   // Key the band chose for this song in a live event's setlist ("" otherwise).
   const chosenPlayKey = eventSetlist?.songs.find((entry) => entry.songId === song?.id)?.key ?? ""
   // The band's cue for *this entry* of the list it was opened from — "tune Eb",
@@ -195,6 +210,19 @@ export default function SongScreen() {
     () => (eventSetlist ? eventSetlist.estimatedDurationSec || liveTotalSec(liveEntries) : 0),
     [eventSetlist, liveEntries],
   )
+
+  // Show log (roadmap #45): while a show runs for this setlist, arriving at a
+  // song starts its clock and the reader's unmount closes the visit — module
+  // store writes (the palette registry's pattern), never a render-phase
+  // setState. The release only closes *this* song's visit, so the replace
+  // swap (new screen mounting before or after the old one unmounts) can never
+  // kill the fresh visit. The sync hook persists the log to the owning event.
+  useShowLogSync(setlistId, livePerformance?.id ?? null, livePerformance?.organizationId ?? null)
+  useEffect(() => {
+    if (!songId || !setlistId) return
+    touchShowSong(setlistId, songId)
+    return () => releaseShowSong(setlistId, songId)
+  }, [songId, setlistId])
 
   // Reader display settings come from the local preference cache so they are
   // restored instantly on every start-up (docs §32), then mirrored to the
@@ -884,6 +912,7 @@ export default function SongScreen() {
             entries={liveEntries}
             index={liveIndex}
             estimatedSec={liveEstimated}
+            seedLog={livePerformance?.showLog ?? EMPTY_SHOW_LOG}
           />
         ) : null}
         <ScrollView
@@ -966,6 +995,7 @@ export default function SongScreen() {
           entries={liveEntries}
           index={liveIndex}
           estimatedSec={liveEstimated}
+          seedLog={livePerformance?.showLog ?? EMPTY_SHOW_LOG}
         />
       ) : null}
 

@@ -44,6 +44,7 @@ const performance = (overrides: Partial<Performance> = {}): Performance => ({
   setlists: [{ id: "s1", name: "Set A" }],
   status: "scheduled",
   type: "gig",
+  showLog: [],
   createdBy: "uid-1",
   createdAt: TIMESTAMP,
   updatedAt: TIMESTAMP,

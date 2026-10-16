@@ -222,6 +222,81 @@ describe("performances carry their type (#46)", () => {
   })
 })
 
+describe("the show log is a member-writable record (#45)", () => {
+  const entry = (songId: string) => ({
+    songId,
+    outcome: "played",
+    actualSec: 210,
+    note: "",
+    updatedAt: 1_760_000_000_000,
+  })
+  const pathFor = (id: string) => `organizations/${orgId}/performances/${id}`
+
+  const seedLoggedShow = async (): Promise<string> => {
+    const id = createId("show")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(pathFor(id)).set({
+        organizationId: orgId,
+        name: "Sala Sur",
+        date: "2026-10-13",
+        setlists: [],
+        venue: { name: "Sala Sur", address: "", notes: "" },
+        status: "completed",
+        type: "gig",
+      })
+    })
+    return id
+  }
+
+  it("lets a member write the show log and the updatedAt touch alone", async () => {
+    const id = await seedLoggedShow()
+    await assertSucceeds(
+      bob()
+        .firestore()
+        .doc(pathFor(id))
+        .update({ showLog: [entry("song-a")], updatedAt: new Date() }),
+    )
+  })
+
+  it("still denies a member touching any other field of the event", async () => {
+    const id = await seedLoggedShow()
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(pathFor(id))
+        .update({ showLog: [entry("song-a")], status: "cancelled" }),
+    )
+  })
+
+  it("lets an admin write the log through the same carve-out", async () => {
+    const id = await seedLoggedShow()
+    await assertSucceeds(
+      alice()
+        .firestore()
+        .doc(pathFor(id))
+        .update({ showLog: [entry("song-a"), entry("song-b")], updatedAt: new Date() }),
+    )
+  })
+
+  it("rejects a show log that is not a list", async () => {
+    const id = await seedLoggedShow()
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(pathFor(id))
+        .update({ showLog: { songId: "song-a" }, updatedAt: new Date() }),
+    )
+  })
+
+  it("rejects a show log past the entry cap", async () => {
+    const id = await seedLoggedShow()
+    const oversized = Array.from({ length: 501 }, (_, index) => entry(`song-${index}`))
+    await assertFails(
+      bob().firestore().doc(pathFor(id)).update({ showLog: oversized, updatedAt: new Date() }),
+    )
+  })
+})
+
 describe("suggestions are member-written and admin-reviewed", () => {
   it("lets a member file a pending suggestion", async () => {
     const id = createId("suggestion")
