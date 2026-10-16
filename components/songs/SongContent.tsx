@@ -32,6 +32,10 @@ interface SongContentProps {
   markers?: AnnotationMarker[]
   /** Opens the annotations editor for a tapped marker. */
   onMarkerPress?: (marker: AnnotationMarker) => void
+  /** Opens the practice-loop sheet for a tapped section header (#15). */
+  onSectionPress?: (sectionId: string) => void
+  /** Lights the header of the section whose loop is playing (#15). */
+  loopSectionId?: string | null
 }
 
 /**
@@ -50,6 +54,8 @@ export function SongContent({
   onChordPress,
   markers = [],
   onMarkerPress,
+  onSectionPress,
+  loopSectionId = null,
 }: SongContentProps) {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
@@ -92,7 +98,22 @@ export function SongContent({
                   <MarkerChips markers={sectionMarkers} onPress={onMarkerPress} />
                 ) : null}
                 {section.lines.length > 0 || section.label.length > 0 ? (
-                  <View style={styles.sectionHeading}>
+                  <Pressable
+                    onPress={onSectionPress ? () => onSectionPress(section.id) : undefined}
+                    accessibilityRole={onSectionPress ? "button" : undefined}
+                    accessibilityLabel={
+                      onSectionPress
+                        ? t("songs.loopSectionA11y", {
+                            section: sectionLabelFor(transposed, index, t),
+                          })
+                        : undefined
+                    }
+                    hitSlop={8}
+                    style={[
+                      styles.sectionHeading,
+                      loopSectionId === section.id && styles.sectionHeadingLoop,
+                    ]}
+                  >
                     <AppText variant="label" tone="primary" style={styles.sectionLabel}>
                       {sectionLabelFor(transposed, index, t)}
                     </AppText>
@@ -101,7 +122,7 @@ export function SongContent({
                         {t("songs.bars", { count: section.bars })}
                       </AppText>
                     ) : null}
-                  </View>
+                  </Pressable>
                 ) : null}
                 <View style={styles.lines}>
                   {section.lines.map((line, lineIndex) => {
@@ -183,7 +204,20 @@ const createStyles = () =>
       padding: Theme.spacing.m,
       marginHorizontal: -Theme.spacing.m,
     },
-    sectionHeading: { flexDirection: "row", alignItems: "baseline", gap: Theme.spacing.s, flexWrap: "wrap" },
+    sectionHeading: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      gap: Theme.spacing.s,
+      flexWrap: "wrap",
+      // Defined from the start (an Android element whose background appears
+      // only in another state can paint square); the section whose loop is
+      // playing swaps the transparent for the accent wash (#15).
+      backgroundColor: "transparent",
+      borderRadius: Theme.radii.s,
+      paddingHorizontal: Theme.spacing.xs,
+      marginHorizontal: -Theme.spacing.xs,
+    },
+    sectionHeadingLoop: { backgroundColor: Theme.colors.accentSoft },
     sectionLabel: { letterSpacing: 1.2 },
     lines: { gap: 2 },
     // The chip row sits above the anchored line (or label), so the monospace

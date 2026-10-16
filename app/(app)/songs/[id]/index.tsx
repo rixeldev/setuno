@@ -53,6 +53,7 @@ import { LiveShowBar } from "@/components/songs/LiveShowBar"
 import { SongNavArrows } from "@/components/songs/SongNavArrows"
 import { MergeSongsDialog } from "@/components/songs/MergeSongsDialog"
 import { MetronomeSheet } from "@/components/songs/MetronomeSheet"
+import { SectionLoopSheet, type LoopSection } from "@/components/songs/SectionLoopSheet"
 import { PrintSheet } from "@/components/songs/PrintSheet"
 import { AddToCollectionSheet } from "@/components/collections/AddToCollectionSheet"
 import { ReaderDock, READER_DOCK_HEIGHT } from "@/components/songs/ReaderDock"
@@ -162,6 +163,9 @@ export default function SongScreen() {
   // one tap away (roadmap redesign of the song screen).
   const [controlsOpen, setControlsOpen] = useState(false)
   const [metronomeOpen, setMetronomeOpen] = useState(false)
+  // The section whose loop sheet is open (roadmap #15); the run itself lives
+  // in the metronome transport, so this only remembers what was tapped.
+  const [loopSection, setLoopSection] = useState<LoopSection | null>(null)
   // Session practice transport (roadmap #11): seeds from the song's BPM, dies
   // with the screen — stepping to the next song starts a fresh visit.
   const metronome = useMetronome(song?.bpm ?? null)
@@ -747,6 +751,20 @@ export default function SongScreen() {
     )
   }
 
+  // Tapping a section header opens its practice loop (#15). The label resolved
+  // here is the very rendering the header shows (`sectionLabelFor`), so the
+  // sheet's title can never drift from the body it was tapped on.
+  const openSectionLoop = (sectionId: string): void => {
+    const index = song.sections.findIndex((section) => section.id === sectionId)
+    if (index < 0) return
+    const section = song.sections[index]
+    setLoopSection({
+      id: section.id,
+      label: sectionLabelFor(song.sections, index, t),
+      bars: section.bars ?? 0,
+    })
+  }
+
   const lyrics =
     song.sections.length === 0 ? (
       <EmptyState
@@ -768,6 +786,8 @@ export default function SongScreen() {
         markers={currentAnnotations?.markers ?? []}
         onMarkerPress={openAnnotations}
         onChordPress={setChordHelp}
+        onSectionPress={tourActive ? undefined : openSectionLoop}
+        loopSectionId={metronome.loop?.sectionId ?? null}
       />
     )
 
@@ -1349,6 +1369,19 @@ export default function SongScreen() {
         onAccentChange={metronome.changeAccent}
         onCountInChange={metronome.changeCountIn}
         onToggle={metronome.toggle}
+      />
+
+      <SectionLoopSheet
+        visible={loopSection !== null}
+        onClose={() => setLoopSection(null)}
+        section={loopSection}
+        bpm={metronome.bpm}
+        beatsPerMeasure={metronome.beatsPerMeasure}
+        loop={metronome.loop}
+        loopView={metronome.loopView}
+        onBpmChange={metronome.changeBpm}
+        onStart={() => (loopSection ? metronome.startLoop({ sectionId: loopSection.id, bars: loopSection.bars }) : undefined)}
+        onStop={metronome.stop}
       />
       {chordSheet}
     </View>

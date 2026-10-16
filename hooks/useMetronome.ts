@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import {
   clampBpm,
@@ -8,6 +8,7 @@ import {
   type MetronomeBeat,
 } from "@/libs/metronome"
 import { startMetronome, type MetronomeHandle } from "@/libs/metronomeEngine"
+import { sectionLoopView, type SectionLoop, type SectionLoopView } from "@/libs/sectionLoop"
 import { hapticBeat } from "@/libs/haptics"
 
 /**
@@ -27,6 +28,12 @@ import { hapticBeat } from "@/libs/haptics"
  *   count-in restarts the run, because the engine reads those when it starts.
  * - `beat` is the last beat that fired (`null` while stopped): the dots, the
  *   count-in number and the haptics all read it.
+ * - **Section loops (#15) ride this same transport**: `startLoop` plays a
+ *   count-in bar and the section's bars forever, and `loopView` is phase over
+ *   `beat.index` (pure, in `libs/sectionLoop.ts`) — the engine never restarts,
+ *   so the loop cannot drift and a tempo change re-anchors without touching
+ *   it. The loop and a plain run are the same run: `stop` ends both, and
+ *   `loop !== null` exactly while a loop is playing.
  */
 export function useMetronome(songBpm: number | null) {
   const [manualBpm, setManualBpm] = useState<number | null>(null)
@@ -35,6 +42,8 @@ export function useMetronome(songBpm: number | null) {
   const [countIn, setCountIn] = useState(false)
   const [running, setRunning] = useState(false)
   const [beat, setBeat] = useState<MetronomeBeat | null>(null)
+  /** The section looping right now (#15); `null` exactly while no loop plays. */
+  const [loop, setLoop] = useState<SectionLoop | null>(null)
 
   const handleRef = useRef<MetronomeHandle | null>(null)
   const tapsRef = useRef<number[]>([])
@@ -66,6 +75,9 @@ export function useMetronome(songBpm: number | null) {
     handleRef.current = null
     setRunning(false)
     setBeat(null)
+    // Stopping ends a loop too — one transport, one truth, so the metronome
+    // sheet's Stop and the loop sheet's Stop can never disagree.
+    setLoop(null)
   }, [])
 
   const toggle = useCallback(() => {
@@ -75,6 +87,34 @@ export function useMetronome(songBpm: number | null) {
     }
     startWith({ bpm, beatsPerMeasure, accent, countIn })
   }, [running, bpm, beatsPerMeasure, accent, countIn, startWith, stop])
+
+  /**
+   * Practice loop (#15): a count-in bar and then the section's bars, over and
+   * over, until `stop`. The count-in is forced on for the run — it is the
+   * point of a loop — and the engine gets it **as a value**, not through the
+   * `countIn` state, which has not landed yet while this callback runs.
+   */
+  const startLoop = useCallback(
+    (section: SectionLoop) => {
+      stop()
+      setLoop(section)
+      setCountIn(true)
+      startWith({ bpm, beatsPerMeasure, accent, countIn: true })
+    },
+    [bpm, beatsPerMeasure, accent, startWith, stop],
+  )
+
+  // Where the running loop sits, derived in render from the last beat fired —
+  // never synced by an effect. Pure in `libs/sectionLoop.ts`, so closing the
+  // sheet, changing the tempo (re-anchor) or the bar size (restart) all keep
+  // the display honest without a single line of extra bookkeeping.
+  const loopView: SectionLoopView | null = useMemo(
+    () =>
+      loop
+        ? sectionLoopView(loop, beatsPerMeasure, countIn ? beatsPerMeasure : 0, beat?.index ?? 0)
+        : null,
+    [loop, beatsPerMeasure, countIn, beat],
+  )
 
   const changeBpm = useCallback((value: number) => setManualBpm(clampBpm(value)), [])
 
@@ -142,9 +182,12 @@ export function useMetronome(songBpm: number | null) {
     countIn,
     running,
     beat,
+    loop,
+    loopView,
     toggle,
     stop,
     tap,
+    startLoop,
     changeBpm,
     changeBeatsPerMeasure,
     changeAccent,
