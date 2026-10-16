@@ -53,6 +53,19 @@ export const hapticError = (): void => {
 }
 
 /**
+ * The tuner's "in tune" chirp (roadmap #13): one firm confirmation the moment
+ * the needle enters the green band — the feedback a physical tuner gives with
+ * its LED, felt instead of seen.
+ */
+export const hapticTuned = (): void => {
+  if (Platform.OS === "android") {
+    run(() => Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Keyboard_Tap))
+    return
+  }
+  run(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success))
+}
+
+/**
  * Rhythm tick for the metronome (roadmap #11): a firmer pulse on the accent
  * so the downbeat is felt in the pocket as well as heard. Kept short — at
  * 240 BPM this fires eight times a second.

@@ -11,17 +11,21 @@ import { TunerDisplay } from "@/components/tuner/TunerDisplay"
 import { useTunerStream } from "@/hooks/useTunerStream"
 
 /**
- * Chromatic tuner spike (roadmap #13) — deliberately **not** listed in any
- * navigation surface: this is the prototype the roadmap asks for before the
- * tuner is committed to ("do not ship a janky tuner"). Open it directly
- * (`/dev/tuner` in the browser; the route inspector in a dev build on native)
- * and read `docs/tuner_spike_memo.md` for the verdict.
+ * Chromatic tuner (roadmap #13, shipped): the spike the owner validated on
+ * hardware ("practically perfect") promoted to a real destination — `TunerIcon`
+ * entry in the sidebar and the More tiles. The whole DSP stays where the spike
+ * left it: YIN (`libs/pitchDetection.ts`) over the engine's window ring
+ * (`libs/tunerEngine.ts`), ~2.5 ms per reading, entirely in JS, no native
+ * module beyond the microphone itself.
  *
- * Analysis budget: one detection per microphone chunk (~10 Hz) lands at ~2.5 ms
- * per reading on desktop V8; `TunerReading.analysisMs` shows the device's real
- * number under "measurement" so the spike can be validated on hardware.
+ * Analysis budget: one detection per microphone chunk (~10 Hz). The faint
+ * caption under the gauge prints the device's real `TunerReading.analysisMs`,
+ * so the number can be re-checked on any hardware the app runs on.
+ *
+ * The mic needs a development build on native (Expo Go has no permission
+ * entry for it); on the web it runs in the browser.
  */
-export default function TunerSpikeScreen() {
+export default function TunerScreen() {
   const { t } = useTranslation()
   const styles = useThemedStyles(createStyles)
   const { status, reading, start, stop } = useTunerStream()
@@ -29,7 +33,7 @@ export default function TunerSpikeScreen() {
   const running = status === "running"
 
   return (
-    <ScreenContainer title={t("tuner.title")} subtitle={t("tuner.prototype")} back>
+    <ScreenContainer title={t("tuner.title")} back>
       <View style={styles.body}>
         <TunerDisplay reading={reading} status={status} />
         <Button
@@ -47,7 +51,7 @@ export default function TunerSpikeScreen() {
         />
         {reading ? (
           <AppText variant="caption" tone="faint" style={styles.budget}>
-            {reading.analysisMs.toFixed(1)} ms
+            {t("tuner.budget", { ms: reading.analysisMs.toFixed(1) })}
           </AppText>
         ) : null}
       </View>
@@ -60,6 +64,8 @@ const createStyles = () =>
     body: {
       alignItems: "center",
       gap: Theme.spacing.l,
+      flexGrow: 1,
+      justifyContent: "center",
       width: "100%",
     },
     budget: {

@@ -62,6 +62,31 @@ describe("yinPitch", () => {
     }
   })
 
+  it("recovers a fractional period to better than 1.5 cents", () => {
+    // The parabola fits the **raw** difference function (kept alongside the
+    // normalised one): the normalisation multiplies by τ and divides by a
+    // running mean, and across the three fit points both tilt the bowl — at
+    // the top of the range τ is only ~18 samples, so that tilt was a real,
+    // measurable bias. Raw, the bowl is symmetric around the period, and
+    // these sines all land *between* integer lags, the case a plain floor
+    // cannot solve at all.
+    for (const frequency of [82.41, 146.83, 233.08, 440, 987.77, 1318.51]) {
+      const estimate = yinPitch(sine(frequency, 24000, ANALYSIS_SECONDS), 24000)
+      expect(estimate, `${frequency} Hz`).not.toBeNull()
+      expect(Math.abs(centsOff(estimate!.frequency, frequency)), `${frequency} Hz`).toBeLessThan(1.5)
+    }
+  })
+
+  it("reads the 5-string low B, under the old 40 Hz floor", () => {
+    // 30.87 Hz sits below the range the tuner used to accept (bass low E) and
+    // only ~2.6 periods fit the window — the case the widened floor exists
+    // for. Wrong-octave answers (B1 at 61.7 Hz) fail the cents check.
+    const estimate = yinPitch(sine(30.87, 24000, ANALYSIS_SECONDS), 24000)
+    expect(estimate).not.toBeNull()
+    expect(Math.abs(centsOff(estimate!.frequency, 30.87))).toBeLessThan(3)
+    expect(nearestNote(estimate!.frequency)!.octave).toBe(0) // B0
+  })
+
   it("survives the engine's decimation step at 48 kHz", () => {
     const estimate = yinPitch(decimateBy2(sine(440, 48000, ANALYSIS_SECONDS * 2)), 24000)
     expect(estimate).not.toBeNull()

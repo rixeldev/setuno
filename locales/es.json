@@ -105,6 +105,7 @@
     "members": "Miembros",
     "collections": "Colecciones",
     "stats": "Estadísticas",
+    "tuner": "Afinador",
     "settings": "Ajustes",
     "more": "Más",
     "switchBand": "Cambiar banda",
@@ -114,6 +115,7 @@
     "membersHint": "Quién toca y qué puede editar",
     "collectionsHint": "Tus borradores privados de setlist",
     "statsHint": "Canciones top y resumen del año",
+    "tunerHint": "Afina cualquier instrumento al oído",
     "switchBandHint": "Toca con otra formación",
     "settingsHint": "Perfil, tema e idioma",
     "shortcuts": "Accesos"
@@ -1219,7 +1221,6 @@
   },
   "tuner": {
     "title": "Afinador",
-    "prototype": "Prototipo de investigación — detección de tono",
     "start": "Empezar",
     "stop": "Detener",
     "listening": "Escuchando…",
@@ -1227,12 +1228,18 @@
     "denied": "Acceso al micrófono denegado",
     "error": "No se pudo abrir el micrófono",
     "inTune": "Afinado",
-    "sharp": "{{cents}}¢ sostenido",
-    "flat": "{{cents}}¢ bemol",
+    "sharp_one": "Sostenido — baja {{cents}} centésimo",
+    "sharp_other": "Sostenido — baja {{cents}} centésimos",
+    "flat_one": "Bemol — sube {{cents}} centésimo",
+    "flat_other": "Bemol — sube {{cents}} centésimos",
     "sharpWord": "sostenido",
     "flatWord": "bemol",
-    "measurement": "{{hertz}} Hz · claridad {{clarity}}%",
-    "readoutA11y": "Afinador: {{note}}, {{cents}} centésimas, {{hertz}} hercios, {{state}}"
+    "measurement": "{{hertz}} Hz · señal {{clarity}}%",
+    "centsHint": "1 centésimo = 1/100 de nota",
+    "scaleFlat": "♭ bemol",
+    "scaleSharp": "♯ sostenido",
+    "budget": "análisis {{ms}} ms",
+    "readoutA11y": "Afinador: {{note}}, {{cents}} centésimos, {{hertz}} hercios, {{state}}"
   },
   "settings": {
     "settings": "Ajustes",

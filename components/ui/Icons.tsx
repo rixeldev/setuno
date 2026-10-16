@@ -208,6 +208,15 @@ export const StatsIcon = (props: any) => (
   <Ionicons name="stats-chart" size={24} color={Theme.colors.text} {...props} />
 )
 
+export const TunerIcon = (props: any) => (
+  <MaterialCommunityIcons
+    name="tuning-fork"
+    size={24}
+    color={Theme.colors.text}
+    {...props}
+  />
+)
+
 export const ComputerIcon = (props: any) => (
   <MaterialIcons
     name="computer"

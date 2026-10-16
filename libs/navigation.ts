@@ -10,6 +10,7 @@ import {
   OrganizationIcon,
   SettingsIcon,
   StatsIcon,
+  TunerIcon,
   UsersIcon,
 } from "@/components/ui/Icons"
 
@@ -39,6 +40,7 @@ export const SIDEBAR_NAV: NavItem[] = [
   { href: "/members", label: "nav.members", icon: UsersIcon },
   { href: "/collections", label: "nav.collections", icon: LibraryIcon },
   { href: "/stats", label: "nav.stats", icon: StatsIcon },
+  { href: "/tuner", label: "nav.tuner", icon: TunerIcon },
   { href: "/settings", label: "nav.settings", icon: SettingsIcon },
 ]
 
@@ -74,6 +76,7 @@ export const MORE_NAV: NavItem[] = [
     icon: StatsIcon,
     description: "nav.statsHint",
   },
+  { href: "/tuner", label: "nav.tuner", icon: TunerIcon, description: "nav.tunerHint" },
   {
     href: "/organizations",
     label: "nav.switchBand",

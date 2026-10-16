@@ -19,8 +19,9 @@ export const TUNER_THRESHOLD = 0.15
 /** Reject an estimate whose clarity (1 − normalized difference) is below this:
  * noise-like input that crossed the threshold only barely. */
 export const TUNER_MIN_CLARITY = 0.6
-/** Below a detuned bass low E; above the highest fretted note we care about. */
-export const TUNER_MIN_FREQUENCY = 40
+/** Below a detuned 5-string low B; above the highest fretted note we care
+ * about. The window resolves 30 Hz (2.6 periods fit), so the low B is tunable. */
+export const TUNER_MIN_FREQUENCY = 30
 export const TUNER_MAX_FREQUENCY = 1400
 /** ~ −80 dBFS: digital silence never reaches the O(n²) walk. */
 export const TUNER_MIN_RMS = 1e-4
@@ -100,9 +101,13 @@ export function yinPitch(
   // The whole function is normalised *before* searching for the crossing: the
   // trough descent and the interpolation below read neighbours of the chosen
   // lag, and a break at the crossing would leave them holding raw differences.
+  // The raw differences are kept alongside: the interpolation refines the
+  // period on *them*, never on the normalized curve.
+  const raw = new Float64Array(tauMax + 1)
   let running = 0
   for (let tau = 1; tau <= tauMax; tau++) {
     running += d[tau]
+    raw[tau] = d[tau]
     d[tau] = running > 0 ? (d[tau] * tau) / running : 1
   }
 
@@ -139,12 +144,17 @@ export function yinPitch(
 
   // Parabolic interpolation around the minimum: the true period almost never
   // lands on an integer lag, and this is what turns a ±1-lag quantisation
-  // (~±20 cents at E2) into sub-cent accuracy.
+  // (up to ~±20 cents at the top of the range) into sub-cent accuracy.
+  // The fit runs on the **raw** difference, not the normalised curve: the
+  // normalisation multiplies by τ and divides by the running mean, and across
+  // the three points of the fit both vary — at high pitches τ is only ~18-20
+  // samples, so that variation tilts the parabola into a measurable bias.
+  // Raw, the difference is a clean bowl around the period.
   let refinedTau = tauStar
   if (tauStar > 1 && tauStar < tauMax) {
-    const s0 = d[tauStar - 1]
-    const s1 = d[tauStar]
-    const s2 = d[tauStar + 1]
+    const s0 = raw[tauStar - 1]
+    const s1 = raw[tauStar]
+    const s2 = raw[tauStar + 1]
     const denominator = 2 * (2 * s1 - s2 - s0)
     if (denominator !== 0) refinedTau = tauStar + (s2 - s0) / denominator
   }

@@ -30,12 +30,34 @@ import {
 export const TUNER_WINDOW_INPUT = 4096
 /** At or above this rate the window is decimated ×2 before analysis. */
 export const TUNER_DECIMATE_ABOVE = 32000
+/**
+ * The newest slice of every window is discarded before analysis: that slice
+ * holds the pluck's attack transient, which is not periodic at all. Letting
+ * it into the window made the needle flinch on *every* pluck — the first
+ * three readings after the string is struck (one 100 ms chunk covers it) all
+ * carried part of the transient, three bad frames out of the median's five.
+ * 30 ms of slightly older audio costs nothing: the string is already ringing
+ * cleanly there.
+ */
+export const TUNER_ONSET_TRIM_MS = 30
+/** Ceiling on the trim in samples, so the ring below has a size that is known
+ * at construction time for every plausible input rate (2400 = 50 ms @48k; at
+ * 96 kHz the trim caps at 25 ms, which is still past the transient). */
+export const TUNER_TRIM_MAX = 2400
+/** The ring and its scratch copy hold the analysis window plus the trim. */
+export const TUNER_RING_SAMPLES = TUNER_WINDOW_INPUT + TUNER_TRIM_MAX
 /** Chunks (≈ 100 ms each) a reading survives a string's decay before the
  * display goes blank — without it the needle flickers on every pluck. */
 export const TUNER_HOLD_PUSHES = 6
 /** Median-of-N over recent frequencies: a single glitched frame cannot move
  * the displayed note, while one frame of latency is imperceptible. */
 export const TUNER_SMOOTHING = 5
+/**
+ * Exponential glide applied to the stabilized frequency: the median kills
+ * glitches, this keeps the needle from stepping between quantized readings —
+ * it moves like a physical tuner's needle instead of a seven-segment display.
+ */
+export const TUNER_NEEDLE_ALPHA = 0.5
 
 export type TunerChunk = {
   /** Float32 PCM, interleaved when `channels > 1`. */
@@ -75,26 +97,39 @@ export function createTunerEngine(
 ): TunerEngine {
   const minClarity = options.minClarity ?? TUNER_MIN_CLARITY
 
-  // Ring of the newest full-rate mono samples; the scratch window is copied
-  // out of it newest-aligned, so chunk sizes never have to match.
-  const ring = new Float32Array(TUNER_WINDOW_INPUT)
+  // Ring of the newest full-rate mono samples (analysis window + onset trim);
+  // the scratch window is copied out of it newest-aligned, so chunk sizes
+  // never have to match.
+  const ring = new Float32Array(TUNER_RING_SAMPLES)
   let filled = 0
   let write = 0
 
   const history: number[] = []
   let quietPushes = 0
-  const scratch = new Float32Array(TUNER_WINDOW_INPUT)
+  let smoothed: number | null = null
+  const scratch = new Float32Array(TUNER_RING_SAMPLES)
+
+  /** How many of the newest full-rate samples this rate's onset trim drops. */
+  const trimFor = (sampleRate: number): number =>
+    Math.min(Math.round((TUNER_ONSET_TRIM_MS / 1000) * sampleRate), TUNER_TRIM_MAX)
+
+  /** Glide the displayed frequency toward the latest stable reading. */
+  const glide = (target: number): number => {
+    smoothed = smoothed === null ? target : smoothed + TUNER_NEEDLE_ALPHA * (target - smoothed)
+    return smoothed
+  }
 
   function analyse(sampleRate: number): TunerReading {
-    // Newest-aligned copy out of the ring.
-    const start = (write - filled + ring.length) % ring.length
-    for (let i = 0; i < filled; i++) {
+    const decimate = sampleRate >= TUNER_DECIMATE_ABOVE
+    const windowInput = decimate ? TUNER_WINDOW_INPUT : TUNER_WINDOW_INPUT / 2
+    // Newest-aligned copy out of the ring, minus the onset trim at its tail.
+    const usable = filled - trimFor(sampleRate)
+    const start = (write - usable + ring.length) % ring.length
+    for (let i = 0; i < usable; i++) {
       scratch[i] = ring[(start + i) % ring.length]
     }
 
-    const decimate = sampleRate >= TUNER_DECIMATE_ABOVE
-    const windowInput = decimate ? TUNER_WINDOW_INPUT : TUNER_WINDOW_INPUT / 2
-    const view = scratch.subarray(filled - windowInput, filled)
+    const view = scratch.subarray(usable - windowInput, usable)
     const analysisWindow = decimate ? decimateBy2(view) : view
     const analysisRate = decimate ? sampleRate / 2 : sampleRate
 
@@ -107,22 +142,20 @@ export function createTunerEngine(
       if (history.length > TUNER_SMOOTHING) history.shift()
       quietPushes = 0
       const sorted = [...history].sort((a, b) => a - b)
-      const stable = sorted[sorted.length >> 1]
-      const note = nearestNote(stable)
-      if (note && stable >= TUNER_MIN_FREQUENCY && stable <= TUNER_MAX_FREQUENCY) {
-        return { ...note, frequency: stable, clarity: estimate.clarity, analysisMs }
+      const frequency = glide(sorted[sorted.length >> 1])
+      const note = nearestNote(frequency)
+      if (note && frequency >= TUNER_MIN_FREQUENCY && frequency <= TUNER_MAX_FREQUENCY) {
+        return { ...note, frequency, clarity: estimate.clarity, analysisMs }
       }
       return null
     }
 
-    // No pitch this chunk: hold the last stable reading through the decay.
+    // No pitch this chunk: hold the last displayed reading through the decay.
     quietPushes = Math.min(quietPushes + 1, 99)
-    if (history.length === 0 || quietPushes > TUNER_HOLD_PUSHES) return null
-    const sorted = [...history].sort((a, b) => a - b)
-    const stable = sorted[sorted.length >> 1]
-    const note = nearestNote(stable)
+    if (history.length === 0 || quietPushes > TUNER_HOLD_PUSHES || smoothed === null) return null
+    const note = nearestNote(smoothed)
     if (!note) return null
-    return { ...note, frequency: stable, clarity: estimate ? estimate.clarity : 0, analysisMs }
+    return { ...note, frequency: smoothed, clarity: estimate ? estimate.clarity : 0, analysisMs }
   }
 
   return {
@@ -156,7 +189,10 @@ export function createTunerEngine(
         filled = Math.min(filled + take, ring.length)
       }
 
-      if (filled < (chunk.sampleRate >= TUNER_DECIMATE_ABOVE ? TUNER_WINDOW_INPUT : TUNER_WINDOW_INPUT / 2)) {
+      const needed =
+        (chunk.sampleRate >= TUNER_DECIMATE_ABOVE ? TUNER_WINDOW_INPUT : TUNER_WINDOW_INPUT / 2) +
+        trimFor(chunk.sampleRate)
+      if (filled < needed) {
         return
       }
       onReading(analyse(chunk.sampleRate))
@@ -167,6 +203,7 @@ export function createTunerEngine(
       write = 0
       history.length = 0
       quietPushes = 0
+      smoothed = null
     },
   }
 }
