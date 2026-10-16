@@ -12,15 +12,19 @@ import { midiToFrequency } from "@/libs/pitchDetection"
  * - **`pluck`** — Karplus-Strong, the classic digital waveguide: a noise burst
  *   circulates an integer delay line through a one-pole averaging filter, and
  *   the string decays exactly like a plucked one. Guitar, ukulele and bass all
- *   get it; only the frequencies differ. Two pitch-derived rules shape it: the
- *   burst is band-limited to the note's own first partials — the count growing
- *   with the string's pitch, so a thick bass string opens on its first handful
- *   — and the onset ramp spans a fraction of the string's own period, so a low
- *   string *swells* like a finger pluck instead of clicking like a slap. Full-band
- *   noise at full scale is the "dirty, saturated" onset, and for a 33 Hz bass
- *   note it was also plainly the *wrong instrument*: white noise hands every
- *   partial equal energy, so a note with ~660 partials up to Nyquist still had
- *   59 % of its sound above 1 kHz and played back as a metallic ping.
+ *   get it; only the frequencies differ. Three pitch-derived rules shape it:
+ *   the burst is band-limited to the note's own first partials — the count
+ *   growing with the string's pitch, so a thick bass string opens on its first
+ *   handful — the burst is *tilted* like a real pluck (a finger or pick
+ *   displaces the string smoothly, so partials fall ~6 dB/octave from the first
+ *   ones; flat white noise is instead the "struck with something metal"
+ *   spectrum), and the onset ramp spans a fraction of the string's own period,
+ *   so a low string *swells* like a finger pluck instead of clicking like a
+ *   slap. Full-band noise at full scale is the "dirty, saturated" onset, and
+ *   for a 33 Hz bass note it was also plainly the *wrong instrument*: white
+ *   noise hands every partial equal energy, so a note with ~660 partials up to
+ *   Nyquist still had 59 % of its sound above 1 kHz and played back as a
+ *   metallic ping.
  * - **`piano`** — a struck tone is not a plucked one, so piano gets a decaying
  *   stack of slightly inharmonic partials instead.
  *
@@ -71,6 +75,19 @@ const EXCITATION_CUTOFF_MIN = 200
 /** Never shave the top off a high note. */
 const EXCITATION_CUTOFF_MAX = 8000
 /**
+ * The pluck's *shape*, in the frequency domain. A finger or pick displaces the
+ * string smoothly and releases it, so the excited partials fall roughly 6 dB
+ * per octave from the first ones — while white noise hands every partial equal
+ * energy and reads as "hit with something metal". One one-pole at a small
+ * multiple of the note itself reproduces that tilt: its corner sits just above
+ * the fundamental, so everything above it slides down at ~6 dB/octave, and the
+ * multiple — not a fixed Hz value — keeps the shape identical at every pitch.
+ * The owner's fourth audition named exactly this ("crashed, saturated, like it
+ * is struck with metal instead of a finger or pick"), and the piano had always
+ * sounded right because its additive stack was tilted all along.
+ */
+const PLUCK_TILT = 2
+/**
  * The level the filtered burst is scaled back to, so cutting brightness never
  * changes loudness: it is the RMS the previous excitation measured (0.7 white
  * noise through two averaging passes ≈ 0.2), so previews open at the level the
@@ -118,7 +135,10 @@ function pluckedString(frequency: number, length: number, sampleRate: number): F
   // Fixed-Hz filtering can only pick one side. The count grows with the pitch
   // (one partial per 4 Hz) up to the 20-partial cap the bright instruments sit
   // at, and a reduced count adds a third pole (−18 dB/oct): sub-E2 is the bass
-  // register, and nothing belonging there sounds better above ~500 Hz.
+  // register, and nothing belonging there sounds better above ~500 Hz. Before
+  // them sits the tilt pole (see {@link PLUCK_TILT}): the band limit decides
+  // how far *up* the burst reaches, the tilt decides how the partials *fall*
+  // on the way there — flat is metal, ~6 dB/octave is a finger.
   const harmonics = Math.min(
     EXCITATION_HARMONICS,
     Math.max(EXCITATION_HARMONICS_MIN, Math.round(frequency / EXCITATION_PARTIAL_HZ))
@@ -130,11 +150,14 @@ function pluckedString(frequency: number, length: number, sampleRate: number): F
       Math.max(EXCITATION_CUTOFF_MIN, harmonics * frequency)
     ) / sampleRate
   const a = 1 - Math.exp(-2 * Math.PI * cutoff)
+  const tilt = 1 - Math.exp((-2 * Math.PI * PLUCK_TILT * frequency) / sampleRate)
+  let tiltPole = 0
   let pole1 = 0
   let pole2 = 0
   let pole3 = 0
   for (let i = 0; i < period; i++) {
-    pole1 += a * (delay[i] - pole1)
+    tiltPole += tilt * (delay[i] - tiltPole)
+    pole1 += a * (tiltPole - pole1)
     pole2 += a * (pole1 - pole2)
     if (reduced) {
       pole3 += a * (pole2 - pole3)
@@ -171,7 +194,15 @@ function pluckedString(frequency: number, length: number, sampleRate: number): F
   for (let i = 0; i < length; i++) {
     const current = delay[index]
     const next = delay[(index + 1) % period]
-    out[i] = i < attack ? current * ((i + 1) / attack) : current
+    if (i < attack) {
+      // Smoothstep, not a straight ramp: a linear rise still starts with a
+      // slope kink, and a kink at the very first samples is the tiny "tick"
+      // that reads as the string being *hit*. The S-curve eases in and out.
+      const position = (i + 1) / attack
+      out[i] = current * position * position * (3 - 2 * position)
+    } else {
+      out[i] = current
+    }
     delay[index] = damping * 0.5 * (current + next)
     index = index + 1 === period ? 0 : index + 1
   }

@@ -211,12 +211,32 @@ describe("synthesizeChord", () => {
   })
 
   it("does not mute the bright instruments while darkening the bass", () => {
-    // The same harmonic-count rule must not flatten everything: a guitar C4
-    // still opens with the glass above 1 kHz that reads as a plucked string.
+    // The same rules must not flatten everything: a guitar C4 still opens with
+    // the glass above 1 kHz that reads as a plucked string. The floor moved
+    // down once (0.25 → 0.18) when the pluck's tilt arrived on the owner's
+    // fourth audition ("struck with metal instead of a finger or pick"): what
+    // reads as *string* is having glass at all, not how much — the piano this
+    // owner calls "relatively good" sits at 0.01.
     const c4 = synthesizeChord([60], "pluck", { seconds: 2 })
     const spectrum = spectralShare(c4, 0.3, CHORD_SAMPLE_RATE)
-    expect(spectrum.highShare).toBeGreaterThan(0.25)
-    expect(spectrum.centroid).toBeGreaterThan(700)
+    expect(spectrum.highShare).toBeGreaterThan(0.18)
+    expect(spectrum.centroid).toBeGreaterThan(650)
+  })
+
+  it("opens a strummed chord warm, not like metal on metal", () => {
+    // The same fourth audition, measured on the *chord* — the sound the chord
+    // sheet actually previews. Before the tilt, a strummed G put 51 % of its
+    // onset energy above 1 kHz (centroid 1382 Hz): the flat white-noise burst,
+    // which reads as the strings being crashed into. A finger or pick releases
+    // the string, so the partials fall ~6 dB/octave: the same window now opens
+    // near 614 Hz with a sixth of the high-end share, while still well above
+    // the piano's 1 % — this is the ceiling that stops the "metal" sound from
+    // creeping back, the pair of the "glass" floor above.
+    const chord = synthesizeChord([43, 50, 55, 59, 62, 67], "pluck", { seconds: 2 })
+    const spectrum = spectralShare(chord, 0.03, CHORD_SAMPLE_RATE)
+    expect(spectrum.highShare).toBeLessThan(0.3)
+    expect(spectrum.centroid).toBeLessThan(900)
+    expect(spectrum.highShare).toBeGreaterThan(0.05)
   })
 
   it("plucks a note at its written pitch", () => {
