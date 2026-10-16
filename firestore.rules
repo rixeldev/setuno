@@ -16,6 +16,8 @@ rules_version = '2';
  *   organizations/{organizationId}/setlists
  *   organizations/{organizationId}/performances
  *   organizations/{organizationId}/performances/{performanceId}/tasks
+ *   organizations/{organizationId}/datePolls
+ *   organizations/{organizationId}/datePolls/{pollId}/votes
  *   organizations/{organizationId}/suggestions
  *   organizations/{organizationId}/activity
  *   organizations/{organizationId}/invitations/{lowercased email}
@@ -588,6 +590,72 @@ service cloud.firestore {
             && request.resource.data.createdBy == resource.data.createdBy;
           allow delete: if isAdmin(organizationId)
             || resource.data.createdBy == request.auth.uid;
+        }
+      }
+
+      // ----------------------------------------------------------- date polls
+
+      match /datePolls/{pollId} {
+        allow read: if isMember(organizationId);
+
+        // Any member may propose dates — logistics, not an admin job (#47's
+        // own rule) — but the poll is born **open, with no winner and no
+        // event**: closing it and stamping the winner is admin territory,
+        // because that step is what turns the poll into an event.
+        allow create: if isMember(organizationId)
+          && request.resource.data.keys().hasOnly([
+            'organizationId', 'title', 'options', 'status', 'winningOptionId',
+            'createdEventId', 'createdBy', 'createdAt', 'updatedAt'
+          ])
+          && request.resource.data.organizationId == organizationId
+          && request.resource.data.title is string
+          && request.resource.data.title.trim().size() > 0
+          && request.resource.data.title.size() <= 120
+          && request.resource.data.options is list
+          && request.resource.data.options.size() >= 2
+          && request.resource.data.options.size() <= 10
+          && request.resource.data.status == 'open'
+          && request.resource.data.winningOptionId == ''
+          && request.resource.data.createdEventId == ''
+          && request.resource.data.createdBy == request.auth.uid;
+
+        // Admin edit only: the title and the dates stay fixable while the
+        // poll is open, and `status`/`winningOptionId` carry the close while
+        // `createdEventId` records the event born from the winner. Rules
+        // cannot iterate the options list, so its document-level shape
+        // (2..10 entries) is pinned here and each entry's contents are
+        // sanitized client-side in `libs/datePolls.ts` — the annotations'
+        // `markers` precedent exactly.
+        allow update: if (isAdmin(organizationId)
+                          && request.resource.data.organizationId == organizationId
+                          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                            'title', 'options', 'status', 'winningOptionId',
+                            'createdEventId', 'updatedAt'
+                          ])
+                          && request.resource.data.title is string
+                          && request.resource.data.title.trim().size() > 0
+                          && request.resource.data.title.size() <= 120
+                          && request.resource.data.options is list
+                          && request.resource.data.options.size() >= 2
+                          && request.resource.data.options.size() <= 10
+                          && request.resource.data.status in ['open', 'closed']);
+        allow delete: if isAdmin(organizationId)
+          || resource.data.createdBy == request.auth.uid;
+
+        // One availability doc per member (doc id = uid), the favorites
+        // shape exactly: a member owns their answer alone, so two votes at
+        // once can never clobber each other and nobody can vote for anyone
+        // else. Option ids' contents are validated client-side — a stale id
+        // counts for nothing (`libs/datePolls.ts`).
+        match /votes/{voterUid} {
+          allow read: if isMember(organizationId);
+          allow create, update: if isMember(organizationId)
+            && request.auth.uid == voterUid
+            && request.resource.data.keys().hasOnly(['optionIds', 'updatedAt'])
+            && request.resource.data.optionIds is list
+            && request.resource.data.optionIds.size() <= 10;
+          allow delete: if isMember(organizationId)
+            && request.auth.uid == voterUid;
         }
       }
 

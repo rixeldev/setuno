@@ -4,8 +4,9 @@
  * contract: private profiles, admin-only song writes, suggestion review,
  * membership management, the owner-only reader state, the song version
  * history (roadmap #26), the performances' event type (roadmap #46), the
- * member-writable show log (roadmap #45) and the event's attendance map and
- * "who brings what" tasks (roadmap #47).
+ * member-writable show log (roadmap #45), the event's attendance map and
+ * "who brings what" tasks (roadmap #47) and the member-proposed date polls
+ * (roadmap #48).
  *
  * Run through `firebase emulators:exec --only firestore,storage "pnpm
  * test:integration"`, which starts the emulators, exports their host variables
@@ -470,6 +471,180 @@ describe("event logistics: attendance and tasks (#47)", () => {
     await assertFails(
       guest().firestore().doc(`${taskPathFor(id)}/${createId("task")}`).set(task("guest")),
     )
+  })
+})
+
+describe("date polls are member-proposed and admin-closed (#48)", () => {
+  const pathFor = (id: string) => `organizations/${orgId}/datePolls/${id}`
+
+  const poll = (createdBy: string, over: Record<string, unknown> = {}) => ({
+    organizationId: orgId,
+    title: "Summer gig — which date?",
+    options: [
+      { id: "o1", date: "2026-07-12", time: "", note: "" },
+      { id: "o2", date: "2026-07-13", time: "21:00", note: "" },
+    ],
+    status: "open",
+    winningOptionId: "",
+    createdEventId: "",
+    createdBy,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...over,
+  })
+
+  const vote = (over: Record<string, unknown> = {}) => ({
+    optionIds: ["o1"],
+    updatedAt: new Date(),
+    ...over,
+  })
+
+  const seedPoll = async (
+    createdBy = "alice",
+    over: Record<string, unknown> = {},
+  ): Promise<string> => {
+    const id = createId("poll")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(pathFor(id)).set(poll(createdBy, over))
+    })
+    return id
+  }
+
+  it("lets any member propose dates — logistics, not an admin job", async () => {
+    await assertSucceeds(
+      bob().firestore().doc(pathFor(createId("poll"))).set(poll("bob")),
+    )
+  })
+
+  it("rejects a poll born closed, pre-winned or pre-linked to an event", async () => {
+    await assertFails(
+      alice().firestore().doc(pathFor(createId("poll"))).set(poll("alice", { status: "closed" })),
+    )
+    await assertFails(
+      alice()
+        .firestore()
+        .doc(pathFor(createId("poll")))
+        .set(poll("alice", { winningOptionId: "o1" })),
+    )
+    await assertFails(
+      alice()
+        .firestore()
+        .doc(pathFor(createId("poll")))
+        .set(poll("alice", { createdEventId: "some-event" })),
+    )
+  })
+
+  it("rejects a poll with an empty title, too few or too many dates", async () => {
+    await assertFails(
+      bob().firestore().doc(pathFor(createId("poll"))).set(poll("bob", { title: "   " })),
+    )
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(pathFor(createId("poll")))
+        .set(poll("bob", { options: [{ id: "o1", date: "2026-07-12" }] })),
+    )
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(pathFor(createId("poll")))
+        .set(
+          poll("bob", {
+            options: Array.from({ length: 11 }, (_, index) => ({
+              id: `o${index}`,
+              date: "2026-07-12",
+            })),
+          }),
+        ),
+    )
+  })
+
+  it("rejects a poll filed under somebody else's name", async () => {
+    await assertFails(
+      bob().firestore().doc(pathFor(createId("poll"))).set(poll("alice")),
+    )
+  })
+
+  it("keeps poll edits with admins while the band may still read them", async () => {
+    const id = await seedPoll()
+    await assertFails(
+      bob().firestore().doc(pathFor(id)).update({ title: "Renamed by Bob", updatedAt: new Date() }),
+    )
+    await assertSucceeds(
+      alice().firestore().doc(pathFor(id)).update({ title: "Renamed by Alice", updatedAt: new Date() }),
+    )
+    await assertFails(guest().firestore().doc(pathFor(id)).get())
+  })
+
+  it("lets an admin close the poll on its winner", async () => {
+    const id = await seedPoll()
+    await assertSucceeds(
+      alice()
+        .firestore()
+        .doc(pathFor(id))
+        .update({ status: "closed", winningOptionId: "o1", updatedAt: new Date() }),
+    )
+  })
+
+  it("lets an admin record the event created from the winner", async () => {
+    const id = await seedPoll()
+    await assertSucceeds(
+      alice()
+        .firestore()
+        .doc(pathFor(id))
+        .update({ createdEventId: "event-1", updatedAt: new Date() }),
+    )
+  })
+
+  it("never lets a member close the poll", async () => {
+    const id = await seedPoll()
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(pathFor(id))
+        .update({ status: "closed", winningOptionId: "o1", updatedAt: new Date() }),
+    )
+  })
+
+  it("lets a member vote in their own document, twice", async () => {
+    const id = await seedPoll()
+    const ref = () => bob().firestore().doc(`${pathFor(id)}/votes/bob`)
+    await assertSucceeds(ref().set(vote()))
+    // Rewritten whole on the next tick — no array union anywhere.
+    await assertSucceeds(ref().set(vote({ optionIds: ["o1", "o2"] })))
+    await assertSucceeds(ref().set(vote({ optionIds: [] })))
+  })
+
+  it("rejects a vote for somebody else or carrying extra fields", async () => {
+    const id = await seedPoll()
+    await assertFails(
+      bob().firestore().doc(`${pathFor(id)}/votes/alice`).set(vote()),
+    )
+    await assertFails(
+      bob().firestore().doc(`${pathFor(id)}/votes/bob`).set(vote({ votedFor: "alice" })),
+    )
+    await assertFails(
+      bob().firestore().doc(`${pathFor(id)}/votes/bob`).set(vote({ optionIds: "o1" })),
+    )
+  })
+
+  it("lets the voter retract their own vote, never another member's", async () => {
+    const id = await seedPoll()
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`${pathFor(id)}/votes/alice`).set(vote())
+    })
+    await assertFails(bob().firestore().doc(`${pathFor(id)}/votes/alice`).delete())
+    await assertSucceeds(bob().firestore().doc(`${pathFor(id)}/votes/bob`).delete())
+  })
+
+  it("keeps poll deletion with its creator or an admin, never a bystander", async () => {
+    const id = await seedPoll("bob")
+    const otherId = await seedPoll("alice")
+    // A fellow member who neither created it nor admins the band.
+    await assertFails(bob().firestore().doc(pathFor(otherId)).delete())
+    // Its own creator, and the band's admin.
+    await assertSucceeds(bob().firestore().doc(pathFor(id)).delete())
+    await assertSucceeds(alice().firestore().doc(pathFor(otherId)).delete())
   })
 })
 

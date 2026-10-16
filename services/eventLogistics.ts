@@ -104,7 +104,7 @@ export const toggleEventTask = async (
   performanceId: string,
   task: EventTask,
 ): Promise<void> => {
-  await updateDoc(doc(firestore, paths.performanceTask(organizationId, performanceId), task.id), {
+  await updateDoc(doc(firestore, paths.performanceTask(organizationId, performanceId, task.id)), {
     done: !task.done,
     updatedAt: serverTimestamp(),
   })
@@ -115,7 +115,7 @@ export const deleteEventTask = async (
   performanceId: string,
   taskId: string,
 ): Promise<void> => {
-  await deleteDoc(doc(firestore, paths.performanceTask(organizationId, performanceId), taskId))
+  await deleteDoc(doc(firestore, paths.performanceTask(organizationId, performanceId, taskId)))
 }
 
 /**

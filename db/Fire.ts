@@ -119,6 +119,13 @@ export const paths = {
     `organizations/${orgId}/performances/${id}/tasks`,
   performanceTask: (orgId: string, id: string, taskId: string) =>
     `organizations/${orgId}/performances/${id}/tasks/${taskId}`,
+  /** Date polls and one availability doc per voting member (roadmap #48). */
+  datePolls: (orgId: string) => `organizations/${orgId}/datePolls`,
+  datePoll: (orgId: string, pollId: string) => `organizations/${orgId}/datePolls/${pollId}`,
+  datePollVotes: (orgId: string, pollId: string) =>
+    `organizations/${orgId}/datePolls/${pollId}/votes`,
+  datePollVote: (orgId: string, pollId: string, uid: string) =>
+    `organizations/${orgId}/datePolls/${pollId}/votes/${uid}`,
   suggestions: (orgId: string) => `organizations/${orgId}/suggestions`,
   suggestion: (orgId: string, id: string) => `organizations/${orgId}/suggestions/${id}`,
   activity: (orgId: string) => `organizations/${orgId}/activity`,

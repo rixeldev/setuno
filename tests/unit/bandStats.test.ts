@@ -59,6 +59,7 @@ const show = (overrides: Partial<Performance> = {}): Performance => ({
   status: "completed",
   type: "gig",
   showLog: [],
+  attendance: {},
   createdBy: "uid-1",
   createdAt: stampAt(2026, 1, 1),
   updatedAt: stampAt(2026, 1, 1),

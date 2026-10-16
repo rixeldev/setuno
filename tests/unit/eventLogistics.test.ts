@@ -16,6 +16,8 @@ const member = (uid: string, displayName = uid): OrganizationMember => ({
   email: `${uid}@band.test`,
   photoURL: null,
   role: "member",
+  joinedAt: { seconds: 0, nanoseconds: 0, toDate: () => new Date(0) },
+  invitedBy: "",
 })
 
 const stamp = (seconds: number) => ({ seconds, nanoseconds: 0, toDate: () => new Date(seconds * 1000) })

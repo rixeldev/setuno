@@ -91,6 +91,7 @@ a sidebar layout on the web.
 | **Setlists** | Build running orders — with **Set 1 / Break / Encore dividers**, a per-song note the band reads in the reader ("tune Eb") and a **goal**: target minutes with breaks counted inside, plus a live "5m left / 6m over" readout while you edit. Lists live under their events, and any list can be duplicated or saved as a **template** (45-min, acoustic, wedding) that lives outside events |
 | **Performances** | Schedule the band's events — **gigs and rehearsals**: the type is picked when creating one, a rehearsal carries its own **goals** instead of notes, both filter lists (and the calendar) by type, and only rehearsals wear the badge |
 | **RSVP & gig tasks** | Answer any event (going / maybe / can't) and see who's coming at a glance; the event also carries a live **"who brings what"** checklist — assign each task to a member or to anyone, tick it off together, and the whole band sees it update |
+| **Date polls** | Propose candidate dates and let the band tick the nights they can make; an admin closes the poll on the winner (most votes, ties to the earliest date) and turns it into a real event in one tap |
 | **Calendar** | Month, week and agenda views of upcoming and past events, filtered by status and by gig/rehearsal |
 | **Calendar export** | Save the band calendar or a single event as an `.ics` file — share sheet on mobile, download on web — with stable UIDs so re-imports update instead of duplicating |
 | **Dashboard** | Next show, quick actions, library stats, recent activity feed |

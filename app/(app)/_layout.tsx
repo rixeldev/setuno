@@ -60,6 +60,10 @@ export default function AppLayout() {
         {/* Post-gig show report (#45): write-through review, so a plain push. */}
         <Stack.Screen name="performances/[id]/report" />
         <Stack.Screen name="performances/[id]/edit" options={modalOptions} />
+        {/* Date polls (roadmap #48): member-proposed, member-voted. */}
+        <Stack.Screen name="polls/index" options={modalOptions} />
+        <Stack.Screen name="polls/new" options={modalOptions} />
+        <Stack.Screen name="polls/[id]" options={modalOptions} />
         <Stack.Screen name="calendar" />
         <Stack.Screen name="members" options={modalOptions} />
         <Stack.Screen name="suggestions/index" options={modalOptions} />

@@ -318,6 +318,11 @@ export const CalendarIcon = (props: any) => (
   <FontAwesome5 name="calendar" size={24} color={Theme.colors.text} {...props} />
 )
 
+/** The date-poll entry (roadmap #48); "poll" verified against the glyphmap. */
+export const PollIcon = (props: any) => (
+  <MaterialCommunityIcons name="poll" size={24} color={Theme.colors.text} {...props} />
+)
+
 export const DiamondIcon = (props: any) => (
   <FontAwesome5 name="gem" size={24} color={Theme.colors.text} {...props} />
 )

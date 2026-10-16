@@ -30,6 +30,7 @@ const performance = (id: string, date: string, overrides: Partial<Performance> =
   status: "scheduled",
   type: "gig",
   showLog: [],
+  attendance: {},
   createdBy: "uid-1",
   createdAt: TIMESTAMP,
   updatedAt: TIMESTAMP,

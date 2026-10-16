@@ -1,5 +1,4 @@
-import type { AttendanceStatus, EventTask } from "@/interfaces"
-import type { OrganizationMember } from "@/interfaces"
+import type { AttendanceStatus, EventTask, OrganizationMember } from "@/interfaces"
 import { toMillis } from "@/interfaces/timestamp"
 
 /**

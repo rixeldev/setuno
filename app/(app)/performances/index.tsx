@@ -8,7 +8,7 @@ import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { Chip } from "@/components/ui/Card"
 import { Button, IconButton } from "@/components/ui/Button"
 import { EmptyState, ErrorState, SkeletonList } from "@/components/ui/States"
-import { CalendarCheckIcon, PlusIcon } from "@/components/ui/Icons"
+import { CalendarCheckIcon, PlusIcon, PollIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { PerformanceCard } from "@/components/performances/PerformanceCard"
 import { useOrganization } from "@/hooks/useOrganization"
@@ -83,14 +83,24 @@ export default function PerformancesScreen() {
       }
       large
       headerRight={
-        isAdmin ? (
+        <View style={styles.headerActions}>
+          {/* Any member may propose dates (roadmap #48) — only scheduling an
+              event from the winner is admin territory. */}
           <IconButton
-            label={t("performances.schedule")}
+            label={t("polls.title")}
             variant="secondary"
-            onPress={() => router.push("/performances/new")}
-            icon={<PlusIcon size={18} color={Theme.colors.text} />}
+            onPress={() => router.push("/polls/index")}
+            icon={<PollIcon size={18} color={Theme.colors.text} />}
           />
-        ) : null
+          {isAdmin ? (
+            <IconButton
+              label={t("performances.schedule")}
+              variant="secondary"
+              onPress={() => router.push("/performances/new")}
+              icon={<PlusIcon size={18} color={Theme.colors.text} />}
+            />
+          ) : null}
+        </View>
       }
       toolbar={
         <View style={styles.toolbar}>
@@ -166,6 +176,12 @@ export default function PerformancesScreen() {
 
 const createStyles = () =>
   StyleSheet.create({
+    // The header's trailing controls: the polls entry plus the admin's own.
+    headerActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.xs,
+    },
     toolbar: {
       gap: 6,
       alignSelf: "flex-start",
