@@ -65,6 +65,45 @@ export interface PerformanceSetlist {
   name: string
 }
 
+/**
+ * A member's RSVP for one event (roadmap #47). Stored as a map on the
+ * performance document — `{ [uid]: status }` — absent on every older document
+ * (no answers yet), and written per key with a dot-path update so two members
+ * answering at the same time can never clobber each other. Only ever written
+ * through `services/eventLogistics.ts#setAttendance`, which touches the
+ * caller's own key alone (the rules enforce exactly that).
+ */
+export type AttendanceStatus = "yes" | "maybe" | "no"
+
+/**
+ * The i18n keys for each answer, declared once for every screen that renders
+ * the chips (the `PERFORMANCE_TYPE_KEYS`/`SHOW_OUTCOME_KEYS` precedent).
+ */
+export const ATTENDANCE_STATUS_KEYS: Record<AttendanceStatus, string> = {
+  yes: "performances.rsvpGoing",
+  maybe: "performances.rsvpMaybe",
+  no: "performances.rsvpNo",
+}
+
+/**
+ * "Who brings what" (roadmap #47): one task per thing, assigned to a member
+ * (or to nobody = anyone's job), with a done tick. Lives in the event's
+ * `tasks` subcollection — logistics belongs to the event, and a subcollection
+ * keeps the event document itself small and never rewritten by a checkbox.
+ */
+export interface EventTask {
+  id: string
+  title: string
+  /** Uid of the member it is assigned to, or "" = anyone. */
+  assignedTo: string
+  done: boolean
+  createdBy: string
+  /** Client time on purpose (the version-history precedent): order must */
+  /** survive an offline write while a server timestamp is still null. */
+  createdAt: TimestampLike
+  updatedAt: TimestampLike
+}
+
 export interface Performance {
   id: string
   organizationId: string
@@ -93,6 +132,14 @@ export interface Performance {
    * status tap can never clobber what the show recorded, and vice versa.
    */
   showLog: ShowLogEntry[]
+  /**
+   * Who answered the event (roadmap #47): uid → RSVP. Absent on every older
+   * document (reads back as no answers) and **not** part of `PerformanceInput`
+   * below — it is written only through `services/eventLogistics.ts#
+   * setAttendance` (one dot-path key per member), so the event form and every
+   * status tap can never clobber the band's answers, and vice versa.
+   */
+  attendance: Record<string, AttendanceStatus>
   createdBy: string
   createdAt: TimestampLike
   updatedAt: TimestampLike

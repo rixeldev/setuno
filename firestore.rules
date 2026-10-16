@@ -15,13 +15,17 @@ rules_version = '2';
  *   organizations/{organizationId}/songs
  *   organizations/{organizationId}/setlists
  *   organizations/{organizationId}/performances
+ *   organizations/{organizationId}/performances/{performanceId}/tasks
  *   organizations/{organizationId}/suggestions
  *   organizations/{organizationId}/activity
  *   organizations/{organizationId}/invitations/{lowercased email}
  *
  * Invariants enforced here:
  *   • only members can read anything inside their band;
- *   • only admins can write songs, setlists, performances or membership;
+ *   • only admins can write the *content* of songs, setlists or performances —
+ *     members get two narrow event carve-outs (roadmap #45/#47): the show log
+ *     and their own attendance answer, plus the event's tasks, which any
+ *     member ticks (logistics is not an admin job);
  *   • any member can create a suggestion, nobody can edit a song directly;
  *   • nobody can change their own role, admins included;
  *   • membership is granted through an email-keyed invitation that only the
@@ -509,33 +513,82 @@ service cloud.firestore {
             || request.resource.data.type in ['gig', 'rehearsal']);
         // Update: admins of this band (full edit) — the whitelist carries the
         // event fields plus `showLog`, the per-song outcome/time record that
-        // the post-gig report writes (roadmap #45).
+        // the post-gig report writes (roadmap #45), and `attendance`, the
+        // uid → RSVP map (roadmap #47).
         //
-        // Members get one narrow carve-out: writing `showLog` alone (plus the
-        // `updatedAt` touch that always rides a write). Whoever is running the
-        // show marks songs from the reader even when they are not an admin,
-        // and the log is operational data about the night, not an edit of the
-        // event itself — every other field stays admin-only.
+        // Members get two narrow carve-outs: writing `showLog` alone (plus the
+        // `updatedAt` touch that always rides a write) — whoever is running the
+        // show marks songs from the reader even when they are not an admin —
+        // or writing `attendance` with **only their own key** changed, one
+        // dot-path per member so two answers at once can never clobber each
+        // other. Operational data about the night, not an edit of the event:
+        // every other field stays admin-only.
         //
-        // Rules cannot iterate the list, so the document-level shape (a list,
-        // at most 500 entries) is pinned here and each entry's contents are
-        // sanitized client-side in `libs/showLog.ts` — the annotations'
-        // `markers` precedent exactly.
+        // Rules cannot iterate the list or the map, so the document-level
+        // shapes (list ≤ 500, map ≤ 100) are pinned here and each entry's
+        // contents are sanitized client-side in `libs/showLog.ts` and
+        // `libs/eventLogistics.ts` — the annotations' `markers` precedent
+        // exactly.
         allow update: if (isAdmin(organizationId)
                           && request.resource.data.organizationId == organizationId
                           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                             'name', 'date', 'endDate', 'startTime', 'endTime', 'venue', 'notes',
-                            'setlists', 'status', 'type', 'updatedAt', 'showLog'
+                            'setlists', 'status', 'type', 'updatedAt', 'showLog', 'attendance'
                           ])
                           && (!('showLog' in request.resource.data)
                               || (request.resource.data.showLog is list
-                                  && request.resource.data.showLog.size() <= 500)))
+                                  && request.resource.data.showLog.size() <= 500))
+                          && (!('attendance' in request.resource.data)
+                              || (request.resource.data.attendance is map
+                                  && request.resource.data.attendance.size() <= 100)))
           || (isMember(organizationId)
-              && request.resource.data.diff(resource.data).affectedKeys()
-                   .hasOnly(['showLog', 'updatedAt'])
-              && request.resource.data.showLog is list
-              && request.resource.data.showLog.size() <= 500);
+              && ((request.resource.data.diff(resource.data).affectedKeys()
+                    .hasOnly(['showLog', 'updatedAt'])
+                   && request.resource.data.showLog is list
+                   && request.resource.data.showLog.size() <= 500)
+                  || (request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['attendance', 'updatedAt'])
+                      && request.resource.data.attendance is map
+                      && request.resource.data.attendance.size() <= 100
+                      && request.resource.data.attendance
+                           .diff(resource.data.get('attendance', {}))
+                           .affectedKeys().hasOnly([request.auth.uid])
+                      && (!request.resource.data.attendance.containsKey(request.auth.uid)
+                          || request.resource.data.attendance[request.auth.uid]
+                               in ['yes', 'maybe', 'no']))));
         allow delete: if isAdmin(organizationId);
+
+        // "Who brings what" (roadmap #47): one small document per thing to
+        // bring, live-ticked by whoever has their hands on the list. Any
+        // member writes them — logistics is not an admin job — but
+        // `createdBy` is immutable at create time and only its creator (or an
+        // admin) may delete one.
+        match /tasks/{taskId} {
+          allow read: if isMember(organizationId);
+          allow create: if isMember(organizationId)
+            && request.resource.data.keys().hasOnly([
+              'title', 'assignedTo', 'done', 'createdBy', 'createdAt', 'updatedAt'
+            ])
+            && request.resource.data.title is string
+            && request.resource.data.title.trim().size() > 0
+            && request.resource.data.title.size() <= 120
+            && request.resource.data.assignedTo is string
+            && request.resource.data.assignedTo.size() <= 128
+            && request.resource.data.done is bool
+            && request.resource.data.createdBy == request.auth.uid;
+          allow update: if isMember(organizationId)
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['title', 'assignedTo', 'done', 'updatedAt'])
+            && request.resource.data.title is string
+            && request.resource.data.title.trim().size() > 0
+            && request.resource.data.title.size() <= 120
+            && request.resource.data.assignedTo is string
+            && request.resource.data.assignedTo.size() <= 128
+            && request.resource.data.done is bool
+            && request.resource.data.createdBy == resource.data.createdBy;
+          allow delete: if isAdmin(organizationId)
+            || resource.data.createdBy == request.auth.uid;
+        }
       }
 
       // ------------------------------------------------------------- suggestions

@@ -114,6 +114,11 @@ export const paths = {
   setlist: (orgId: string, setlistId: string) => `organizations/${orgId}/setlists/${setlistId}`,
   performances: (orgId: string) => `organizations/${orgId}/performances`,
   performance: (orgId: string, id: string) => `organizations/${orgId}/performances/${id}`,
+  /** "Who brings what" tasks of one event (roadmap #47). */
+  performanceTasks: (orgId: string, id: string) =>
+    `organizations/${orgId}/performances/${id}/tasks`,
+  performanceTask: (orgId: string, id: string, taskId: string) =>
+    `organizations/${orgId}/performances/${id}/tasks/${taskId}`,
   suggestions: (orgId: string) => `organizations/${orgId}/suggestions`,
   suggestion: (orgId: string, id: string) => `organizations/${orgId}/suggestions/${id}`,
   activity: (orgId: string) => `organizations/${orgId}/activity`,

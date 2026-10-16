@@ -3,7 +3,9 @@
  * suite described in `tests/integration/README.md`. The scenarios mirror its
  * contract: private profiles, admin-only song writes, suggestion review,
  * membership management, the owner-only reader state, the song version
- * history (roadmap #26) and the performances' event type (roadmap #46).
+ * history (roadmap #26), the performances' event type (roadmap #46), the
+ * member-writable show log (roadmap #45) and the event's attendance map and
+ * "who brings what" tasks (roadmap #47).
  *
  * Run through `firebase emulators:exec --only firestore,storage "pnpm
  * test:integration"`, which starts the emulators, exports their host variables
@@ -293,6 +295,180 @@ describe("the show log is a member-writable record (#45)", () => {
     const oversized = Array.from({ length: 501 }, (_, index) => entry(`song-${index}`))
     await assertFails(
       bob().firestore().doc(pathFor(id)).update({ showLog: oversized, updatedAt: new Date() }),
+    )
+  })
+})
+
+describe("event logistics: attendance and tasks (#47)", () => {
+  const pathFor = (id: string) => `organizations/${orgId}/performances/${id}`
+  const taskPathFor = (id: string) => `${pathFor(id)}/tasks`
+
+  const task = (createdBy: string, over: Record<string, unknown> = {}) => ({
+    title: "Amplifier",
+    assignedTo: "",
+    done: false,
+    createdBy,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...over,
+  })
+
+  const seedShow = async (extra: Record<string, unknown> = {}): Promise<string> => {
+    const id = createId("show")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(pathFor(id)).set({
+        organizationId: orgId,
+        name: "Sala Sur",
+        date: "2026-10-13",
+        setlists: [],
+        venue: { name: "Sala Sur", address: "", notes: "" },
+        status: "scheduled",
+        type: "gig",
+        ...extra,
+      })
+    })
+    return id
+  }
+
+  const seedTask = async (id: string, createdBy: string): Promise<string> => {
+    const taskId = createId("task")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`${taskPathFor(id)}/${taskId}`).set(task(createdBy))
+    })
+    return taskId
+  }
+
+  it("lets a member answer for themselves, creating the map", async () => {
+    const id = await seedShow()
+    await assertSucceeds(
+      bob().firestore().doc(pathFor(id)).update({
+        "attendance.bob": "yes",
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it("lets a member change their own key inside an existing map", async () => {
+    const id = await seedShow({ attendance: { alice: "yes" } })
+    await assertSucceeds(
+      bob().firestore().doc(pathFor(id)).update({
+        "attendance.bob": "maybe",
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it("never lets a member answer (or retract) for another member", async () => {
+    const id = await seedShow({ attendance: { alice: "yes" } })
+    await assertFails(
+      bob().firestore().doc(pathFor(id)).update({
+        "attendance.alice": "no",
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it("rejects a member answer that touches any other event field", async () => {
+    const id = await seedShow()
+    await assertFails(
+      bob().firestore().doc(pathFor(id)).update({
+        "attendance.bob": "yes",
+        status: "cancelled",
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it("rejects an answer outside the three states", async () => {
+    const id = await seedShow()
+    await assertFails(
+      bob().firestore().doc(pathFor(id)).update({
+        "attendance.bob": "later",
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it("lets an admin rewrite the whole map through the event whitelist", async () => {
+    const id = await seedShow()
+    await assertSucceeds(
+      alice().firestore().doc(pathFor(id)).update({
+        attendance: { alice: "yes", bob: "no" },
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it("lets any member file a task in their own name", async () => {
+    const id = await seedShow()
+    await assertSucceeds(
+      bob().firestore().doc(`${taskPathFor(id)}/${createId("task")}`).set(task("bob")),
+    )
+  })
+
+  it("rejects a task filed in somebody else's name", async () => {
+    const id = await seedShow()
+    await assertFails(
+      bob().firestore().doc(`${taskPathFor(id)}/${createId("task")}`).set(task("alice")),
+    )
+  })
+
+  it("rejects a task with an empty or oversized title", async () => {
+    const id = await seedShow()
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(`${taskPathFor(id)}/${createId("task")}`)
+        .set(task("bob", { title: "  " })),
+    )
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(`${taskPathFor(id)}/${createId("task")}`)
+        .set(task("bob", { title: "x".repeat(121) })),
+    )
+  })
+
+  it("lets any member tick a task without touching its authorship", async () => {
+    const id = await seedShow()
+    const taskId = await seedTask(id, "alice")
+    await assertSucceeds(
+      bob().firestore().doc(`${taskPathFor(id)}/${taskId}`).update({
+        done: true,
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it("rejects an update that rewrites who created the task", async () => {
+    const id = await seedShow()
+    const taskId = await seedTask(id, "alice")
+    await assertFails(
+      bob().firestore().doc(`${taskPathFor(id)}/${taskId}`).update({
+        done: true,
+        createdBy: "bob",
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it("keeps deletion with its creator or an admin, never a bystander", async () => {
+    const id = await seedShow()
+    const aliceTask = await seedTask(id, "alice")
+    const bobTask = await seedTask(id, "bob")
+    // A fellow member who neither created it nor admins the band.
+    await assertFails(bob().firestore().doc(`${taskPathFor(id)}/${aliceTask}`).delete())
+    // Its own creator, and the band's admin.
+    await assertSucceeds(bob().firestore().doc(`${taskPathFor(id)}/${bobTask}`).delete())
+    await assertSucceeds(alice().firestore().doc(`${taskPathFor(id)}/${aliceTask}`).delete())
+  })
+
+  it("hides the task list from outsiders", async () => {
+    const id = await seedShow()
+    const taskId = await seedTask(id, "bob")
+    await assertFails(guest().firestore().doc(`${taskPathFor(id)}/${taskId}`).get())
+    await assertFails(
+      guest().firestore().doc(`${taskPathFor(id)}/${createId("task")}`).set(task("guest")),
     )
   })
 })

@@ -30,6 +30,9 @@ import { useOrgData } from "@/hooks/useOrgData"
 import { deletePerformance, updatePerformance } from "@/services/performances"
 import { toFriendlyError } from "@/services/errors"
 import { exportPerformancesToIcs } from "@/libs/calendarExport"
+import { AttendanceCard } from "@/components/performances/AttendanceCard"
+import { EventTasksCard } from "@/components/performances/EventTasksCard"
+import { useEventTasks } from "@/hooks/useEventTasks"
 import type { RelativeDayLabels } from "@/libs/format"
 import { formatDateRange, formatDurationLong, formatRelativeDay, formatTime } from "@/libs/format"
 import { parseIsoDate } from "@/libs/validation"
@@ -57,7 +60,11 @@ export default function PerformanceDetail() {
 
   const { profile } = useAuth()
   const { organization, organizationId, isAdmin } = useOrganization()
-  const { performances, setlists, loading } = useOrgData()
+  const { performances, setlists, members, loading } = useOrgData()
+  // Roadmap #47: the tasks subscribe per screen (the RSVP map rides the event
+  // document above); tagged by band+event inside the hook, so a stale list can
+  // never leak across events.
+  const { tasks: eventTasks } = useEventTasks(organizationId, performanceId)
 
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -313,6 +320,29 @@ export default function PerformanceDetail() {
           </View>
         )}
       </Card>
+
+      {/* Roadmap #47: RSVP + "who brings what", hidden for a cancelled event
+          — there is nothing to answer and nothing to bring to a night that
+          is not happening. */}
+      {performance.status !== "cancelled" && profile ? (
+        <>
+          <AttendanceCard
+            organizationId={organizationId ?? ""}
+            performanceId={performance.id}
+            attendance={performance.attendance}
+            members={members}
+            currentUid={profile.uid}
+          />
+          <EventTasksCard
+            organizationId={organizationId ?? ""}
+            performanceId={performance.id}
+            tasks={eventTasks}
+            members={members}
+            currentUid={profile.uid}
+            isAdmin={isAdmin}
+          />
+        </>
+      ) : null}
 
       {performance.status === "cancelled" ? (
         <AppText variant="caption" tone="danger">

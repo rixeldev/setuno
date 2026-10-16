@@ -30,6 +30,8 @@ import { ValidationError } from "@/services/errors"
 import { ISO_DATE_PATTERN, TIME_PATTERN, toIsoDate } from "@/libs/validation"
 import { performanceLastDay } from "@/libs/performances"
 import { sanitizeShowLog } from "@/libs/showLog"
+import { mapAttendance } from "@/libs/eventLogistics"
+import { deleteEventTasks } from "@/services/eventLogistics"
 
 const MAX_SETLISTS = 20
 
@@ -77,6 +79,9 @@ const mapPerformance = (data: Record<string, unknown>, id: string): Performance 
     // Roadmap #45: absent on every older document (reads back as no log), and
     // sanitized on the way in — the rules only pin the list shape.
     showLog: sanitizeShowLog(data.showLog),
+    // Roadmap #47: absent on every older document (no answers yet), and only
+    // the caller's own key is ever written — the rules enforce exactly that.
+    attendance: mapAttendance(data.attendance),
     createdBy: String(data.createdBy ?? ""),
     createdAt: data.createdAt as Performance["createdAt"],
     updatedAt: data.updatedAt as Performance["updatedAt"],
@@ -256,6 +261,10 @@ export const deletePerformance = async (
 ): Promise<void> => {
   const uid = requireUserId()
   const performance = await fetchPerformance(organizationId, performanceId)
+  // Firestore does not cascade subcollections: drop the event's tasks first
+  // (best-effort inside — leftover docs are unreachable once the event is
+  // gone, exactly like the version history's cleanup).
+  await deleteEventTasks(organizationId, performanceId)
   await deleteDoc(doc(firestore, paths.performance(organizationId, performanceId)))
 
   void logActivity({
