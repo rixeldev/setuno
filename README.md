@@ -87,7 +87,7 @@ a sidebar layout on the web.
 | **ChordPro import/export** | Paste a ChordPro document into the song form to load its lyrics and chords, and export any song back to a `.cho` file from the reader |
 | **Print & PDF** | Print a song or a whole setlist — with chords or lyrics only, at three text sizes — and share it as a PDF or send it straight to a printer; a setlist prints each song in the key the band actually plays it in |
 | **Setlist running order** | Open a song from an event's setlist and step through it with corner arrows |
-| **Suggestions** | Members propose changes, admins accept/reject them with a note |
+| **Suggestions** | Members propose changes, admins accept/reject them with a note, and every suggestion carries an open comment thread (removed comments stay visible as "removed") |
 | **Setlists** | Build running orders — with **Set 1 / Break / Encore dividers**, a per-song note the band reads in the reader ("tune Eb") and a **goal**: target minutes with breaks counted inside, plus a live "5m left / 6m over" readout while you edit. Lists live under their events, and any list can be duplicated or saved as a **template** (45-min, acoustic, wedding) that lives outside events |
 | **Performances** | Schedule the band's events — **gigs and rehearsals**: the type is picked when creating one, a rehearsal carries its own **goals** instead of notes, both filter lists (and the calendar) by type, and only rehearsals wear the badge |
 | **RSVP & gig tasks** | Answer any event (going / maybe / can't) and see who's coming at a glance; the event also carries a live **"who brings what"** checklist — assign each task to a member or to anyone, tick it off together, and the whole band sees it update |

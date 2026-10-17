@@ -80,4 +80,17 @@ export interface SuggestionInput {
 
 export const PENDING_SUGGESTION_STATUS: SuggestionStatus = "pending"
 
+/** One comment in a suggestion's discussion thread (roadmap #55). */
+export interface SuggestionComment {
+  id: string
+  body: string
+  authorId: string
+  /** Denormalised for display, exactly like the suggestion's own `authorName`. */
+  authorName: string
+  /** Client time so an offline comment keeps its place in the thread. */
+  createdAt: TimestampLike
+  /** `null` while live; a timestamp is the tombstone shown to everyone. */
+  deletedAt: TimestampLike | null
+}
+
 export type SuggestionSong = Pick<Song, "id" | "title" | "artist">

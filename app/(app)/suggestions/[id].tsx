@@ -13,6 +13,7 @@ import { Dialog } from "@/components/ui/Dialog"
 import { EmptyState } from "@/components/ui/States"
 import { useToast } from "@/components/ui/Toast"
 import { ModalScreen } from "@/components/app/ModalScreen"
+import { CommentsBlock } from "@/components/suggestions/CommentsBlock"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
@@ -264,6 +265,15 @@ export default function SuggestionDetail() {
           onPress={() => router.push(`/songs/${suggestion.songId}`)}
         />
       ) : null}
+
+      <CommentsBlock
+        organizationId={organizationId}
+        suggestionId={suggestion.id}
+        songTitle={suggestion.songTitle}
+        currentUid={profile?.uid ?? ""}
+        isAdmin={isAdmin}
+        author={{ id: profile?.uid ?? "", name: profile?.displayName || "" }}
+      />
 
       <Dialog
         visible={rejectOpen}

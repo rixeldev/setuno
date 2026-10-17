@@ -6,7 +6,7 @@
  * history (roadmap #26), the performances' event type (roadmap #46), the
  * member-writable show log (roadmap #45), the event's attendance map and
  * "who brings what" tasks (roadmap #47) and the member-proposed date polls
- * (roadmap #48).
+ * (roadmap #48), plus the suggestion comment threads (roadmap #55).
  *
  * Run through `firebase emulators:exec --only firestore,storage "pnpm
  * test:integration"`, which starts the emulators, exports their host variables
@@ -822,6 +822,149 @@ describe("suggestions are member-written and admin-reviewed", () => {
           reviewedAt: new Date(),
           reviewNote: "Good catch",
         }),
+    )
+  })
+})
+
+describe("suggestion comments are a member discussion (#55)", () => {
+  const commentPath = (id = suggestionId) =>
+    `organizations/${orgId}/suggestions/${id}/comments`
+
+  const comment = (authorId: string, over: Record<string, unknown> = {}) => ({
+    body: "Totally agree — G is kinder to the singer",
+    authorId,
+    authorName: authorId,
+    createdAt: new Date(),
+    deletedAt: null,
+    ...over,
+  })
+
+  const seedComment = async (
+    authorId = "bob",
+    over: Record<string, unknown> = {},
+  ): Promise<string> => {
+    const id = createId("comment")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`${commentPath()}/${id}`).set(comment(authorId, over))
+    })
+    return id
+  }
+
+  const seedMember = async (uid: string): Promise<void> => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`organizations/${orgId}/members/${uid}`).set({
+        uid,
+        displayName: uid,
+        email: `${uid}@example.com`,
+        photoURL: "",
+        role: "member",
+        joinedAt: new Date(),
+        invitedBy: "",
+      })
+    })
+  }
+
+  it("lets a member comment on a suggestion", async () => {
+    const id = createId("comment")
+    await assertSucceeds(
+      bob().firestore().doc(`${commentPath()}/${id}`).set(comment("bob")),
+    )
+  })
+
+  it("stops a comment filed under someone else's name", async () => {
+    const id = createId("comment")
+    await assertFails(
+      bob().firestore().doc(`${commentPath()}/${id}`).set(comment("alice")),
+    )
+  })
+
+  it("stops an anonymous comment", async () => {
+    const id = createId("comment")
+    await assertFails(
+      guest().firestore().doc(`${commentPath()}/${id}`).set(comment("ghost")),
+    )
+  })
+
+  it("stops an empty body", async () => {
+    const id = createId("comment")
+    await assertFails(
+      bob().firestore().doc(`${commentPath()}/${id}`).set(comment("bob", { body: "" })),
+    )
+  })
+
+  it("counts the limit in characters, not bytes", async () => {
+    // 1000 accented characters must pass and 1001 must fail — the same
+    // number `sanitizeCommentBody` clamps to on the client.
+    await assertSucceeds(
+      bob()
+        .firestore()
+        .doc(`${commentPath()}/ok-${createId("comment")}`)
+        .set(comment("bob", { body: "á".repeat(1000) })),
+    )
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(`${commentPath()}/over-${createId("comment")}`)
+        .set(comment("bob", { body: "á".repeat(1001) })),
+    )
+  })
+
+  it("stops a comment carrying fields outside the whitelist", async () => {
+    const id = createId("comment")
+    await assertFails(
+      bob().firestore().doc(`${commentPath()}/${id}`).set(comment("bob", { read: true })),
+    )
+  })
+
+  it("lets the author soften their comment into a tombstone", async () => {
+    const id = await seedComment()
+    await assertSucceeds(
+      bob().firestore().doc(`${commentPath()}/${id}`).update({ deletedAt: new Date() }),
+    )
+  })
+
+  it("lets an admin remove someone else's comment", async () => {
+    const id = await seedComment("bob")
+    await assertSucceeds(
+      alice().firestore().doc(`${commentPath()}/${id}`).update({ deletedAt: new Date() }),
+    )
+  })
+
+  it("never lets a comment be edited after it is posted", async () => {
+    const id = await seedComment()
+    await assertFails(
+      bob().firestore().doc(`${commentPath()}/${id}`).update({ body: "rewritten" }),
+    )
+  })
+
+  it("never lets another member remove a comment", async () => {
+    await seedMember("charlie")
+    const id = await seedComment("bob")
+    await assertFails(
+      env
+        .authenticatedContext("charlie")
+        .firestore()
+        .doc(`${commentPath()}/${id}`)
+        .update({ deletedAt: new Date() }),
+    )
+  })
+
+  it("keeps removal irreversible", async () => {
+    const id = await seedComment("bob", { deletedAt: new Date() })
+    await assertFails(
+      bob().firestore().doc(`${commentPath()}/${id}`).update({ deletedAt: null }),
+    )
+  })
+
+  it("lets the author hard-delete — the cascade path", async () => {
+    const id = await seedComment()
+    await assertSucceeds(bob().firestore().doc(`${commentPath()}/${id}`).delete())
+  })
+
+  it("stops a non-member reading the thread", async () => {
+    await seedComment()
+    await assertFails(
+      env.authenticatedContext("mallory").firestore().collection(commentPath()).get(),
     )
   })
 })

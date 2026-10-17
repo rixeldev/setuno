@@ -19,6 +19,7 @@ export type ActivityType =
   | "suggestion_created"
   | "suggestion_accepted"
   | "suggestion_rejected"
+  | "suggestion_commented"
   | "setlist_created"
   | "setlist_updated"
   | "setlist_deleted"

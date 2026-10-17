@@ -132,6 +132,11 @@ export const paths = {
     `organizations/${orgId}/checklists/${checklistId}`,
   suggestions: (orgId: string) => `organizations/${orgId}/suggestions`,
   suggestion: (orgId: string, id: string) => `organizations/${orgId}/suggestions/${id}`,
+  /** Discussion comments on one suggestion (roadmap #55). */
+  suggestionComments: (orgId: string, id: string) =>
+    `organizations/${orgId}/suggestions/${id}/comments`,
+  suggestionComment: (orgId: string, id: string, commentId: string) =>
+    `organizations/${orgId}/suggestions/${id}/comments/${commentId}`,
   activity: (orgId: string) => `organizations/${orgId}/activity`,
   activityEvent: (orgId: string, id: string) => `organizations/${orgId}/activity/${id}`,
   invitations: (orgId: string) => `organizations/${orgId}/invitations`,
