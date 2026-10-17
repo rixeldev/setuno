@@ -80,6 +80,19 @@ describe("buildPushMessage", () => {
       expect(removed.body).not.toBe(role.body)
     }
   })
+
+  it("names the actor and the song in mentions and assignments (roadmap #58)", () => {
+    for (const lang of LANGS) {
+      for (const type of ["commentMentioned", "suggestionAssigned"] as const) {
+        const message = buildPushMessage(type, lang, {
+          actorName: "Ada",
+          songTitle: "Kinder",
+        })
+        expect(message.body).toContain("Ada")
+        expect(message.body).toContain('"Kinder"')
+      }
+    }
+  })
 })
 
 describe("chunkMessages", () => {

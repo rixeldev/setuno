@@ -49,6 +49,8 @@ const mapSuggestion = (data: Record<string, unknown>, id: string): SongSuggestio
     reviewedByName: (data.reviewedByName as string | null) ?? null,
     reviewedAt: (data.reviewedAt as SongSuggestion["reviewedAt"]) ?? null,
     reviewNote: String(data.reviewNote ?? ""),
+    // Absent on every older document: nobody assigned yet.
+    assigneeId: String(data.assigneeId ?? ""),
   }) as SongSuggestion
 
 const describeChange = (change: SuggestionChange): string => {
@@ -165,6 +167,24 @@ export const fetchSuggestion = async (
 export const countPendingSuggestions = async (organizationId: string): Promise<number> => {
   const items = await fetchSuggestions(organizationId, "pending")
   return items.length
+}
+
+/**
+ * Assigns a pending suggestion to a member — or clears the assignment with
+ * `""` (roadmap #58). One field, one update: the rules pin `assigneeId` as
+ * the only key this write may touch and only while the suggestion is
+ * pending, so review fields and the author's own edits can never ride
+ * through it. Any member may assign (self-claims included); guests cannot
+ * even see the thread.
+ */
+export const setSuggestionAssignee = async (
+  organizationId: string,
+  suggestionId: string,
+  assigneeId: string,
+): Promise<void> => {
+  await updateDoc(doc(firestore, paths.suggestion(organizationId, suggestionId)), {
+    assigneeId: assigneeId.trim(),
+  })
 }
 
 /** Rejects (or cancels) a suggestion without touching the songbook. */

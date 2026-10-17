@@ -68,7 +68,7 @@ a sidebar layout on the web.
 | **Song status** | Mark a song as **draft**, **active** or **retired** from its editor; the songbook badges the exceptions, and retired songs stay searchable everywhere while being skipped when you build a setlist — until you switch on "Include retired" in the picker |
 | **Trash and recovery** | Deleting a song from the reader moves it to the **trash** instead of destroying it: restore it anytime, or an admin can delete it — and its version history — forever. Songs left 30 days in the trash are then cleaned up automatically. Trashed songs vanish from the songbook, search and setlist pickers |
 | **Unread activity** | The band's activity feed now knows what you have seen: the Home tab carries an unread badge and opening the dashboard clears it. Each member's marker is private — the band never learns who read what |
-| **Push notifications** | Your phone buzzes when something happens in the band: new suggestions, a verdict on yours, a new event, an invitation or a membership change. Each of the five types can be switched off per account in Settings, and each device has its own on/off switch — the app never asks for permission until you flip it (native builds only; the web app keeps the preferences) |
+| **Push notifications** | Your phone buzzes when something happens in the band: new suggestions, a verdict on yours, a mention in a comment, a suggestion assigned to you, a new event, an invitation or a membership change. Each of the seven types can be switched off per account in Settings, and each device has its own on/off switch — the app never asks for permission until you flip it (native builds only; the web app keeps the preferences) |
 | **Favourite voicings** | Pin a preferred guitar position per chord; the play guide opens on it from then on (stored on your profile, not the song) |
 | **Transposition** | Move any song up/down by semitones — the stored song is never mutated |
 | **Play guide** | Tap any chord while reading to see how to play it: every guitar or ukulele position (capo-aware), the root position on a 5-string bass diagram, or the piano keys — and hear the exact voicing on screen, synthesized on the device (no samples, works offline) |
@@ -90,7 +90,7 @@ a sidebar layout on the web.
 | **Print & PDF** | Print a song or a whole setlist — with chords or lyrics only, at three text sizes — and share it as a PDF or send it straight to a printer; a setlist prints each song in the key the band actually plays it in |
 | **Share by link or QR** | Hand a song or a whole setlist to anyone: mint a public read-only link — no account needed — shown as a QR code plus a copyable URL, optionally expiring (7 or 30 days) and revocable anytime by its creator or an admin. The link opens a clean public page: the song's lyrics and chords, or the setlist's running order with its dividers, notes and play keys. Share a gig's setlist and flip **Public live setlist** on: fans watching the link see a LIVE banner with the song the band is playing right now and where in the set it sits, moving as the show runs and settling into “this is how the night ran” once the position goes quiet |
 | **Setlist running order** | Open a song from an event's setlist and step through it with corner arrows |
-| **Suggestions** | Members propose changes, admins accept/reject them with a note, and every suggestion carries an open comment thread (removed comments stay visible as "removed") |
+| **Suggestions** | Members propose changes, admins accept/reject them with a note, and every suggestion carries an open comment thread (removed comments stay visible as "removed"). In the thread, `@` a bandmate to mention them — the handle lights up and they get a push — and any member can assign the suggestion to whoever should fix it (unassigning is just as easy) |
 | **Setlists** | Build running orders — with **Set 1 / Break / Encore dividers**, a per-song note the band reads in the reader ("tune Eb") and a **goal**: target minutes with breaks counted inside, plus a live "5m left / 6m over" readout while you edit. Lists live under their events, and any list can be duplicated or saved as a **template** (45-min, acoustic, wedding) that lives outside events |
 | **Performances** | Schedule the band's events — **gigs and rehearsals**: the type is picked when creating one, a rehearsal carries its own **goals** instead of notes, both filter lists (and the calendar) by type, and only rehearsals wear the badge |
 | **RSVP & gig tasks** | Answer any event (going / maybe / can't) and see who's coming at a glance; the event also carries a live **"who brings what"** checklist — assign each task to a member or to anyone, tick it off together, and the whole band sees it update |
@@ -315,7 +315,8 @@ each tab.
   included — while suggestions, their comments, the activity feed, date polls and the checklist
   library stay plain-member: a guest reads the night, not the band's conversation.
 - Only **admins** can create/edit songs, setlists and performances; **any member** can create a
-  suggestion but nobody can resolve their own — and a guest can create nothing at all.
+  suggestion but nobody can resolve their own — and a guest can create nothing at all. A member
+  may also flip a pending suggestion's assignee and nothing else with it (one field, one update).
 - Membership is granted only through an **email-keyed invitation** that the matching authenticated
   account accepts in the same batch that creates the membership — nobody can add another person's
   account for them.

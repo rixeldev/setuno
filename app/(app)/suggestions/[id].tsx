@@ -10,6 +10,7 @@ import { Badge, Card, Chip } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
 import { Dialog } from "@/components/ui/Dialog"
+import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
 import { EmptyState } from "@/components/ui/States"
 import { useToast } from "@/components/ui/Toast"
 import { ModalScreen } from "@/components/app/ModalScreen"
@@ -17,7 +18,8 @@ import { CommentsBlock } from "@/components/suggestions/CommentsBlock"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
-import { acceptSuggestion, rejectSuggestion } from "@/services/suggestions"
+import { acceptSuggestion, rejectSuggestion, setSuggestionAssignee } from "@/services/suggestions"
+import { canCollaborate } from "@/libs/membership"
 import { toFriendlyError } from "@/services/errors"
 import { formatRelativeTime } from "@/libs/format"
 import { diffChordLine, diffWords } from "@/libs/songDiff"
@@ -48,11 +50,13 @@ export default function SuggestionDetail() {
 
   const { profile } = useAuth()
   const { organizationId, isAdmin } = useOrganization()
-  const { suggestions, songLibrary } = useOrgData()
+  const { suggestions, songLibrary, members } = useOrgData()
 
   const [rejectOpen, setRejectOpen] = useState(false)
   const [note, setNote] = useState("")
   const [busy, setBusy] = useState(false)
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [assigning, setAssigning] = useState(false)
 
   const suggestion = useMemo(
     () => suggestions.find((entry) => entry.id === suggestionId) ?? null,
@@ -61,6 +65,28 @@ export default function SuggestionDetail() {
   const song = suggestion?.songId ? (songLibrary.get(suggestion.songId) ?? null) : null
   const isAuthor = suggestion?.authorId === profile?.uid
   const canReview = isAdmin && suggestion?.status === "pending"
+
+  // Lightweight assignment (roadmap #58): a member who left the band keeps
+  // their id but no name, so the chip says so instead of inventing one — and
+  // any collaborator may reassign or clear it while the thread is pending.
+  const assigneeId = suggestion?.assigneeId ?? ""
+  const assigneeName = useMemo(() => {
+    if (!assigneeId) return ""
+    return (
+      members.find((entry) => entry.uid === assigneeId)?.displayName ??
+      t("suggestions.assigneeFormer")
+    )
+  }, [assigneeId, members, t])
+  const assignable = useMemo(() => members.filter((entry) => canCollaborate(entry.role)), [members])
+
+  const assign = (uid: string): void => {
+    if (!organizationId || !suggestion) return
+    setAssignOpen(false)
+    setAssigning(true)
+    void setSuggestionAssignee(organizationId, suggestion.id, uid)
+      .catch((error) => toast.showError(toFriendlyError(error, t("suggestions.assignError"))))
+      .finally(() => setAssigning(false))
+  }
 
   const change = suggestion?.change
   const chordDiff = change?.kind === "chord_change" ? change : null
@@ -142,6 +168,18 @@ export default function SuggestionDetail() {
             }
           />
         </View>
+
+        {/* Who owns the thread: tappable while it is open, a plain caption
+            once it is resolved (the rules only allow assigning a pending
+            suggestion). */}
+        <Chip
+          size="sm"
+          label={assigneeName || t("suggestions.unassigned")}
+          tone={assigneeName ? "primary" : "default"}
+          disabled={assigning || suggestion.status !== "pending"}
+          onPress={() => setAssignOpen(true)}
+          accessibilityLabel={t("suggestions.assignTo")}
+        />
 
         <AppText variant="subheading">{suggestion.summary}</AppText>
 
@@ -273,7 +311,29 @@ export default function SuggestionDetail() {
         currentUid={profile?.uid ?? ""}
         isAdmin={isAdmin}
         author={{ id: profile?.uid ?? "", name: profile?.displayName || "" }}
+        members={members}
       />
+
+      <BottomSheet
+        visible={assignOpen}
+        onClose={() => setAssignOpen(false)}
+        title={t("suggestions.assignTo")}
+      >
+        <SheetOptionRow
+          label={t("suggestions.unassigned")}
+          selected={!suggestion.assigneeId}
+          onPress={() => assign("")}
+        />
+        {assignable.map((member) => (
+          <SheetOptionRow
+            key={member.uid}
+            label={member.displayName}
+            hint={member.email}
+            selected={suggestion.assigneeId === member.uid}
+            onPress={() => assign(member.uid)}
+          />
+        ))}
+      </BottomSheet>
 
       <Dialog
         visible={rejectOpen}

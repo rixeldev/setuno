@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useMemo, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { useTranslation } from "react-i18next"
 
@@ -8,25 +8,36 @@ import { AppText } from "@/components/ui/AppText"
 import { Button, IconButton } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
 import { Dialog } from "@/components/ui/Dialog"
+import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
 import { Skeleton } from "@/components/ui/States"
 import { useToast } from "@/components/ui/Toast"
-import { TrashIcon } from "@/components/ui/Icons"
+import { AtIcon, TrashIcon } from "@/components/ui/Icons"
+import { MentionText } from "@/components/suggestions/MentionText"
 import { useSuggestionComments } from "@/hooks/useSuggestionComments"
 import {
   createSuggestionComment,
   deleteSuggestionComment,
 } from "@/services/suggestionComments"
 import { sanitizeCommentBody } from "@/libs/suggestionComments"
+import { canCollaborate } from "@/libs/membership"
+import { appendMention } from "@/functions/src/mentions"
 import { toFriendlyError } from "@/services/errors"
 import { formatRelativeTime } from "@/libs/format"
 import { toDate } from "@/interfaces/timestamp"
-import type { SuggestionComment } from "@/interfaces"
+import type { OrganizationMember, SuggestionComment } from "@/interfaces"
 
 /**
  * The suggestion's discussion thread (roadmap #55): every member may write,
  * removal is a tombstone ("comment removed") so the conversation keeps its
  * shape for everyone, and only the author or an admin ever sees the delete
  * control — which always asks first.
+ *
+ * Since roadmap #58 the composer can mention a bandmate: the @ button opens
+ * the roster and inserts `@handle `, handles light up in every posted
+ * comment, and the push that fires from the mention is derived by the same
+ * parser (`functions/src/mentions.ts`) this screen renders with. Guests are
+ * filtered out of the roster twice over — they cannot open this thread at
+ * all, so a mention they would never see must not resolve.
  */
 export function CommentsBlock({
   organizationId,
@@ -35,6 +46,7 @@ export function CommentsBlock({
   currentUid,
   isAdmin,
   author,
+  members,
 }: {
   organizationId: string | null
   suggestionId: string
@@ -42,6 +54,8 @@ export function CommentsBlock({
   currentUid: string
   isAdmin: boolean
   author: { id: string; name: string }
+  /** Live band roster from `useOrgData` — drives the @ picker and the highlights. */
+  members: OrganizationMember[]
 }) {
   const { t } = useTranslation()
   const styles = useThemedStyles(createStyles)
@@ -52,6 +66,17 @@ export function CommentsBlock({
   const [sending, setSending] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<SuggestionComment | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [mentionOpen, setMentionOpen] = useState(false)
+
+  const roster = useMemo(
+    () =>
+      members
+        .filter((member) => canCollaborate(member.role))
+        .map((member) => ({ uid: member.uid, displayName: member.displayName })),
+    [members],
+  )
+  // A solo band has nobody to mention — not even a ping to yourself.
+  const mentionable = roster.filter((entry) => entry.uid !== author.id)
 
   const canSend = !sending && sanitizeCommentBody(draft) !== null
 
@@ -134,7 +159,7 @@ export function CommentsBlock({
                 {t("suggestions.commentsRemoved")}
               </AppText>
             ) : (
-              <AppText variant="body">{comment.body}</AppText>
+              <MentionText body={comment.body} members={roster} />
             )}
           </View>
         )
@@ -148,6 +173,15 @@ export function CommentsBlock({
           multiline
           containerStyle={styles.composerField}
         />
+        {mentionable.length > 0 ? (
+          <IconButton
+            icon={<AtIcon size={18} color={Theme.colors.text} />}
+            label={t("suggestions.mentionMember")}
+            size={28}
+            onPress={() => setMentionOpen(true)}
+            style={styles.mentionButton}
+          />
+        ) : null}
         <Button
           label={t("suggestions.commentsSend")}
           variant="secondary"
@@ -157,6 +191,23 @@ export function CommentsBlock({
           onPress={() => void send()}
         />
       </View>
+
+      <BottomSheet
+        visible={mentionOpen}
+        onClose={() => setMentionOpen(false)}
+        title={t("suggestions.mentionMember")}
+      >
+        {mentionable.map((member) => (
+          <SheetOptionRow
+            key={member.uid}
+            label={member.displayName}
+            onPress={() => {
+              setMentionOpen(false)
+              setDraft((current) => appendMention(current, member.displayName))
+            }}
+          />
+        ))}
+      </BottomSheet>
 
       <Dialog
         visible={pendingDelete !== null}
@@ -192,4 +243,5 @@ const createStyles = () =>
       marginTop: Theme.spacing.xs,
     },
     composerField: { flex: 1 },
+    mentionButton: { marginTop: 2 },
   })

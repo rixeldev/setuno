@@ -9,9 +9,10 @@
  * (roadmap #48), the suggestion comment threads (roadmap #55), the
  * owner-only push registrations (roadmap #52), the anonymous share-link
  * snapshots (roadmap #56), the live setlist positions a member may write
- * onto them (roadmap #57) and the read-only guest role that reads the band's
+ * onto them (roadmap #57), the read-only guest role that reads the band's
  * music and logistics while every collaboration surface stays denied
- * (roadmap #59).
+ * (roadmap #59) and the one-field suggestion assignments any member writes
+ * (roadmap #58).
  *
  * Run through `firebase emulators:exec --only firestore,storage "pnpm
  * test:integration"`, which starts the emulators, exports their host variables
@@ -831,6 +832,71 @@ describe("suggestions are member-written and admin-reviewed", () => {
   })
 })
 
+describe("suggestion assignments are lightweight member writes (#58)", () => {
+  const assignPath = (id = suggestionId) => `organizations/${orgId}/suggestions/${id}`
+
+  it("lets any member assign a pending suggestion — and clear it again", async () => {
+    await assertSucceeds(
+      bob().firestore().doc(assignPath()).update({ assigneeId: "alice" }),
+    )
+    await assertSucceeds(
+      bob().firestore().doc(assignPath()).update({ assigneeId: "" }),
+    )
+  })
+
+  it("lets the author claim their own suggestion", async () => {
+    await assertSucceeds(
+      bob().firestore().doc(assignPath()).update({ assigneeId: "bob" }),
+    )
+  })
+
+  it("stops an update that touches the assignment and anything else", async () => {
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(assignPath())
+        .update({ assigneeId: "alice", summary: "Renamed" }),
+    )
+  })
+
+  it("stops assigning a suggestion that was already reviewed", async () => {
+    await assertSucceeds(
+      alice()
+        .firestore()
+        .doc(assignPath())
+        .update({
+          status: "rejected",
+          reviewedBy: "alice",
+          reviewedByName: "alice",
+          reviewedAt: new Date(),
+          reviewNote: "",
+        }),
+    )
+    await assertFails(
+      bob().firestore().doc(assignPath()).update({ assigneeId: "alice" }),
+    )
+  })
+
+  it("stops an assignee id that is not a plain uid", async () => {
+    await assertFails(
+      bob().firestore().doc(assignPath()).update({ assigneeId: "x".repeat(129) }),
+    )
+    await assertFails(
+      bob().firestore().doc(assignPath()).update({ assigneeId: 42 }),
+    )
+  })
+
+  it("stops a create smuggling the field in", async () => {
+    const id = createId("suggestion")
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(assignPath(id))
+        .set({ ...suggestion("bob"), assigneeId: "bob" }),
+    )
+  })
+})
+
 describe("suggestion comments are a member discussion (#55)", () => {
   const commentPath = (id = suggestionId) =>
     `organizations/${orgId}/suggestions/${id}/comments`
@@ -1576,7 +1642,7 @@ describe("the guest role reads the band and nothing else (roadmap #59)", () => {
     )
   })
 
-  it("stops a guest suggesting, commenting or resolving", async () => {
+  it("stops a guest suggesting, commenting, assigning or resolving", async () => {
     await seedGuest()
     const db = roger().firestore()
     await assertFails(
@@ -1594,6 +1660,9 @@ describe("the guest role reads the band and nothing else (roadmap #59)", () => {
           createdAt: new Date(),
           deletedAt: null,
         }),
+    )
+    await assertFails(
+      db.doc(`organizations/${orgId}/suggestions/${suggestionId}`).update({ assigneeId: "roger" }),
     )
     await assertFails(
       db.doc(`organizations/${orgId}/suggestions/${suggestionId}`).update({ status: "accepted" }),

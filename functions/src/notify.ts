@@ -14,6 +14,8 @@
 export const PUSH_NOTIFICATION_TYPES = [
   "suggestionCreated",
   "suggestionResolved",
+  "commentMentioned",
+  "suggestionAssigned",
   "performanceCreated",
   "invitationReceived",
   "membershipChanged",
@@ -77,6 +79,18 @@ const TEMPLATES: Record<
       title: ctx.songTitle ? `Your suggestion about "${ctx.songTitle}"` : "Your suggestion",
       body: `${ctx.actorName ?? ANONYMOUS.en.admin} ${ctx.status === "rejected" ? "rejected" : "accepted"} it.`,
     }),
+    commentMentioned: (ctx) => ({
+      title: "You were mentioned",
+      body: ctx.songTitle
+        ? `${ctx.actorName ?? ANONYMOUS.en.member} mentioned you in a comment on "${ctx.songTitle}".`
+        : `${ctx.actorName ?? ANONYMOUS.en.member} mentioned you in a suggestion's comments.`,
+    }),
+    suggestionAssigned: (ctx) => ({
+      title: "A suggestion was assigned to you",
+      body: ctx.songTitle
+        ? `${ctx.actorName ?? ANONYMOUS.en.member} assigned you the suggestion about "${ctx.songTitle}".`
+        : `${ctx.actorName ?? ANONYMOUS.en.member} assigned you a suggestion.`,
+    }),
     performanceCreated: (ctx) => ({
       title: ctx.eventName ? `New event: ${ctx.eventName}` : "New event",
       body: ctx.eventDate
@@ -108,6 +122,18 @@ const TEMPLATES: Record<
     suggestionResolved: (ctx) => ({
       title: ctx.songTitle ? `Tu sugerencia sobre "${ctx.songTitle}"` : "Tu sugerencia",
       body: `${ctx.actorName ?? ANONYMOUS.es.admin} la ${ctx.status === "rejected" ? "rechazó" : "aceptó"}.`,
+    }),
+    commentMentioned: (ctx) => ({
+      title: "Te mencionaron",
+      body: ctx.songTitle
+        ? `${ctx.actorName ?? ANONYMOUS.es.member} te mencionó en un comentario sobre "${ctx.songTitle}".`
+        : `${ctx.actorName ?? ANONYMOUS.es.member} te mencionó en los comentarios de una sugerencia.`,
+    }),
+    suggestionAssigned: (ctx) => ({
+      title: "Te asignaron una sugerencia",
+      body: ctx.songTitle
+        ? `${ctx.actorName ?? ANONYMOUS.es.member} te asignó la sugerencia sobre "${ctx.songTitle}".`
+        : `${ctx.actorName ?? ANONYMOUS.es.member} te asignó una sugerencia.`,
     }),
     performanceCreated: (ctx) => ({
       title: ctx.eventName ? `Evento nuevo: ${ctx.eventName}` : "Evento nuevo",

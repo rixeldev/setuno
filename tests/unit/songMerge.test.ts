@@ -92,6 +92,7 @@ const suggestion = (id: string, songId: string | null): SongSuggestion => ({
   createdAt: TIMESTAMP,
   reviewedBy: null,
   reviewedByName: null,
+  assigneeId: "",
   reviewedAt: null,
   reviewNote: "",
 })

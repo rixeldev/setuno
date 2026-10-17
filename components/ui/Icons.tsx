@@ -710,3 +710,8 @@ export const UndoIcon = ({ size = 24, color = Theme.colors.text, ...rest }: Icon
 export const RedoIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
   <MaterialCommunityIcons name="redo-variant" size={size} color={color} {...rest} />
 )
+
+/** Mention a bandmate in a suggestion comment (roadmap #58). */
+export const AtIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="at" size={size} color={color} {...rest} />
+)

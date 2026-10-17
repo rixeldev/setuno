@@ -66,6 +66,13 @@ export interface SongSuggestion {
   reviewedByName: string | null
   reviewedAt: TimestampLike | null
   reviewNote: string
+  /**
+   * Lightweight assignment (roadmap #58): the uid of the member who owns the
+   * thread, `""` while unassigned. Absent on every older document (reads
+   * back as `""`), written only through `setSuggestionAssignee` — a one-field
+   * update the rules pin to a pending suggestion.
+   */
+  assigneeId: string
 }
 
 /** Fields a member supplies when submitting a suggestion. */

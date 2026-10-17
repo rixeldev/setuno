@@ -25,7 +25,7 @@ import {
  * Push notification preferences (roadmap #52): the OS permission state and
  * the per-device master switch (turning it off deletes this install's device
  * document — the absence *is* the off state, so the silent refresh on app
- * start can never turn it back on), plus the five per-account opt-outs that
+ * start can never turn it back on), plus the per-account opt-outs that
  * follow the user to every device. The device state is one local read; the
  * preferences ride the subscribed profile and write through
  * `updatePreferences`.
@@ -66,6 +66,14 @@ export default function NotificationsSettingsScreen() {
     suggestionResolved: {
       label: t("settings.notifySuggestionResolved"),
       hint: t("settings.notifySuggestionResolvedHint"),
+    },
+    commentMentioned: {
+      label: t("settings.notifyCommentMentioned"),
+      hint: t("settings.notifyCommentMentionedHint"),
+    },
+    suggestionAssigned: {
+      label: t("settings.notifySuggestionAssigned"),
+      hint: t("settings.notifySuggestionAssignedHint"),
     },
     performanceCreated: {
       label: t("settings.notifyPerformanceCreated"),

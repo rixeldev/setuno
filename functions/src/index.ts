@@ -7,6 +7,7 @@ import {
   onDocumentCreated,
   onDocumentDeleted,
   onDocumentUpdated,
+  onDocumentUpdatedWithAuthContext,
 } from "firebase-functions/v2/firestore"
 import { HttpsError, onCall } from "firebase-functions/v2/https"
 import { onSchedule } from "firebase-functions/v2/scheduler"
@@ -37,6 +38,7 @@ import {
   type PushLanguage,
   type PushNotificationType,
 } from "./notify"
+import { extractMentionUids, type MentionMember } from "./mentions"
 import { sendExpoPush, type ExpoPushMessage } from "./expoPush"
 
 initializeApp()
@@ -70,7 +72,7 @@ export const purgeTrashedSongs = onSchedule(
 // ---------------------------------------------------------------------------
 // Push notifications (roadmap #52)
 //
-// Five band events fan out to the members whose preferences allow them, via
+// The band's events fan out to the members whose preferences allow them, via
 // their registered devices (`users/{uid}/devices`, one doc per install). Every
 // send is best-effort: a push provider hiccup must never look like a broken
 // write, so each recipient is wrapped and logged instead of thrown. The
@@ -98,6 +100,26 @@ const memberUids = async (
 const bandNameOf = async (db: Firestore, organizationId: string): Promise<string | undefined> => {
   const organization = await db.doc(`organizations/${organizationId}`).get()
   return text(organization.data()?.name)
+}
+
+/**
+ * The roster `@mentions` resolve against (roadmap #58): every collaborator's
+ * display name — guests excluded, because they read the night but never the
+ * suggestions surface, so a mention they cannot open would only be noise. The
+ * app's composer filters the same way through `canCollaborate`, so the handle
+ * a member can tap and the handle this trigger notifies are one set.
+ */
+const memberRoster = async (
+  db: Firestore,
+  organizationId: string,
+): Promise<MentionMember[]> => {
+  const snapshot = await db.collection(`organizations/${organizationId}/members`).get()
+  return snapshot.docs
+    .filter((member) => member.data().role !== "guest")
+    .map((member) => ({
+      uid: member.id,
+      displayName: text(member.data().displayName) ?? "",
+    }))
 }
 
 /**
@@ -202,6 +224,71 @@ export const onSuggestionResolved = onDocumentUpdated(
         songTitle: text(after.songTitle),
         bandName: await bandNameOf(db, event.params.organizationId),
         status: after.status === "rejected" ? "rejected" : "accepted",
+      },
+      event.params.organizationId,
+    )
+  },
+)
+
+/** New `@mention` in a comment (roadmap #58): each mentioned member once.
+ * The parse is `mentions.ts` — the very code the composer and the comment
+ * renderer use — so nobody is notified for a handle the thread does not light
+ * up, and the comment's own author never pings themselves. */
+export const onSuggestionCommentCreated = onDocumentCreated(
+  "organizations/{organizationId}/suggestions/{suggestionId}/comments/{commentId}",
+  async (event) => {
+    const comment = event.data?.data()
+    if (!comment || comment.deletedAt) return
+    const body = text(comment.body)
+    if (!body) return
+    const db = getFirestore()
+    const roster = await memberRoster(db, event.params.organizationId)
+    const authorId = text(comment.authorId)
+    const mentioned = extractMentionUids(body, roster).filter((uid) => uid !== authorId)
+    if (mentioned.length === 0) return
+    const suggestion = await db
+      .doc(`organizations/${event.params.organizationId}/suggestions/${event.params.suggestionId}`)
+      .get()
+    await notifyUsers(
+      db,
+      mentioned,
+      "commentMentioned",
+      {
+        actorName: text(comment.authorName),
+        songTitle: text(suggestion.data()?.songTitle),
+        bandName: await bandNameOf(db, event.params.organizationId),
+      },
+      event.params.organizationId,
+    )
+  },
+)
+
+/** Suggestion assigned (roadmap #58): the new assignee, once, and never the
+ * member who claimed it for themselves. The rules pin the assignment to a
+ * one-field update on a pending suggestion, so any `assigneeId` change here
+ * is a real hand-off; the actor rides the write's auth context
+ * (`authId` is the signed-in uid a member's client write always carries —
+ * Firestore reports it under the generic "unknown" auth type). */
+export const onSuggestionAssigned = onDocumentUpdatedWithAuthContext(
+  "organizations/{organizationId}/suggestions/{suggestionId}",
+  async (event) => {
+    const before = event.data?.before.data()
+    const after = event.data?.after.data()
+    if (!before || !after) return
+    const assigneeId = text(after.assigneeId)
+    if (!assigneeId || assigneeId === text(before.assigneeId)) return
+    const actorUid = event.authId ?? null
+    if (actorUid && assigneeId === actorUid) return
+    const db = getFirestore()
+    const actor = actorUid ? await db.doc(`users/${actorUid}`).get() : null
+    await notifyUsers(
+      db,
+      [assigneeId],
+      "suggestionAssigned",
+      {
+        actorName: text(actor?.data()?.displayName),
+        songTitle: text(after.songTitle),
+        bandName: await bandNameOf(db, event.params.organizationId),
       },
       event.params.organizationId,
     )

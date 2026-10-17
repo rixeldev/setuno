@@ -53,7 +53,8 @@ export interface UserPreferences {
    * type missing from it — means *enabled*, so every profile created before
    * #52 keeps receiving everything with no migration, exactly the contract
    * `functions/src/notify.ts#pushTypeEnabled` applies on every send. The
-   * notifications screen always writes the whole five-type map.
+   * notifications screen always writes the whole `PUSH_NOTIFICATION_TYPES`
+   * map.
    */
   notifications?: Partial<Record<PushNotificationType, boolean>>
 }

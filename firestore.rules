@@ -811,6 +811,14 @@ service cloud.firestore {
 
         // Admins review; authors may still edit or withdraw their own pending
         // suggestion but cannot resolve it themselves.
+        //
+        // Lightweight assignments (roadmap #58) are the third door: any
+        // member — the author included, "I'll take it" — may flip
+        // `assigneeId` and nothing else, and only while the thread is open.
+        // A field-level carve-out in the #57 `live` pointer's own shape; the
+        // value is a uid or the empty string (unassign), and the rules cannot
+        // walk the roster, so *whose* uid it is stays client-side — the
+        // picker only ever offers real members.
         allow update: if (isAdmin(organizationId)
                           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                             'status', 'reviewedBy', 'reviewedByName', 'reviewedAt',
@@ -821,7 +829,13 @@ service cloud.firestore {
               && resource.data.status == 'pending'
               && request.resource.data.status == 'pending'
               && request.resource.data.diff(resource.data).affectedKeys()
-                   .hasOnly(['comment', 'summary', 'change', 'type', 'songTitle']));
+                   .hasOnly(['comment', 'summary', 'change', 'type', 'songTitle']))
+          || (isMember(organizationId)
+              && resource.data.status == 'pending'
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['assigneeId'])
+              && request.resource.data.assigneeId is string
+              && request.resource.data.assigneeId.size() <= 128);
 
         allow delete: if isAdmin(organizationId)
           || (isSelf(resource.data.authorId) && resource.data.status == 'pending');

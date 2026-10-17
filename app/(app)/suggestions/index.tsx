@@ -41,7 +41,7 @@ export default function SuggestionsScreen() {
   const router = useRouter()
   const { profile } = useAuth()
   const { isAdmin } = useOrganization()
-  const { suggestions, pendingSuggestions, loading, error } = useOrgData()
+  const { suggestions, pendingSuggestions, loading, error, members } = useOrgData()
   const [filter, setFilter] = useState<Filter>(isAdmin ? "pending" : "mine")
 
   const visible = useMemo(() => {
@@ -96,39 +96,49 @@ export default function SuggestionsScreen() {
         />
       ) : (
         <View style={styles.list}>
-          {visible.map((suggestion) => (
-            <Card
-              key={suggestion.id}
-              onPress={() => router.push(`/suggestions/${suggestion.id}`)}
-              accessibilityLabel={t("suggestions.cardA11y", {
-                song: suggestion.songTitle || t("suggestions.newSongLower"),
-                author: suggestion.authorName,
-              })}
-              style={{ gap: Theme.spacing.s }}
-            >
-              <View style={styles.row}>
-                <View style={styles.flex}>
-                  <AppText variant="bodyStrong" numberOfLines={1}>
-                    {suggestion.songTitle || t("suggestions.newSong")}
-                  </AppText>
-                  <AppText variant="caption" tone="muted" numberOfLines={1}>
-                    {suggestion.authorName} · {formatRelativeTime(toDate(suggestion.createdAt))}
-                  </AppText>
+          {visible.map((suggestion) => {
+            // Lightweight assignment (roadmap #58): who owns the thread, as
+            // one more fragment of the caption line. A member who left keeps
+            // the id, so the row says so rather than dropping the fact.
+            const assignee = suggestion.assigneeId ?
+              (members.find((entry) => entry.uid === suggestion.assigneeId)?.displayName ??
+                t("suggestions.assigneeFormer"))
+            : ""
+            return (
+              <Card
+                key={suggestion.id}
+                onPress={() => router.push(`/suggestions/${suggestion.id}`)}
+                accessibilityLabel={t("suggestions.cardA11y", {
+                  song: suggestion.songTitle || t("suggestions.newSongLower"),
+                  author: suggestion.authorName,
+                })}
+                style={{ gap: Theme.spacing.s }}
+              >
+                <View style={styles.row}>
+                  <View style={styles.flex}>
+                    <AppText variant="bodyStrong" numberOfLines={1}>
+                      {suggestion.songTitle || t("suggestions.newSong")}
+                    </AppText>
+                    <AppText variant="caption" tone="muted" numberOfLines={1}>
+                      {suggestion.authorName} · {formatRelativeTime(toDate(suggestion.createdAt))}
+                      {assignee ? ` · ${t("suggestions.assignedToShort", { name: assignee })}` : ""}
+                    </AppText>
+                  </View>
+                  <Badge label={t(`suggestions.${suggestion.status}`)} tone={STATUS_TONES[suggestion.status]} />
                 </View>
-                <Badge label={t(`suggestions.${suggestion.status}`)} tone={STATUS_TONES[suggestion.status]} />
-              </View>
 
-              <AppText variant="caption" tone="faint" numberOfLines={2}>
-                {suggestion.summary}
-              </AppText>
-
-              {suggestion.comment.trim().length > 0 ? (
-                <AppText variant="caption" tone="muted" numberOfLines={2}>
-                  “{suggestion.comment}”
+                <AppText variant="caption" tone="faint" numberOfLines={2}>
+                  {suggestion.summary}
                 </AppText>
-              ) : null}
-            </Card>
-          ))}
+
+                {suggestion.comment.trim().length > 0 ? (
+                  <AppText variant="caption" tone="muted" numberOfLines={2}>
+                    “{suggestion.comment}”
+                  </AppText>
+                ) : null}
+              </Card>
+            )
+          })}
         </View>
       )}
     </ModalScreen>
