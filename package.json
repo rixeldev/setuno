@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "assets:generate": "node scripts/generate-assets.mjs",
     "assets:store": "node scripts/generate-store-assets.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && pnpm --dir functions run typecheck",
     "lint": "expo lint",
     "lint:fix": "expo lint --fix",
     "test": "vitest run --project unit",
@@ -20,6 +20,8 @@
     "deploy:rules": "npx firebase-tools@latest deploy --only firestore:rules",
     "deploy:indexes": "npx firebase-tools@latest deploy --only firestore:indexes",
     "deploy:storage": "npx firebase-tools@latest deploy --only storage",
+    "deploy:functions": "pnpm --dir functions run build && npx firebase-tools@latest deploy --only functions",
+    "serve:functions": "pnpm --dir functions run build && npx firebase-tools@latest emulators:start --only functions,firestore",
     "export:web": "node scripts/ensure-firebase-config.mjs && expo export --platform web"
   },
   "dependencies": {

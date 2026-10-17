@@ -38,6 +38,8 @@ pnpm export:web         # production web export
 pnpm deploy:rules       # publish firestore.rules to the pinned project
 pnpm deploy:indexes     # publish firestore.indexes.json
 pnpm deploy:storage     # publish storage.rules
+pnpm deploy:functions   # build + publish the Cloud Functions workspace
+pnpm serve:functions    # build + run the functions & firestore emulators
 pnpm assets:store [es|en] # Play Store graphics from docs/images captures
 npx expo-doctor         # diagnose dependency and config issues
 ```
@@ -122,6 +124,12 @@ npx expo-doctor         # diagnose dependency and config issues
 - **Private annotations** (`users/{uid}/annotations/{songId}` — free-form `notes` plus inline `markers`) are the same trust model: owner-only, whitelisted by `annotationKeys()`/`validAnnotation()`, never written to the shared song document. Rules cannot iterate the `markers` list, so the document-level shape (types + `2000`/`50` limits) is pinned there and each entry's contents are validated client-side in `libs/annotations.ts#annotationFromData`. Touch either side and redeploy the rules with `pnpm deploy:rules`.
 - `firebase deploy --only firestore:indexes` replaces the remote index set with the file, so keep `firestore.indexes.json` up to date before deploying (otherwise unlisted composite indexes are removed).
 
+## Cloud Functions
+
+- The **functions workspace** (`functions/`, roadmap P0.1) is a **pnpm workspace member** (`pnpm-workspace.yaml`'s `packages`): one root `pnpm install` covers app and functions, everything hoists flat, and `pnpm typecheck` chains the functions `tsc` — CI needed no workflow change. Runtime is **Node 22** (`engines`; current Firebase docs: 22/20 supported, 18 deprecated), `firebase-functions@^7` + `firebase-admin@^14`, `nodenext` compiling CommonJS into `functions/lib/` (gitignored). The root eslint config lints `functions/src` with the **same rules as the app** — no semicolons, and no `console`: log through `firebase-functions`' `logger`.
+- **The first function is `purgeTrashedSongs`** (`functions/src/index.ts`, the scheduled half of #31's trash): every day at 04:17 UTC it deletes the songs whose `deletedAt` is 30 days old plus their `versions` — the exact `purgeSong` cascade; the per-user documents keyed by the song id stay behind, like a manual purge. The pure core is `functions/src/purge.ts` (`purgeExpiredSongs(db, now)` takes the Firestore instance as an argument, so the integration suite runs the real query and cascade straight against the emulator through firebase-admin, in its own `demo-*` namespace). The Admin SDK bypasses the rules: **no rules change ever ships with a function**. Live songs are spared by *two* range filters on `deletedAt` (`> epoch` and `< cutoff`) because `null` — what `restoreSong` writes — orders before every timestamp and would match an upper bound alone; `tests/integration/trashPurge.test.ts` pins both live shapes.
+- `pnpm deploy:functions` builds then deploys — **the project must be on the Blaze plan** (Cloud Functions + Cloud Scheduler are not available on Spark). On deploy firebase-tools falls back to npm inside `functions/` (the pnpm lockfile lives at the workspace root); the stray `package-lock.json` there is gitignored. `pnpm serve:functions` runs the functions + firestore emulators locally. Future push triggers, IAP validation, account deletion, share tokens and scheduled cleanup all live in this workspace — never in app code.
+
 ## Internationalization
 
 - i18next is configured in `services/i18next.ts`; locale bundles are `locales/en.json` and `locales/es.json`.
@@ -158,8 +166,9 @@ npx expo-doctor         # diagnose dependency and config issues
   `BottomSheet` with Restore / Delete forever, the latter behind a `danger` `Dialog`), and
   `songLibrary` deliberately keeps both sides so setlists and annotations still resolve a trashed
   song's id. The rules' songs update whitelist carries `deletedAt`/`deletedBy` → **needs
-  `pnpm deploy:rules`**. The **scheduled 30-day hard-delete is still Phase 0** (Cloud Functions
-  workspace): until it ships the trash holds forever and purging is manual.
+  `pnpm deploy:rules`**. The **scheduled 30-day hard-delete ships with the functions workspace**
+  (roadmap P0.1): `purgeTrashedSongs` purges the expired trash daily with the same cascade, so the
+  trash holds forever only until that function is deployed — see the Cloud Functions section.
 - **The activity feed knows what you have read** (roadmap #53): one personal marker per band at
   `users/{uid}/activityRead/{orgId}` — `services/activity.ts#subscribeActivityRead` +
   `#markActivityRead` (**client** time, exactly like a trashed song or a version's `savedAt`: a

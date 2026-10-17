@@ -1,3 +1,11 @@
+# The Cloud Functions workspace (roadmap P0.1) is a member package, so one
+# root install covers app and functions and everything hoists flat (the
+# Android CMake path limit, see below, only ever hit native code — functions
+# has none). firebase-admin/firebase-functions never reach the app bundle:
+# nothing in the app imports them, Metro only follows imports.
+packages:
+  - functions
+
 allowBuilds:
   '@firebase/util': false
   protobufjs: false

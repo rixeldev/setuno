@@ -37,6 +37,12 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Cloud Functions (roadmap P0.1): the build output is generated on deploy,
+# and firebase-tools' npm fallback drops its own lockfile here (the deploy
+# installs in functions/ without a pnpm one in that directory).
+functions/lib/
+functions/package-lock.json
+
 # generated native folders (Continuous Native Generation)
 /ios
 /android

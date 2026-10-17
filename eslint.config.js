@@ -8,7 +8,9 @@ module.exports = defineConfig([
   // only scopes those rules. Its own object makes them global, so the build
   // output and the node-only scripts stay out of the linter.
   {
-    ignores: ["dist/*", "scripts/*", ".expo/*"],
+    // The functions workspace lints its TypeScript like the rest of the app
+    // (same rules), but `functions/lib` is the tsc output the deploy builds.
+    ignores: ["dist/*", "scripts/*", ".expo/*", "functions/lib/*"],
   },
   {
     rules: {
