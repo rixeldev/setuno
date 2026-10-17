@@ -87,6 +87,7 @@ a sidebar layout on the web.
 | **Reference links** | Optional YouTube / Spotify / Apple Music links per song, edited under “More details” and opened in the matching app from the reader (no embedding) |
 | **ChordPro import/export** | Paste a ChordPro document into the song form to load its lyrics and chords, and export any song back to a `.cho` file from the reader |
 | **Print & PDF** | Print a song or a whole setlist — with chords or lyrics only, at three text sizes — and share it as a PDF or send it straight to a printer; a setlist prints each song in the key the band actually plays it in |
+| **Share by link or QR** | Hand a song or a whole setlist to anyone: mint a public read-only link — no account needed — shown as a QR code plus a copyable URL, optionally expiring (7 or 30 days) and revocable anytime by its creator or an admin. The link opens a clean public page: the song's lyrics and chords, or the setlist's running order with its dividers, notes and play keys |
 | **Setlist running order** | Open a song from an event's setlist and step through it with corner arrows |
 | **Suggestions** | Members propose changes, admins accept/reject them with a note, and every suggestion carries an open comment thread (removed comments stay visible as "removed") |
 | **Setlists** | Build running orders — with **Set 1 / Break / Encore dividers**, a per-song note the band reads in the reader ("tune Eb") and a **goal**: target minutes with breaks counted inside, plus a live "5m left / 6m over" readout while you edit. Lists live under their events, and any list can be duplicated or saved as a **template** (45-min, acoustic, wedding) that lives outside events |
@@ -145,6 +146,11 @@ service imports the shared app from `db/Fire.ts`. On CI (Vercel), the file is ge
 
 For Android Google Sign-In, copy `.env.example` to `.env` and set `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`
 (Firebase Console → Authentication → Google → Web client ID), and register the app's SHA-1 in Firebase.
+
+For **native builds**, also set `EXPO_PUBLIC_WEB_BASE_URL` to the deployed web address (for example
+`https://setuno.vercel.app`): share links point at the public `/share/<token>` page, the browser
+knows its own origin but a phone build does not. Without it the share sheet still opens and
+explains that this build cannot mint a link.
 
 Web additionally resolves `@react-native-firebase/*` through Metro shims (see
 [Architecture](#architecture)), so the same code runs unmodified in the browser.

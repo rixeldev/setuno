@@ -148,6 +148,11 @@ export const paths = {
   activityEvent: (orgId: string, id: string) => `organizations/${orgId}/activity/${id}`,
   invitations: (orgId: string) => `organizations/${orgId}/invitations`,
   invitation: (orgId: string, id: string) => `organizations/${orgId}/invitations/${id}`,
+  /**
+   * Public share snapshots (roadmap #56), keyed by their unguessable token —
+   * readable by anyone holding the exact id, unreachable by listing.
+   */
+  share: (token: string) => `shares/${token}`,
 } as const
 
 /** Currently signed-in uid, or null when signed out. */

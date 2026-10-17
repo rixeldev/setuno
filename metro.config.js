@@ -18,6 +18,7 @@ const WEB_SHIMS = {
   "@react-native-firebase/app": path.resolve(SHIMS_DIR, "firebase-app.web.ts"),
   "@react-native-firebase/auth": path.resolve(SHIMS_DIR, "firebase-auth.web.ts"),
   "@react-native-firebase/firestore": path.resolve(SHIMS_DIR, "firebase-firestore.web.ts"),
+  "@react-native-firebase/functions": path.resolve(SHIMS_DIR, "firebase-functions.web.ts"),
   "@react-native-firebase/storage": path.resolve(SHIMS_DIR, "firebase-storage.web.ts"),
   "firebase/auth": path.resolve(SHIMS_DIR, "firebase-auth-persistence.web.ts"),
 }

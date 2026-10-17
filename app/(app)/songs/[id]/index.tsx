@@ -35,6 +35,7 @@ import {
   PauseIcon,
   PlayFilledIcon,
   PrintIcon,
+  ShareIcon,
   StarFilledIcon,
   StarIcon,
   SuggestIcon,
@@ -57,6 +58,7 @@ import { MetronomeSheet } from "@/components/songs/MetronomeSheet"
 import { SectionLoopSheet, type LoopSection } from "@/components/songs/SectionLoopSheet"
 import { PrintSheet } from "@/components/songs/PrintSheet"
 import { AddToCollectionSheet } from "@/components/collections/AddToCollectionSheet"
+import { ShareSheet } from "@/components/shares/ShareSheet"
 import { ReaderDock, READER_DOCK_HEIGHT } from "@/components/songs/ReaderDock"
 import { AnnotationsBlock } from "@/components/annotations/AnnotationsBlock"
 import { useToast } from "@/components/ui/Toast"
@@ -160,6 +162,7 @@ export default function SongScreen() {
   const [duplicating, setDuplicating] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
   const [addToCollection, setAddToCollection] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   // The control tray ships shut: the lyrics are the screen, everything else is
   // one tap away (roadmap redesign of the song screen).
   const [controlsOpen, setControlsOpen] = useState(false)
@@ -1208,6 +1211,18 @@ export default function SongScreen() {
                 </AppText>
               </Pressable>
 
+              <Pressable
+                onPress={() => setShareOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel={t("shares.shareA11y", { title: song.title })}
+                style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
+              >
+                <ShareIcon size={15} color={Theme.colors.textMuted} />
+                <AppText variant="caption" tone="muted">
+                  {t("shares.title")}
+                </AppText>
+              </Pressable>
+
               {isAdmin ? (
                 <>
                   <Pressable
@@ -1353,6 +1368,15 @@ export default function SongScreen() {
         visible={addToCollection}
         onClose={() => setAddToCollection(false)}
         song={song}
+      />
+
+      <ShareSheet
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        kind="song"
+        organizationId={song.organizationId}
+        sourceId={song.id}
+        title={song.title}
       />
 
       <MetronomeSheet

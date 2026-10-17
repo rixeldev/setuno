@@ -1,14 +1,27 @@
+import { randomBytes } from "crypto"
 import { initializeApp } from "firebase-admin/app"
-import { type Firestore, getFirestore } from "firebase-admin/firestore"
+import { Timestamp, type Firestore, getFirestore } from "firebase-admin/firestore"
 import { logger } from "firebase-functions/v2"
 import {
   onDocumentCreated,
   onDocumentDeleted,
   onDocumentUpdated,
 } from "firebase-functions/v2/firestore"
+import { HttpsError, onCall } from "firebase-functions/v2/https"
 import { onSchedule } from "firebase-functions/v2/scheduler"
 
 import { TRASH_TTL_DAYS, purgeExpiredSongs } from "./purge"
+import {
+  SHARE_EXPIRY_DAYS,
+  SHARE_PAYLOAD_BYTES_MAX,
+  SHARE_VERSION,
+  isShareToken,
+  sanitizeShareTitle,
+  sanitizeSharedSetlist,
+  sanitizeSharedSong,
+  shareExpiryAt,
+  type ShareKind,
+} from "./shares"
 import {
   buildPushMessage,
   isPushLanguage,
@@ -283,3 +296,161 @@ export const onMemberRemoved = onDocumentDeleted(
     )
   },
 )
+
+// --------------------------------------------------------------- share links
+//
+// Roadmap #56: a member publishes a song or setlist as a read-only link.
+// `shares/{token}` is written only from the *stored source document* through
+// the Admin SDK — never from caller-supplied content — so a payload cannot be
+// fabricated, and it bypasses the security rules exactly like every other
+// Admin SDK write: `firestore.rules` grants an anonymous `get` by exact token
+// and denies listing, so holding the link is the only way to reach it.
+
+/** 16 random bytes as base64url — 22 path-safe characters, 128 bits of entropy. */
+const SHARE_TOKEN_BYTES = 16
+
+const readCallInput = (data: unknown): Record<string, unknown> =>
+  typeof data === "object" && data !== null ? (data as Record<string, unknown>) : {}
+
+/**
+ * Publish (or refresh) the band's link for one song or setlist. Idempotent per
+ * source: an active link keeps its token while its snapshot and expiry are
+ * rewritten in place, so "share again" never hands out a second URL — expired
+ * twins and duplicates are cleaned up in the same batch.
+ */
+export const createShare = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to share")
+  const uid = request.auth.uid
+  const data = readCallInput(request.data)
+
+  const kind: ShareKind | null =
+    data.kind === "song" || data.kind === "setlist" ? data.kind : null
+  const organizationId = typeof data.organizationId === "string" ? data.organizationId : ""
+  const sourceId = typeof data.sourceId === "string" ? data.sourceId : ""
+  if (
+    !kind ||
+    organizationId.length === 0 ||
+    organizationId.length > 128 ||
+    sourceId.length === 0 ||
+    sourceId.length > 128
+  ) {
+    throw new HttpsError("invalid-argument", "kind, organizationId and sourceId are required")
+  }
+  let expiresInDays: number | null = null
+  const rawDays = data.expiresInDays
+  if (rawDays !== null && rawDays !== undefined) {
+    if (typeof rawDays !== "number" || !SHARE_EXPIRY_DAYS.includes(rawDays)) {
+      throw new HttpsError("invalid-argument", "Unsupported expiry")
+    }
+    expiresInDays = rawDays
+  }
+
+  const db = getFirestore()
+  // Membership first: sharing publishes band content to the world, so the
+  // caller must belong to the band that owns the source.
+  const member = await db.doc(`organizations/${organizationId}/members/${uid}`).get()
+  if (!member.exists) throw new HttpsError("permission-denied", "You are not a member of this band")
+
+  const sourceRef =
+    kind === "song"
+      ? db.doc(`organizations/${organizationId}/songs/${sourceId}`)
+      : db.doc(`organizations/${organizationId}/setlists/${sourceId}`)
+  const source = await sourceRef.get()
+  if (!source.exists) throw new HttpsError("not-found", "That song or setlist no longer exists")
+  const raw = source.data() ?? {}
+  if (kind === "song" && raw.deletedAt !== null && raw.deletedAt !== undefined) {
+    throw new HttpsError("failed-precondition", "Restore the song from the trash to share it")
+  }
+
+  const title = sanitizeShareTitle(raw.title)
+  const payload = kind === "song" ? sanitizeSharedSong(raw) : sanitizeSharedSetlist(raw)
+  if (Buffer.byteLength(JSON.stringify(payload), "utf8") > SHARE_PAYLOAD_BYTES_MAX) {
+    throw new HttpsError("resource-exhausted", "This share is too large to publish")
+  }
+
+  const now = Timestamp.now()
+  const expiresMs = shareExpiryAt(expiresInDays, now.toMillis())
+  const expiresAt = expiresMs === null ? null : Timestamp.fromMillis(expiresMs)
+
+  const existing = await db
+    .collection("shares")
+    .where("kind", "==", kind)
+    .where("organizationId", "==", organizationId)
+    .where("sourceId", "==", sourceId)
+    .get()
+  // Keep exactly one live link (lowest token, so every caller agrees on which)
+  // and delete the rest: whatever is expired is dead, whatever else is live is
+  // a duplicate from before this contract existed.
+  const live = existing.docs
+    .filter((entry) => {
+      const expires = entry.data().expiresAt as Timestamp | null | undefined
+      return !expires || expires.toMillis() > now.toMillis()
+    })
+    .sort((a, b) => (a.id < b.id ? -1 : 1))
+  const kept = live[0]
+
+  const batch = db.batch()
+  let token: string
+  if (kept) {
+    token = kept.id
+    batch.update(kept.ref, {
+      version: SHARE_VERSION,
+      title,
+      payload,
+      createdBy: uid,
+      expiresAt,
+      updatedAt: now,
+    })
+  } else {
+    token = randomBytes(SHARE_TOKEN_BYTES).toString("base64url")
+    batch.set(db.doc(`shares/${token}`), {
+      version: SHARE_VERSION,
+      kind,
+      organizationId,
+      sourceId,
+      title,
+      payload,
+      createdBy: uid,
+      createdAt: now,
+      updatedAt: now,
+      expiresAt,
+    })
+  }
+  for (const extra of existing.docs) {
+    if (!kept || extra.id !== kept.id) batch.delete(extra.ref)
+  }
+  await batch.commit()
+
+  return { token, expiresAt: expiresMs, reused: Boolean(kept) }
+})
+
+/**
+ * Kill a link for good (the document is deleted, so the public `get` finds
+ * nothing). The link's creator may revoke it, and so may any admin of the band
+ * it belongs to — "revocable" in the roadmap means either can pull it back.
+ * Missing tokens answer `revoked: true`: a second tap stays a no-op.
+ */
+export const revokeShare = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to revoke a link")
+  const uid = request.auth.uid
+  const data = readCallInput(request.data)
+  if (!isShareToken(data.token)) {
+    throw new HttpsError("invalid-argument", "token is required")
+  }
+
+  const db = getFirestore()
+  const ref = db.doc(`shares/${data.token}`)
+  const share = await ref.get()
+  if (!share.exists) return { revoked: true }
+
+  const snapshot = share.data() ?? {}
+  if (snapshot.createdBy !== uid) {
+    const organizationId = typeof snapshot.organizationId === "string" ? snapshot.organizationId : ""
+    const member = await db.doc(`organizations/${organizationId}/members/${uid}`).get()
+    if (member.data()?.role !== "admin") {
+      throw new HttpsError("permission-denied", "Only the creator or an admin can revoke this link")
+    }
+  }
+  await ref.delete()
+  return { revoked: true }
+})

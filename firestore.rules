@@ -24,6 +24,7 @@ rules_version = '2';
  *   organizations/{organizationId}/suggestions/{suggestionId}/comments
  *   organizations/{organizationId}/activity
  *   organizations/{organizationId}/invitations/{lowercased email}
+ *   shares/{token}                                    public share snapshot (#56)
  *
  * Invariants enforced here:
  *   • only members can read anything inside their band;
@@ -37,7 +38,10 @@ rules_version = '2';
  *     matching authenticated account can accept, in the same batch that creates
  *     the membership;
  *   • `users/{uid}` is private: no client can look up another person's account,
- *     which is what keeps invite-by-email honest.
+ *     which is what keeps invite-by-email honest;
+ *   • `shares/{token}` is the only anonymous read: a public link works signed
+ *     out, dies at its deadline, and can never be listed or written by a client
+ *     (roadmap #56).
  */
 
 service cloud.firestore {
@@ -804,6 +808,28 @@ service cloud.firestore {
         // The feed stays append-only, except while the owner deletes the band.
         allow delete: if ownerIsDeletingOrganization(organizationId);
       }
+    }
+
+    // ---------------------------------------------------------------- shares
+    //
+    // Public share links (roadmap #56): `shares/{token}` holds a denormalized,
+    // read-only snapshot of one song or setlist. The document is written only
+    // by the `createShare` callable through the Admin SDK — which bypasses
+    // these rules, and that is exactly why no write rule exists — and the
+    // payload is rebuilt from the stored source document, so a client can never
+    // publish fabricated content through it.
+    //
+    // Anyone holding the exact token may read it. An expired snapshot reads as
+    // gone even though the document still exists (the app treats the resulting
+    // denial exactly like a missing document), so a link stops working at its
+    // deadline with nobody deleting it — deletion is what `revokeShare` does.
+    // Listing stays closed: without a list the collection cannot be
+    // enumerated, so holding the token is the only way in.
+    match /shares/{token} {
+      allow get: if resource == null
+        || resource.data.get("expiresAt", null) == null
+        || resource.data.get("expiresAt", null) > request.time;
+      allow list, write: if false;
     }
 
     // ---------------------------------------------------------------- version

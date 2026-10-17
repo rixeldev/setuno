@@ -19,6 +19,7 @@ import { SetlistKeyDialog } from "@/components/setlists/SetlistKeyDialog"
 import { SetlistBlockDialog } from "@/components/setlists/SetlistBlockDialog"
 import { SetlistNoteDialog } from "@/components/setlists/SetlistNoteDialog"
 import { PrintSheet } from "@/components/songs/PrintSheet"
+import { ShareSheet } from "@/components/shares/ShareSheet"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
@@ -101,6 +102,7 @@ export default function SetlistDetail() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   // "Save as template" asks what to call the template, the way the songbook's
   // saved views do — the name is what the band will look for later.
   const [savingTemplate, setSavingTemplate] = useState(false)
@@ -842,6 +844,14 @@ export default function SetlistDetail() {
           }}
         />
         <SheetOptionRow
+          label={t("setlists.share")}
+          hint={t("setlists.shareHint")}
+          onPress={() => {
+            setMenuOpen(false)
+            setShareOpen(true)
+          }}
+        />
+        <SheetOptionRow
           label={t("setlists.deleteSetlist")}
           onPress={() => {
             setMenuOpen(false)
@@ -855,6 +865,15 @@ export default function SetlistDetail() {
         onClose={() => setPrintOpen(false)}
         title={setlist.name}
         render={(options) => setlistPrintHtml(setlist.name, printableSongs, options)}
+      />
+
+      <ShareSheet
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        kind="setlist"
+        organizationId={setlist.organizationId}
+        sourceId={setlist.id}
+        title={setlist.name}
       />
 
       <Dialog

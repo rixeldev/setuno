@@ -6,8 +6,9 @@
  * history (roadmap #26), the performances' event type (roadmap #46), the
  * member-writable show log (roadmap #45), the event's attendance map and
  * "who brings what" tasks (roadmap #47), the member-proposed date polls
- * (roadmap #48), the suggestion comment threads (roadmap #55) and the
- * owner-only push registrations (roadmap #52).
+ * (roadmap #48), the suggestion comment threads (roadmap #55), the
+ * owner-only push registrations (roadmap #52) and the anonymous share-link
+ * snapshots (roadmap #56).
  *
  * Run through `firebase emulators:exec --only firestore,storage "pnpm
  * test:integration"`, which starts the emulators, exports their host variables
@@ -1253,5 +1254,69 @@ describe("song versions are an admin-written, member-readable history", () => {
       await ctx.firestore().doc(versionPath(id)).set(version("alice"))
     })
     await assertFails(bob().firestore().doc(versionPath(id)).delete())
+  })
+})
+
+describe("share links are public, token-addressed snapshots (#56)", () => {
+  const sharePath = (token: string) => `shares/${token}`
+
+  const share = (overrides: Record<string, unknown> = {}) => ({
+    version: 1,
+    kind: "song",
+    organizationId: orgId,
+    sourceId: songId,
+    title: "Seed song",
+    payload: { artist: "", key: "G", capo: 0, bpm: null, durationSec: null, sections: [] },
+    createdBy: "alice",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    expiresAt: null,
+    ...overrides,
+  })
+
+  const seedShare = async (token: string, overrides: Record<string, unknown> = {}) => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(sharePath(token)).set(share(overrides))
+    })
+  }
+
+  it("lets anyone — signed in or not — read an active link", async () => {
+    const token = createId("share")
+    await seedShare(token)
+    await assertSucceeds(guest().firestore().doc(sharePath(token)).get())
+    await assertSucceeds(alice().firestore().doc(sharePath(token)).get())
+  })
+
+  it("answers a missing token with a plain miss, not an error", async () => {
+    await assertSucceeds(guest().firestore().doc(sharePath(createId("missing"))).get())
+  })
+
+  it("reads an expired link as denied, so the app shows it as gone", async () => {
+    const token = createId("share")
+    await seedShare(token, { expiresAt: new Date(Date.now() - 60_000) })
+    await assertFails(guest().firestore().doc(sharePath(token)).get())
+    // Even the band's own members hit the same wall: expiry is the contract.
+    await assertFails(alice().firestore().doc(sharePath(token)).get())
+  })
+
+  it("still serves a link that expires in the future", async () => {
+    const token = createId("share")
+    await seedShare(token, { expiresAt: new Date(Date.now() + 60_000) })
+    await assertSucceeds(guest().firestore().doc(sharePath(token)).get())
+  })
+
+  it("never lets the collection be listed", async () => {
+    await assertFails(guest().firestore().collection("shares").get())
+    await assertFails(alice().firestore().collection("shares").get())
+  })
+
+  it("denies every client write: only the callables own the collection", async () => {
+    const fresh = createId("share")
+    await assertFails(alice().firestore().doc(sharePath(fresh)).set(share()))
+    const seeded = createId("share")
+    await seedShare(seeded)
+    await assertFails(alice().firestore().doc(sharePath(seeded)).update({ title: "hijacked" }))
+    await assertFails(alice().firestore().doc(sharePath(seeded)).delete())
+    await assertFails(bob().firestore().doc(sharePath(seeded)).delete())
   })
 })
