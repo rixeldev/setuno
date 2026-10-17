@@ -95,6 +95,13 @@ export const paths = {
   userAnnotation: (uid: string, songId: string) => `users/${uid}/annotations/${songId}`,
   /** Personal read marker of a band's activity feed (roadmap #53). */
   userActivityRead: (uid: string, orgId: string) => `users/${uid}/activityRead/${orgId}`,
+  /**
+   * Push registrations (roadmap #52): one doc per install, the document id is
+   * the Expo push token itself. Owner-only; Cloud Functions read it with the
+   * Admin SDK, which bypasses the rules.
+   */
+  userDevices: (uid: string) => `users/${uid}/devices`,
+  userDevice: (uid: string, deviceId: string) => `users/${uid}/devices/${deviceId}`,
   /** Personal favorite songs, one doc per star (roadmap #33), owner-only. */
   userFavorites: (uid: string) => `users/${uid}/favorites`,
   userFavorite: (uid: string, songId: string) => `users/${uid}/favorites/${songId}`,

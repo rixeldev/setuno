@@ -10,6 +10,7 @@ import { CommandPaletteHost } from "@/components/app/CommandPaletteHost"
 import { SyncBanner } from "@/components/app/SyncBanner"
 import { BannerAdSlot } from "@/components/ads/BannerAdSlot"
 import { useResponsive } from "@/hooks/useResponsive"
+import { usePushRegistration } from "@/hooks/usePushRegistration"
 import { isFocusRoute } from "@/libs/navigation"
 
 /**
@@ -27,6 +28,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // On desktop the banner stays a dashboard detail (web renders nothing); the
   // mobile slot below is persistent while the navigation is visible.
   const onDashboard = pathname === "/" && !focused
+
+  // Push registrations refresh silently here (roadmap #52): never prompts,
+  // never resurrects a device the user switched off in the settings screen.
+  usePushRegistration()
 
   // Floating UI (the toast) anchors above the measured bottom chrome; release
   // it while the bar is hidden and when the shell goes away.

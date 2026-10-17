@@ -10,6 +10,7 @@ rules_version = '2';
  *   users/{uid}/annotations/{songId}                private per-song annotations
  *   users/{uid}/favorites/{songId}                 private star, one doc per song
  *   users/{uid}/collections/{collectionId}          private setlist drafts
+ *   users/{uid}/devices/{expo push token}           push registration, one doc per install (#52)
  *   organizations/{organizationId}                  the band
  *   organizations/{organizationId}/members/{uid}
  *   organizations/{organizationId}/songs
@@ -308,6 +309,26 @@ service cloud.firestore {
           && request.resource.data.createdAt is timestamp
           && request.resource.data.updatedAt is timestamp;
         allow delete: if isSelf(uid);
+      }
+
+      /**
+       * Push registrations (roadmap #52): one document per install, and its id
+       * IS the Expo push token, so the body can never drift from its own key.
+       * Owner-only both ways — another member must never read this device's
+       * token — with a closed field list, so a client cannot smuggle anything
+       * into the shape Cloud Functions fan out from. The fields are exactly
+       * what `services/notifications.ts` writes (no `createdAt`: a merge write
+       * would only re-stamp it).
+       */
+      match /devices/{deviceId} {
+        allow read, delete: if isSelf(uid);
+        allow create, update: if isSelf(uid)
+          && request.resource.data.keys().hasOnly(['token', 'platform', 'lang', 'lastSeenAt'])
+          && request.resource.data.token is string
+          && request.resource.data.token == deviceId
+          && request.resource.data.platform in ['android', 'ios']
+          && request.resource.data.lang in ['en', 'es']
+          && request.resource.data.lastSeenAt is timestamp;
       }
     }
 

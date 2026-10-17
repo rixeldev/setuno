@@ -1,3 +1,5 @@
+import type { PushNotificationType } from "@/functions/src/notify"
+
 import type { MaybeTimestamp, TimestampLike } from "./timestamp"
 
 /** "system" follows the device/browser colour scheme. */
@@ -46,6 +48,14 @@ export interface UserPreferences {
    * brings it back, even after a re-install or on another device.
    */
   demoSongSeeded?: boolean
+  /**
+   * Per-type push opt-outs (roadmap #52). Opt-out model: an absent map — or a
+   * type missing from it — means *enabled*, so every profile created before
+   * #52 keeps receiving everything with no migration, exactly the contract
+   * `functions/src/notify.ts#pushTypeEnabled` applies on every send. The
+   * notifications screen always writes the whole five-type map.
+   */
+  notifications?: Partial<Record<PushNotificationType, boolean>>
 }
 
 /** Minimal, shareable profile written to `users/{uid}`. */

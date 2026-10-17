@@ -83,6 +83,15 @@ export const LanguageIcon = (props: any) => (
   <Ionicons name="language" color={Theme.colors.text} size={24} {...props} />
 )
 
+export const NotificationsIcon = (props: any) => (
+  <MaterialCommunityIcons
+    name="bell-outline"
+    color={Theme.colors.text}
+    size={24}
+    {...props}
+  />
+)
+
 export const PlayIcon = (props: any) => (
   <Ionicons
     name="play-outline"

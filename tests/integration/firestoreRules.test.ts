@@ -5,8 +5,9 @@
  * membership management, the owner-only reader state, the song version
  * history (roadmap #26), the performances' event type (roadmap #46), the
  * member-writable show log (roadmap #45), the event's attendance map and
- * "who brings what" tasks (roadmap #47) and the member-proposed date polls
- * (roadmap #48), plus the suggestion comment threads (roadmap #55).
+ * "who brings what" tasks (roadmap #47), the member-proposed date polls
+ * (roadmap #48), the suggestion comment threads (roadmap #55) and the
+ * owner-only push registrations (roadmap #52).
  *
  * Run through `firebase emulators:exec --only firestore,storage "pnpm
  * test:integration"`, which starts the emulators, exports their host variables
@@ -966,6 +967,81 @@ describe("suggestion comments are a member discussion (#55)", () => {
     await assertFails(
       env.authenticatedContext("mallory").firestore().collection(commentPath()).get(),
     )
+  })
+})
+
+describe("push registrations are a device's own business (#52)", () => {
+  /** The document id is the token itself, brackets and all. */
+  const deviceToken = () => `ExponentPushToken[${createId("device")}]`
+
+  const registration = (token: string, overrides: Record<string, unknown> = {}) => ({
+    token,
+    platform: "android",
+    lang: "en",
+    lastSeenAt: new Date(),
+    ...overrides,
+  })
+
+  it("lets the owner register and refresh this device", async () => {
+    const token = deviceToken()
+    const path = `users/alice/devices/${token}`
+    await assertSucceeds(alice().firestore().doc(path).set(registration(token)))
+    await assertSucceeds(alice().firestore().doc(path).update({ lastSeenAt: new Date() }))
+  })
+
+  it("lets the owner remove their own device", async () => {
+    const token = deviceToken()
+    const path = `users/alice/devices/${token}`
+    await assertSucceeds(alice().firestore().doc(path).set(registration(token)))
+    await assertSucceeds(alice().firestore().doc(path).delete())
+  })
+
+  it("rejects a body whose token is not the document id", async () => {
+    await assertFails(
+      alice()
+        .firestore()
+        .doc(`users/alice/devices/${deviceToken()}`)
+        .set(registration(deviceToken())),
+    )
+  })
+
+  it("stops another member from registering a device for you", async () => {
+    const token = deviceToken()
+    await assertFails(bob().firestore().doc(`users/alice/devices/${token}`).set(registration(token)))
+  })
+
+  it("hides one member's device list from another", async () => {
+    await assertFails(bob().firestore().collection("users/alice/devices").get())
+  })
+
+  it("rejects a registration carrying an extra field", async () => {
+    const token = deviceToken()
+    await assertFails(
+      alice()
+        .firestore()
+        .doc(`users/alice/devices/${token}`)
+        .set(registration(token, { enabled: false })),
+    )
+  })
+
+  it("rejects an unknown platform", async () => {
+    const token = deviceToken()
+    await assertFails(
+      alice().firestore().doc(`users/alice/devices/${token}`).set(registration(token, { platform: "web" })),
+    )
+  })
+
+  it("rejects an unsupported language", async () => {
+    const token = deviceToken()
+    await assertFails(
+      alice().firestore().doc(`users/alice/devices/${token}`).set(registration(token, { lang: "fr" })),
+    )
+  })
+
+  it("turns a guest away from a single device and the list alike", async () => {
+    const token = deviceToken()
+    await assertFails(guest().firestore().doc(`users/alice/devices/${token}`).get())
+    await assertFails(guest().firestore().collection("users/alice/devices").get())
   })
 })
 

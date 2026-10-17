@@ -72,6 +72,18 @@ export default {
             "The game accesses your photos to let you pick an image for your profile picture.",
         },
       ],
+      // Push (#52): the small icon is a pure-alpha glyph tinted with the ember
+      // accent, and the plugin's default channel is the very id
+      // `services/notifications.ts` creates at registration time — messages
+      // that arrive before the app ever opens still have a channel to land on.
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/notification-icon.png",
+          color: "#EA580C",
+          defaultChannel: "default",
+        },
+      ],
       [
         "expo-splash-screen",
         {

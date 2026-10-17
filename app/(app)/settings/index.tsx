@@ -17,6 +17,7 @@ import {
   LanguageIcon,
   LinkIcon,
   LogoutIcon,
+  NotificationsIcon,
   OrganizationIcon,
   PaletteIconNew,
   ShieldIcon,
@@ -29,6 +30,7 @@ import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { getAppearance } from "@/services/themeManager"
 import { useLanguagePreference } from "@/services/i18next"
+import { disablePushForThisDevice } from "@/services/notifications"
 import { getDeviceLanguage } from "@/libs/deviceLanguage"
 import { PRIVACY_URL, TERMS_URL } from "@/libs/appLinks"
 import { LANGUAGE_NAMES, matchLanguage } from "@/libs/language"
@@ -81,6 +83,11 @@ export default function SettingsScreen() {
   const handleSignOut = async () => {
     setSigningOut(true)
     try {
+      // Shared-device hygiene (roadmap #52): stop this install from receiving
+      // the account's pushes before it has no account. Best effort, and it
+      // must run while the owner can still write — after `signOut` the rules
+      // would (correctly) refuse.
+      if (user?.uid) await disablePushForThisDevice(user.uid).catch(() => undefined)
       await signOut()
       toast.showSuccess(t("toasts.signedOut"))
     } catch (error) {
@@ -156,6 +163,12 @@ export default function SettingsScreen() {
           title={t("settings.language")}
           subtitle={languageLabel}
           onPress={() => setSheet("language")}
+        />
+        <Divider />
+        <Row
+          icon={NotificationsIcon}
+          title={t("settings.notifications")}
+          onPress={() => router.push("/settings/notifications")}
         />
         <Divider />
         <Row

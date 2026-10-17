@@ -80,6 +80,7 @@ export default function AppLayout() {
         <Stack.Screen name="settings/index" />
         <Stack.Screen name="settings/profile" options={modalOptions} />
         <Stack.Screen name="settings/organization" options={modalOptions} />
+        <Stack.Screen name="settings/notifications" />
         <Stack.Screen name="more" options={{ animation: "none" }} />
         <Stack.Screen name="organizations/index" options={modalOptions} />
         <Stack.Screen name="organizations/new" options={modalOptions} />
