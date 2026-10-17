@@ -26,6 +26,7 @@ import {
   SIDEBAR_NAV,
   isNavActive,
   isTabActive,
+  visibleNavItems,
   type NavItem,
 } from "@/libs/navigation"
 
@@ -129,7 +130,9 @@ export function OrgSwitcher({ compact = false }: { compact?: boolean }) {
                     <AppText variant="caption" tone="faint">
                       {item.role === "admin"
                         ? t("organizations.admin")
-                        : t("auth.musician")}
+                        : item.role === "guest"
+                          ? t("organizations.guest")
+                          : t("auth.musician")}
                     </AppText>
                   </View>
                   {active ? (
@@ -164,6 +167,7 @@ export function SidebarNav() {
   const router = useRouter()
   const pathname = usePathname()
   const { pendingSuggestions, unreadActivityCount } = useOrgData()
+  const { role } = useOrganization()
   const { signOut, profile } = useAuth()
 
   return (
@@ -181,7 +185,9 @@ export function SidebarNav() {
       </View>
 
       <ScrollView style={styles.nav} contentContainerStyle={styles.navContent}>
-        {SIDEBAR_NAV.map((item) => {
+        {/* Guests (roadmap #59) never see the collaboration entries: the
+            rules deny the whole surface, so the door is withheld. */}
+        {visibleNavItems(SIDEBAR_NAV, role).map((item) => {
           const active = isNavActive(item.href, pathname)
           const badge = navBadge(item, pendingSuggestions.length, unreadActivityCount)
           const Icon = item.icon

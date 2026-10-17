@@ -34,6 +34,12 @@ interface EventTasksCardProps {
   members: OrganizationMember[]
   currentUid: string
   isAdmin: boolean
+  /**
+   * Roadmap #59: a guest reads this list but the rules deny them the writes
+   * (create, toggle, edit, assign, attach), so every affordance that would
+   * fail is withheld rather than shown and rejected.
+   */
+  canWrite: boolean
 }
 
 /**
@@ -52,6 +58,7 @@ export function EventTasksCard({
   members,
   currentUid,
   isAdmin,
+  canWrite,
 }: EventTasksCardProps) {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
@@ -137,7 +144,7 @@ export function EventTasksCard({
 
       {tasks.map((task) => {
         const assignee = task.assignedTo ? nameOf(task.assignedTo) : ""
-        const canDelete = task.createdBy === currentUid || isAdmin
+        const canDelete = canWrite && (task.createdBy === currentUid || isAdmin)
         return (
           <View key={task.id} style={styles.row}>
             <Pressable
@@ -145,7 +152,7 @@ export function EventTasksCard({
               accessibilityState={{ checked: task.done }}
               accessibilityLabel={task.title}
               hitSlop={Theme.hitSlop}
-              disabled={busy}
+              disabled={busy || !canWrite}
               onPress={() =>
                 run(
                   toggleEventTask(organizationId, performanceId, task),
@@ -163,7 +170,7 @@ export function EventTasksCard({
 
             <Pressable
               style={styles.rowBody}
-              disabled={busy}
+              disabled={busy || !canWrite}
               onPress={() => {
                 setDraftTitle(task.title)
                 setDialog({ mode: "edit", task })
@@ -185,7 +192,7 @@ export function EventTasksCard({
               size="sm"
               label={assignee || t("performances.taskAnyone")}
               tone={assignee ? "primary" : "default"}
-              disabled={busy}
+              disabled={busy || !canWrite}
               onPress={() => setAssignTarget(task)}
               accessibilityLabel={t("performances.taskAssignTo")}
             />
@@ -201,29 +208,31 @@ export function EventTasksCard({
         )
       })}
 
-      <View style={styles.actions}>
-        <Button
-          variant="secondary"
-          size="sm"
-          label={t("performances.taskAdd")}
-          icon={<PlusIcon size={18} color={Theme.colors.text} />}
-          disabled={busy}
-          style={styles.action}
-          onPress={() => {
-            setDraftTitle("")
-            setDialog({ mode: "add" })
-          }}
-        />
-        <Button
-          variant="ghost"
-          size="sm"
-          label={t("checklists.attachButton")}
-          icon={<ListIcon size={18} color={Theme.colors.text} />}
-          disabled={busy}
-          style={styles.action}
-          onPress={() => setAttachOpen(true)}
-        />
-      </View>
+      {canWrite ? (
+        <View style={styles.actions}>
+          <Button
+            variant="secondary"
+            size="sm"
+            label={t("performances.taskAdd")}
+            icon={<PlusIcon size={18} color={Theme.colors.text} />}
+            disabled={busy}
+            style={styles.action}
+            onPress={() => {
+              setDraftTitle("")
+              setDialog({ mode: "add" })
+            }}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            label={t("checklists.attachButton")}
+            icon={<ListIcon size={18} color={Theme.colors.text} />}
+            disabled={busy}
+            style={styles.action}
+            onPress={() => setAttachOpen(true)}
+          />
+        </View>
+      ) : null}
 
       <Dialog
         visible={dialog !== null}

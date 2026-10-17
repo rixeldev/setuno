@@ -37,6 +37,7 @@ import {
 } from "@/interfaces"
 import { logActivity } from "@/services/activity"
 import { ValidationError } from "@/services/errors"
+import { normalizeRole } from "@/libs/membership"
 
 const mapOrganization = (data: Record<string, unknown>, id: string): Organization =>
   ({
@@ -55,7 +56,7 @@ const mapMember = (data: Record<string, unknown>, id: string): OrganizationMembe
     displayName: String(data.displayName ?? ""),
     email: String(data.email ?? ""),
     photoURL: (data.photoURL as string | null) ?? null,
-    role: (data.role as OrganizationRole) === "admin" ? "admin" : "member",
+    role: normalizeRole(data.role),
     joinedAt: data.joinedAt as OrganizationMember["joinedAt"],
     invitedBy: (data.invitedBy as string | null) ?? null,
   }) as OrganizationMember
@@ -66,7 +67,7 @@ const mapInvitation = (data: Record<string, unknown>, id: string): Invitation =>
     organizationId: String(data.organizationId ?? ""),
     organizationName: String(data.organizationName ?? ""),
     email: String(data.email ?? ""),
-    role: (data.role as OrganizationRole) === "admin" ? "admin" : "member",
+    role: normalizeRole(data.role),
     status: (data.status as Invitation["status"]) ?? "pending",
     invitedBy: String(data.invitedBy ?? ""),
     invitedByName: String(data.invitedByName ?? ""),
@@ -271,8 +272,8 @@ export const fetchMemberRole = async (
 ): Promise<OrganizationRole | null> => {
   const snapshot = await getDoc(doc(firestore, paths.member(organizationId, uid)))
   if (!snapshot.exists()) return null
-  const data = snapshot.data() as { role?: OrganizationRole }
-  return data.role === "admin" ? "admin" : "member"
+  const data = snapshot.data() as { role?: unknown }
+  return normalizeRole(data.role)
 }
 
 /**

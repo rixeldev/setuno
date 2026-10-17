@@ -99,7 +99,7 @@ const OrgDataContext = createContext<OrgDataContextValue | null>(null)
  * band's contents.
  */
 export function OrgDataProvider({ children }: { children: React.ReactNode }) {
-  const { organizationId, isAdmin } = useOrganization()
+  const { organizationId, isAdmin, isGuest } = useOrganization()
   const { profile } = useAuth()
   const uid = profile?.uid ?? null
 
@@ -160,21 +160,35 @@ export function OrgDataProvider({ children }: { children: React.ReactNode }) {
       ),
       subscribeSetlists(organizationId, (setlists) => merge({ setlists }), onError),
       subscribePerformances(organizationId, (performances) => merge({ performances }), onError),
-      subscribeSuggestions(organizationId, "all", (suggestions) => merge({ suggestions }), onError),
       subscribeMembers(organizationId, (members) => merge({ members }), onError),
       // Invitations are admin-only in the security rules: a plain member reads
       // their own invite through the band switcher, never the collection.
       ...(isAdmin
         ? [subscribeInvitations(organizationId, (invitations) => merge({ invitations }), onError)]
         : []),
-      subscribeActivity(organizationId, (activity) => merge({ activity }), 25, onError),
+      // Guests (roadmap #59) read the band's music and logistics but the rules
+      // deny them suggestions, comments and the activity feed — so those
+      // listeners are never opened, exactly like the invitations above: a
+      // listener the rules would reject only paints an error the screen would
+      // clear a frame later.
+      ...(isGuest
+        ? []
+        : [
+            subscribeSuggestions(
+              organizationId,
+              "all",
+              (suggestions) => merge({ suggestions }),
+              onError,
+            ),
+            subscribeActivity(organizationId, (activity) => merge({ activity }), 25, onError),
+          ]),
     ]
 
     return () => {
       cancelled = true
       unsubscribers.forEach((unsubscribe) => unsubscribe())
     }
-  }, [organizationId, isAdmin])
+  }, [organizationId, isAdmin, isGuest])
 
   const current = organizationId !== null && snapshot.organizationId === organizationId ? snapshot : EMPTY
 
@@ -191,6 +205,11 @@ export function OrgDataProvider({ children }: { children: React.ReactNode }) {
     // that is in the trash.
     const { visible, trashed } = partitionTrashed(current.songs)
     const songLibrary = new Map(current.songs.map((song) => [song.id, song]))
+    // Guests never carry the collaboration slices (roadmap #59): the rules
+    // deny those documents, so the listeners above never even open — and a
+    // role flip to guest must not leave the previous slice behind on screen.
+    const suggestions = isGuest ? EMPTY.suggestions : current.suggestions
+    const activity = isGuest ? EMPTY.activity : current.activity
     // Roadmap #34: usage history is derived from the events and setlists that
     // are already subscribed — recomputed here so every screen (songbook
     // filters, the reader footer) sees the same numbers from one walk.
@@ -200,14 +219,14 @@ export function OrgDataProvider({ children }: { children: React.ReactNode }) {
       trashedSongs: trashed,
       setlists: current.setlists,
       performances: current.performances,
-      suggestions: current.suggestions,
-      pendingSuggestions: current.suggestions.filter((item) => item.status === "pending"),
+      suggestions,
+      pendingSuggestions: suggestions.filter((item) => item.status === "pending"),
       members: current.members,
       // Demotions must not leave an admin-only slice behind.
       invitations: isAdmin ? current.invitations : EMPTY.invitations,
-      activity: current.activity,
+      activity,
       // Derived, never stored per event: the badge is the feed minus the marker.
-      unreadActivityCount: countUnreadActivity(current.activity, activityReadAt),
+      unreadActivityCount: countUnreadActivity(activity, activityReadAt),
       markActivityRead: markRead,
       songLibrary,
       songUsage,
@@ -219,7 +238,7 @@ export function OrgDataProvider({ children }: { children: React.ReactNode }) {
       loading: current.pending,
       error: current.error,
     }
-  }, [current, isAdmin, activityReadAt, markRead])
+  }, [current, isAdmin, isGuest, activityReadAt, markRead])
 
   return <OrgDataContext.Provider value={value}>{children}</OrgDataContext.Provider>
 }

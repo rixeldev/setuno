@@ -208,7 +208,9 @@ export const onSuggestionResolved = onDocumentUpdated(
   },
 )
 
-/** New event on the calendar: the whole band, except whoever added it. */
+/** New event on the calendar: the whole band, except whoever added it.
+ * Guests included (roadmap #59): a sub or tech who is read-only to the band's
+ * conversation still wants the call time. */
 export const onPerformanceCreated = onDocumentCreated(
   "organizations/{organizationId}/performances/{performanceId}",
   async (event) => {

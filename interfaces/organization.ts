@@ -1,6 +1,6 @@
 import type { TimestampLike } from "./timestamp"
 
-export type OrganizationRole = "admin" | "member"
+export type OrganizationRole = "admin" | "member" | "guest"
 
 export interface Organization {
   id: string
@@ -57,4 +57,5 @@ export interface OrganizationRef {
 export const ROLE_LABELS: Record<OrganizationRole, string> = {
   admin: "Admin",
   member: "Member",
+  guest: "Guest",
 }

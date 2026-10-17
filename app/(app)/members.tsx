@@ -23,6 +23,23 @@ import { toFriendlyError } from "@/services/errors"
 import { validateEmail } from "@/libs/validation"
 import type { OrganizationMember, OrganizationRole } from "@/interfaces"
 
+/** The role each sheet row moves a member *to* ("Make admin"…). */
+const ROLE_MOVE_LABELS: Record<OrganizationRole, string> = {
+  admin: "members.makeAdmin",
+  member: "members.makeMember",
+  guest: "members.makeGuest",
+}
+
+/** What each role means, spelled on its invitation chip. */
+const INVITE_ROLE_LABELS: Record<OrganizationRole, string> = {
+  admin: "members.adminCanEdit",
+  member: "members.memberCanSuggest",
+  guest: "members.guestCanView",
+}
+
+/** Invitations can be minted for every role; the default stays a plain member. */
+const INVITE_ROLES: readonly OrganizationRole[] = ["member", "admin", "guest"]
+
 /**
  * Members and invitations (docs §7, §18): one tidy surface per group. Role and
  * removal actions live behind a per-member options sheet, so nothing dangerous
@@ -178,15 +195,15 @@ export default function MembersScreen() {
                         ? "accent"
                         : member.role === "admin"
                           ? "primary"
-                          : "muted"
+                          : member.role === "guest"
+                            ? "faint"
+                            : "muted"
                     }
                     numberOfLines={1}
                   >
                     {member.uid === organization?.ownerId
                       ? t("organizations.owner")
-                      : member.role === "admin"
-                        ? t("organizations.admin")
-                        : t("organizations.member")}
+                      : t(`organizations.${member.role}`)}
                   </AppText>
                   {member.email ? (
                     <AppText variant="caption" tone="muted" numberOfLines={1}>
@@ -259,16 +276,22 @@ export default function MembersScreen() {
       >
         {menuMember ? (
           <>
-            <SheetOptionRow
-              label={
-                menuMember.role === "admin" ? t("members.makeMember") : t("members.makeAdmin")
-              }
-              onPress={() => {
-                const member = menuMember
-                setMenuOpen(false)
-                void changeRole(member, member.role === "admin" ? "member" : "admin")
-              }}
-            />
+            {/* Three roles mean two moves from wherever they stand: the sheet
+                offers every role they are not (roadmap #59), so promoting and
+                demoting to guest live in one control. */}
+            {(["admin", "member", "guest"] as OrganizationRole[])
+              .filter((entry) => entry !== menuMember.role)
+              .map((entry) => (
+                <SheetOptionRow
+                  key={entry}
+                  label={t(ROLE_MOVE_LABELS[entry])}
+                  onPress={() => {
+                    const member = menuMember
+                    setMenuOpen(false)
+                    void changeRole(member, entry)
+                  }}
+                />
+              ))}
             <SheetOptionRow
               label={t("organizations.removeMember")}
               onPress={() => {
@@ -302,10 +325,10 @@ export default function MembersScreen() {
           icon={<EmailIcon size={15} color={Theme.colors.textFaint} />}
         />
         <View style={styles.roleRow}>
-          {(["member", "admin"] as OrganizationRole[]).map((entry) => (
+          {INVITE_ROLES.map((entry) => (
             <Chip
               key={entry}
-              label={entry === "admin" ? t("members.adminCanEdit") : t("members.memberCanSuggest")}
+              label={t(INVITE_ROLE_LABELS[entry])}
               tone="primary"
               selected={inviteRole === entry}
               onPress={() => setInviteRole(entry)}
@@ -344,5 +367,5 @@ const createStyles = () =>
     divider: { borderTopWidth: 1, borderTopColor: Theme.colors.borderSoft },
     flex: { flex: 1, minWidth: 0, gap: 2 },
     nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-    roleRow: { gap: 6 },
+    roleRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   })

@@ -38,6 +38,8 @@ interface OrganizationContextValue {
   member: OrganizationMember | null
   role: OrganizationRole | null
   isAdmin: boolean
+  /** The read-only guest role (roadmap #59): reads music and logistics, never writes. */
+  isGuest: boolean
   organizationId: string | null
   invitations: Invitation[]
   /** Set when the invitations query failed (e.g. rules not deployed yet). */
@@ -344,6 +346,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       member,
       role: member?.role ?? null,
       isAdmin: member?.role === "admin",
+      isGuest: member?.role === "guest",
       organizationId: activeIdResolved,
       invitations,
       invitationsError: invitesError,

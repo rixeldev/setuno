@@ -52,7 +52,7 @@ a sidebar layout on the web.
 | **Usernames** | Unique, case-insensitive username per account; one rename every 3 months |
 | **Your data, your call** | Take everything Setuno stores about you with you: one JSON export (profile, bands, songs, your personal data) handed to the share sheet or downloaded. Or delete the account for good behind a password or Google re-confirmation — you walk out of every band (a band left with nobody in it goes too; one left without an admin promotes its most senior member), your username is freed and your private data is erased, while the band keeps what it made together |
 | **Bands (organizations)** | Create a band, rename it, set a logo, delete it, switch between bands |
-| **Members & roles** | Invite by email, accept/decline invitations, admins & members, promote/demote, remove; profiles stay in sync per band |
+| **Members & roles** | Invite by email (as admin, member or **guest**), accept/decline invitations, promote/demote, remove; profiles stay in sync per band. A **guest** is read-only, made for substitutes and techs: they read the songs, setlists and events but never write, suggest or see the activity feed |
 | **Songbook** | Create, edit and delete songs with lyrics, chords, tags, genre, BPM, capo and duration; paste a lyric block (section headers, inline `[C]` chords and other apps' metadata are handled) with a live preview |
 | **Advanced search** | Instant search across title, artist, genre, tags and key, plus a filter panel: artist/genre/key/tag chips, tempo (slow / medium / fast / sprint) and length (short / standard / long) buckets, and a chord-progression search that matches `Am F C G` as a run of chords on one lyric line |
 | **Usage history** | Every song the band has played says so — "played 12 times · last played 3 events ago" in the reader, derived from the setlists of completed events (nothing extra is stored) — the filter panel can show only what has never been played or has not been played recently, and the setlist picker's **"Not played in 3 gigs"** switch turns its list into a rotation: the most neglected songs first, so the next setlist refreshes the repertoire |
@@ -311,9 +311,11 @@ each tab.
 
 [`firestore.rules`](./firestore.rules) enforces:
 
-- Only **members** can read anything inside their band.
+- Any roster member can read their band's music and logistics, the read-only **guest** role
+  included — while suggestions, their comments, the activity feed, date polls and the checklist
+  library stay plain-member: a guest reads the night, not the band's conversation.
 - Only **admins** can create/edit songs, setlists and performances; **any member** can create a
-  suggestion but nobody can resolve their own.
+  suggestion but nobody can resolve their own — and a guest can create nothing at all.
 - Membership is granted only through an **email-keyed invitation** that the matching authenticated
   account accepts in the same batch that creates the membership — nobody can add another person's
   account for them.

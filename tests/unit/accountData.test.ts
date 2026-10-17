@@ -14,7 +14,11 @@ import {
   type RosterMember,
 } from "../../functions/src/accountData"
 
-const member = (uid: string, role: "admin" | "member", joinedAt: number | null): RosterMember => ({
+const member = (
+  uid: string,
+  role: "admin" | "member" | "guest",
+  joinedAt: number | null,
+): RosterMember => ({
   uid,
   role,
   joinedAt,
@@ -73,6 +77,37 @@ describe("planOrgRemovals", () => {
     }
     expect(planOrgRemovals([org], "u1")).toEqual([
       { orgId: "band", action: "leave", promoteUid: "u3", transferOwnerTo: "u3" },
+    ])
+  })
+
+  it("skips a more senior guest when the last admin leaves (roadmap #59)", () => {
+    // A guest is read-only: promoting one would leave the band without
+    // anybody who can invite, edit or manage members.
+    const org: OrgRoster = {
+      orgId: "band",
+      ownerId: "u1",
+      members: [
+        member("u1", "admin", 0),
+        member("u2", "guest", MINUTE),
+        member("u3", "member", 2 * MINUTE),
+      ],
+    }
+    expect(planOrgRemovals([org], "u1")).toEqual([
+      { orgId: "band", action: "leave", promoteUid: "u3", transferOwnerTo: "u3" },
+    ])
+  })
+
+  it("promotes nobody when the band is guests-only, but still hands the owner keys over", () => {
+    // No candidate can administer, so no promotion happens — yet the owner
+    // keys must move anyway: a dangling ownerId would leave the band
+    // undeletable forever, so the senior guest takes that last baton.
+    const org: OrgRoster = {
+      orgId: "band",
+      ownerId: "u1",
+      members: [member("u1", "admin", 0), member("u2", "guest", MINUTE)],
+    }
+    expect(planOrgRemovals([org], "u1")).toEqual([
+      { orgId: "band", action: "leave", promoteUid: null, transferOwnerTo: "u2" },
     ])
   })
 

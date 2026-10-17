@@ -14,6 +14,7 @@ import { PerformanceCard } from "@/components/performances/PerformanceCard"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { DEFAULT_EVENT_TYPES, EVENT_TYPES, filterByEventType } from "@/libs/performances"
+import { canCollaborate } from "@/libs/membership"
 import { PERFORMANCE_TYPE_KEYS } from "@/interfaces/performance"
 import type { PerformanceType } from "@/interfaces/performance"
 
@@ -32,7 +33,7 @@ export default function PerformancesScreen() {
   const { t } = useTranslation()
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
-  const { isAdmin } = useOrganization()
+  const { role, isAdmin } = useOrganization()
   const { performances, upcomingPerformances, pastPerformances, loading, error } = useOrgData()
   const [tab, setTab] = useState<TabKey>("upcoming")
   const [types, setTypes] = useState<PerformanceType[]>([...DEFAULT_EVENT_TYPES])
@@ -85,13 +86,16 @@ export default function PerformancesScreen() {
       headerRight={
         <View style={styles.headerActions}>
           {/* Any member may propose dates (roadmap #48) — only scheduling an
-              event from the winner is admin territory. */}
-          <IconButton
-            label={t("polls.title")}
-            variant="secondary"
-            onPress={() => router.push("/polls/index")}
-            icon={<PollIcon size={18} color={Theme.colors.text} />}
-          />
+              event from the winner is admin territory, and a guest (roadmap
+              #59) is outside the vote entirely: the rules deny the reads. */}
+          {canCollaborate(role) ? (
+            <IconButton
+              label={t("polls.title")}
+              variant="secondary"
+              onPress={() => router.push("/polls/index")}
+              icon={<PollIcon size={18} color={Theme.colors.text} />}
+            />
+          ) : null}
           {isAdmin ? (
             <IconButton
               label={t("performances.schedule")}

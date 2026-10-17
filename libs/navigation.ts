@@ -1,5 +1,7 @@
 import type { ComponentType } from "react"
 
+import type { OrganizationRole } from "@/interfaces"
+
 import {
   CalendarIcon,
   ChatIcon,
@@ -25,6 +27,12 @@ export interface NavItem {
   secondary?: boolean
   /** Only visible to organization admins. */
   adminOnly?: boolean
+  /**
+   * Hidden from guests (roadmap #59): the security rules deny the whole
+   * surface, so the door is withheld rather than shown and rejected. The
+   * activity feed and its badge ride the same rule.
+   */
+  memberOnly?: boolean
   /** Shows the pending suggestion counter. */
   badge?: "suggestions" | "activity"
 }
@@ -36,7 +44,7 @@ export const SIDEBAR_NAV: NavItem[] = [
   { href: "/setlists", label: "nav.setlists", icon: ListIcon },
   { href: "/performances", label: "nav.performances", icon: CalendarIcon },
   { href: "/calendar", label: "nav.calendar", icon: CalendarIcon, secondary: true },
-  { href: "/suggestions", label: "nav.suggestions", icon: ChatIcon, badge: "suggestions" },
+  { href: "/suggestions", label: "nav.suggestions", icon: ChatIcon, badge: "suggestions", memberOnly: true },
   { href: "/members", label: "nav.members", icon: UsersIcon },
   { href: "/collections", label: "nav.collections", icon: LibraryIcon },
   { href: "/stats", label: "nav.stats", icon: StatsIcon },
@@ -62,6 +70,7 @@ export const MORE_NAV: NavItem[] = [
     icon: ChatIcon,
     description: "nav.suggestionsHint",
     badge: "suggestions",
+    memberOnly: true,
   },
   { href: "/members", label: "nav.members", icon: UsersIcon, description: "nav.membersHint" },
   {
@@ -85,6 +94,14 @@ export const MORE_NAV: NavItem[] = [
   },
   { href: "/settings", label: "nav.settings", icon: SettingsIcon, description: "nav.settingsHint" },
 ]
+
+/**
+ * The nav a role may see (roadmap #59): guests sit outside the band's
+ * conversation, so `memberOnly` entries — and the badges they carry — never
+ * render for them. Pure, so the filter unit-tests without a renderer.
+ */
+export const visibleNavItems = (items: NavItem[], role: OrganizationRole | null): NavItem[] =>
+  role === "guest" ? items.filter((item) => !item.memberOnly) : items
 
 /** True when `pathname` belongs to the nav entry (exact for tabs, prefix for details). */
 export const isNavActive = (href: string, pathname: string): boolean => {

@@ -8,8 +8,10 @@
  * "who brings what" tasks (roadmap #47), the member-proposed date polls
  * (roadmap #48), the suggestion comment threads (roadmap #55), the
  * owner-only push registrations (roadmap #52), the anonymous share-link
- * snapshots (roadmap #56) and the live setlist positions a member may write
- * onto them (roadmap #57).
+ * snapshots (roadmap #56), the live setlist positions a member may write
+ * onto them (roadmap #57) and the read-only guest role that reads the band's
+ * music and logistics while every collaboration surface stays denied
+ * (roadmap #59).
  *
  * Run through `firebase emulators:exec --only firestore,storage "pnpm
  * test:integration"`, which starts the emulators, exports their host variables
@@ -1459,5 +1461,279 @@ describe("the live setlist pointer is member-writable (#57)", () => {
         .doc(pathFor(id))
         .update({ liveShare: pointer, name: "Renamed by a member", updatedAt: new Date() }),
     )
+  })
+})
+
+describe("the guest role reads the band and nothing else (roadmap #59)", () => {
+  /** A signed-in member whose document carries the read-only `guest` role. */
+  const roger = () => env.authenticatedContext("roger")
+  /** A fresh invitee whose invitation arrives with the guest role. */
+  const ivan = () => env.authenticatedContext("ivan", { email: "ivan@example.com" })
+
+  const seedGuest = async (): Promise<void> => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`organizations/${orgId}/members/roger`).set({
+        uid: "roger",
+        displayName: "roger",
+        email: "roger@example.com",
+        photoURL: "",
+        role: "guest",
+        joinedAt: new Date(),
+        invitedBy: "alice",
+      })
+    })
+  }
+
+  /** One document of each surface the guest may (or may not) read. */
+  const seedBandSurfaces = async (): Promise<void> => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore()
+      await db.doc(`organizations/${orgId}/setlists/set-1`).set({
+        organizationId: orgId,
+        name: "Set",
+        songs: [],
+      })
+      await db.doc(`organizations/${orgId}/performances/gig-1`).set({
+        organizationId: orgId,
+        name: "Gig",
+        date: "2026-11-01",
+      })
+      await db
+        .doc(`organizations/${orgId}/performances/gig-1/tasks/task-1`)
+        .set({
+          title: "PA",
+          assignedTo: "",
+          done: false,
+          createdBy: "bob",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+      await db.doc(`organizations/${orgId}/datePolls/poll-1`).set({
+        organizationId: orgId,
+        title: "When?",
+        options: [],
+        status: "open",
+      })
+      await db.doc(`organizations/${orgId}/checklists/check-1`).set({
+        name: "Gear",
+        kind: "gear",
+        items: ["cables"],
+      })
+      await db.doc(`organizations/${orgId}/activity/evt-1`).set({ message: "Bob added a song" })
+      await db.doc(`organizations/${orgId}/songs/${songId}/versions/v-1`).set({
+        songId,
+        title: "Before",
+        sections: [],
+      })
+    })
+  }
+
+  it("lets a guest read the band's music and logistics", async () => {
+    await seedGuest()
+    await seedBandSurfaces()
+    const db = roger().firestore()
+    await assertSucceeds(db.doc(`organizations/${orgId}`).get())
+    await assertSucceeds(db.doc(songPath()).get())
+    await assertSucceeds(db.collection(`organizations/${orgId}/songs`).get())
+    await assertSucceeds(db.doc(`organizations/${orgId}/setlists/set-1`).get())
+    await assertSucceeds(db.doc(`organizations/${orgId}/performances/gig-1`).get())
+    await assertSucceeds(db.collection(`organizations/${orgId}/performances/gig-1/tasks`).get())
+    await assertSucceeds(db.collection(`organizations/${orgId}/members`).get())
+  })
+
+  it("keeps suggestions, the feed and the song history out of a guest's reach", async () => {
+    await seedGuest()
+    await seedBandSurfaces()
+    const db = roger().firestore()
+    await assertFails(db.doc(`organizations/${orgId}/suggestions/${suggestionId}`).get())
+    await assertFails(db.collection(`organizations/${orgId}/suggestions`).get())
+    await assertFails(db.doc(`organizations/${orgId}/activity/evt-1`).get())
+    await assertFails(db.doc(`organizations/${orgId}/songs/${songId}/versions/v-1`).get())
+  })
+
+  it("keeps the date polls, the checklist library and the invitations out of reach", async () => {
+    await seedGuest()
+    await seedBandSurfaces()
+    const db = roger().firestore()
+    await assertFails(db.doc(`organizations/${orgId}/datePolls/poll-1`).get())
+    await assertFails(db.doc(`organizations/${orgId}/checklists/check-1`).get())
+    await assertFails(db.collection(`organizations/${orgId}/invitations`).get())
+  })
+
+  it("stops a guest writing the band's content", async () => {
+    await seedGuest()
+    const db = roger().firestore()
+    await assertFails(
+      db
+        .doc(`organizations/${orgId}/songs/${createId("song")}`)
+        .set({ organizationId: orgId, title: "Sneaky", sections: [] }),
+    )
+    await assertFails(db.doc(songPath()).update({ title: "Renamed by a guest" }))
+    await assertFails(
+      db
+        .doc(`organizations/${orgId}/setlists/${createId("set")}`)
+        .set({ organizationId: orgId, name: "Sneaky set", songs: [] }),
+    )
+  })
+
+  it("stops a guest suggesting, commenting or resolving", async () => {
+    await seedGuest()
+    const db = roger().firestore()
+    await assertFails(
+      db
+        .doc(`organizations/${orgId}/suggestions/${createId("suggestion")}`)
+        .set(suggestion("roger")),
+    )
+    await assertFails(
+      db
+        .doc(`organizations/${orgId}/suggestions/${suggestionId}/comments/${createId("comment")}`)
+        .set({
+          body: "Nice one",
+          authorId: "roger",
+          authorName: "roger",
+          createdAt: new Date(),
+          deletedAt: null,
+        }),
+    )
+    await assertFails(
+      db.doc(`organizations/${orgId}/suggestions/${suggestionId}`).update({ status: "accepted" }),
+    )
+  })
+
+  it("stops a guest answering the RSVP or ticking a task", async () => {
+    await seedGuest()
+    await seedBandSurfaces()
+    const db = roger().firestore()
+    await assertFails(
+      db
+        .doc(`organizations/${orgId}/performances/gig-1`)
+        .update({ "attendance.roger": "yes", updatedAt: new Date() }),
+    )
+    await assertFails(
+      db
+        .doc(`organizations/${orgId}/performances/gig-1/tasks/task-1`)
+        .update({ done: true, updatedAt: new Date() }),
+    )
+  })
+
+  it("stops a guest writing the live setlist position", async () => {
+    await seedGuest()
+    const token = createId("share")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`shares/${token}`).set({
+        organizationId: orgId,
+        kind: "song",
+        songId,
+        createdAt: new Date(),
+        expiresAt: null,
+      })
+    })
+    await assertFails(
+      roger()
+        .firestore()
+        .doc(`shares/${token}`)
+        .update({ live: { songId, position: 2, updatedAt: 1700000000000 } }),
+    )
+  })
+
+  it("lets a guest keep their own reader state and stars", async () => {
+    await seedGuest()
+    const db = roger().firestore()
+    await assertSucceeds(
+      db.doc(`users/roger/readerState/${songId}`).set({
+        autoscrollSpeed: 120,
+        autoscrollDelay: 5,
+        scrollRatio: 0.4,
+        semitones: 0,
+        capo: 0,
+        fontSize: 18,
+      }),
+    )
+    await assertSucceeds(db.doc(`users/roger/favorites/${songId}`).set({ songId }))
+  })
+
+  it("lets an admin make a member a guest — and take it back", async () => {
+    await assertSucceeds(
+      alice().firestore().doc(`organizations/${orgId}/members/bob`).update({ role: "guest" }),
+    )
+    await assertSucceeds(
+      alice().firestore().doc(`organizations/${orgId}/members/bob`).update({ role: "member" }),
+    )
+  })
+
+  it("never lets a guest change their own role", async () => {
+    await seedGuest()
+    await assertFails(
+      roger().firestore().doc(`organizations/${orgId}/members/roger`).update({ role: "member" }),
+    )
+  })
+
+  it("lets an admin invite a guest and nothing outside the roles", async () => {
+    const invitation = (email: string, role: string) => ({
+      organizationId: orgId,
+      organizationName: "The band",
+      email,
+      role,
+      status: "pending",
+      invitedBy: "alice",
+      invitedByName: "alice",
+      createdAt: new Date(),
+      respondedAt: null,
+    })
+    const email = `${createId("invitee")}@example.com`
+    await assertSucceeds(
+      alice()
+        .firestore()
+        .doc(`organizations/${orgId}/invitations/${email}`)
+        .set(invitation(email, "guest")),
+    )
+    const bogus = `${createId("invitee")}@example.com`
+    await assertFails(
+      alice()
+        .firestore()
+        .doc(`organizations/${orgId}/invitations/${bogus}`)
+        .set(invitation(bogus, "wizard")),
+    )
+  })
+
+  it("lands a guest invitation as a guest on the member doc and the mirror", async () => {
+    const email = "ivan@example.com"
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`organizations/${orgId}/invitations/${email}`).set({
+        organizationId: orgId,
+        organizationName: "The band",
+        email,
+        role: "guest",
+        status: "pending",
+        invitedBy: "alice",
+        invitedByName: "alice",
+        createdAt: new Date(),
+        respondedAt: null,
+      })
+    })
+    const ivansDb = ivan().firestore()
+    const batch = ivansDb.batch()
+    batch.update(ivansDb.doc(`organizations/${orgId}/invitations/${email}`), {
+      status: "accepted",
+      respondedAt: new Date(),
+    })
+    batch.set(ivansDb.doc(`organizations/${orgId}/members/ivan`), {
+      uid: "ivan",
+      displayName: "ivan",
+      email,
+      photoURL: "",
+      role: "guest",
+      joinedAt: new Date(),
+      invitedBy: "alice",
+    })
+    batch.set(ivansDb.doc(`users/ivan/organizations/${orgId}`), {
+      name: "The band",
+      role: "guest",
+      logoURL: "",
+      joinedAt: new Date(),
+    })
+    await assertSucceeds(batch.commit())
+    const mirror = await assertSucceeds(ivansDb.doc(`users/ivan/organizations/${orgId}`).get())
+    expect(mirror.data()?.role).toBe("guest")
   })
 })

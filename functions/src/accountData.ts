@@ -94,12 +94,20 @@ const bySeniority = (a: RosterMember, b: RosterMember): number => {
 const isAdmin = (member: RosterMember): boolean => member.role === "admin"
 
 /**
+ * Whether this roster member could take over the band's administration.
+ * A guest (roadmap #59) is read-only, so promoting one would leave the band
+ * without anybody who can manage it.
+ */
+const canAdminister = (member: RosterMember): boolean => member.role !== "guest"
+
+/**
  * What this member's exit does to each band they belong to:
  *
  * - nobody left → the whole band is deleted (a band with no members is a
  *   ghost, and Firestore does not clean it up by itself);
- * - the last admin left with members behind → the most senior member is
- *   promoted, otherwise the band has nobody who can manage it;
+ * - the last admin left with members behind → the most senior member who can
+ *   administer is promoted (never a guest, roadmap #59), otherwise the band
+ *   has nobody who can manage it;
  * - the owner left with members behind → `ownerId` hands over to the
  *   promoted member, or to the most senior admin (or member) when no
  *   promotion was needed.
@@ -116,11 +124,20 @@ export const planOrgRemovals = (orgs: readonly OrgRoster[], uid: string): OrgRem
 
     const departing = org.members.find((member) => member.uid === uid)
     const ordered = [...remaining].sort(bySeniority)
-    const admins = ordered.filter(isAdmin)
+    // Guests (roadmap #59) are read-only, so the promotion skips them — a
+    // guest admin could invite nobody and edit nothing. `transferOwnerTo`
+    // still falls back to the senior guest when no one else remains, because
+    // a dangling ownerId would leave the band undeletable forever.
+    const promotable = ordered.filter(canAdminister)
+    const admins = promotable.filter(isAdmin)
     const promoteUid =
-      departing && isAdmin(departing) && admins.length === 0 ? ordered[0].uid : null
+      departing && isAdmin(departing) && admins.length === 0
+        ? (promotable[0]?.uid ?? null)
+        : null
     const transferOwnerTo =
-      org.ownerId === uid ? (promoteUid ?? admins[0]?.uid ?? ordered[0].uid) : null
+      org.ownerId === uid
+        ? (promoteUid ?? admins[0]?.uid ?? promotable[0]?.uid ?? ordered[0]?.uid ?? null)
+        : null
     return { orgId: org.orgId, action: "leave", promoteUid, transferOwnerTo }
   })
 

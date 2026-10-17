@@ -123,7 +123,11 @@ export default function OrganizationsScreen() {
                     {organization.name}
                   </AppText>
                   <AppText variant="caption" tone="muted">
-                    {organization.role === "admin" ? t("organizations.youreAdmin") : t("organizations.member")}
+                    {organization.role === "admin"
+                      ? t("organizations.youreAdmin")
+                      : organization.role === "guest"
+                        ? t("organizations.guest")
+                        : t("organizations.member")}
                   </AppText>
                 </View>
                 {active ? (
@@ -150,7 +154,11 @@ export default function OrganizationsScreen() {
               </AppText>
               <AppText variant="caption" tone="muted">
                 {t("auth.invitedBy", { name: invitation.invitedByName || t("common.unknownAdmin") })} ·{" "}
-                {invitation.role === "admin" ? t("organizations.asAdmin") : t("organizations.asMember")}
+                {invitation.role === "admin"
+                  ? t("organizations.asAdmin")
+                  : invitation.role === "guest"
+                    ? t("organizations.asGuest")
+                    : t("organizations.asMember")}
               </AppText>
               <Button
                 label={t("auth.acceptInvitation")}
@@ -177,7 +185,12 @@ export default function OrganizationsScreen() {
         onClose={() => setJoinOpen(false)}
         title={accepting ? t("auth.joinBandTitle", { name: accepting.organizationName }) : t("organizations.joinBand")}
         description={t("auth.joinBandDescription", {
-          role: accepting?.role === "admin" ? t("auth.roleAdmin") : t("auth.roleMusician"),
+          role:
+            accepting?.role === "admin"
+              ? t("auth.roleAdmin")
+              : accepting?.role === "guest"
+                ? t("auth.roleGuest")
+                : t("auth.roleMusician"),
         })}
         confirmLabel={t("organizations.joinBand")}
         confirmLoading={busy}

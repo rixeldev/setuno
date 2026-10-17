@@ -132,9 +132,11 @@ export default function SettingsScreen() {
                     ? t("organizations.owner")
                     : role === "admin"
                       ? t("organizations.admin")
-                      : t("organizations.member")
+                      : role === "guest"
+                        ? t("organizations.guest")
+                        : t("organizations.member")
                 }
-                tone="primary"
+                tone={role === "guest" ? "default" : "primary"}
                 style={styles.badge}
               />
             ) : null}

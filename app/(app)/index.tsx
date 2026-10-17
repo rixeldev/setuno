@@ -38,6 +38,7 @@ import {
 } from "@/libs/format"
 import { parseIsoDate } from "@/libs/validation"
 import { setlistSummary } from "@/libs/performanceSetlists"
+import { canCollaborate } from "@/libs/membership"
 
 const MAX_RECENT_SONGS = 3
 const MAX_UPCOMING = 3
@@ -54,8 +55,16 @@ export default function Dashboard() {
   const { t, i18n } = useTranslation()
   const toast = useToast()
   const { profile } = useAuth()
-  const { organization, organizationId, isAdmin, state, organizationsError, retryOrganizations } =
-    useOrganization()
+  const {
+    organization,
+    organizationId,
+    role,
+    isAdmin,
+    isGuest,
+    state,
+    organizationsError,
+    retryOrganizations,
+  } = useOrganization()
   const {
     songs,
     setlists,
@@ -310,12 +319,18 @@ export default function Dashboard() {
           icon: MusicIcon,
           href: "/songs",
         },
-        {
-          key: "suggest",
-          label: t("suggestions.newSuggestion"),
-          icon: ChatIcon,
-          href: "/suggestions/new",
-        },
+        // Guests (roadmap #59) read the songbook; the rules deny them
+        // suggestions, so the door to that flow stays shut too.
+        ...(canCollaborate(role)
+          ? [
+              {
+                key: "suggest",
+                label: t("suggestions.newSuggestion"),
+                icon: ChatIcon,
+                href: "/suggestions/new",
+              },
+            ]
+          : []),
         {
           key: "gigs",
           label: t("nav.gigs"),
@@ -352,9 +367,7 @@ export default function Dashboard() {
         <View style={styles.topBar}>
           {account}
           <Badge
-            label={
-              isAdmin ? t("organizations.admin") : t("organizations.member")
-            }
+            label={t(`organizations.${role ?? "member"}`)}
             tone="primary"
           />
         </View>
@@ -660,33 +673,37 @@ export default function Dashboard() {
           </Section>
         </View>
 
-        <View style={styles.block}>
-          <Section title={t("dashboard.bandActivity")}>
-            {activity.length === 0 ? (
-              <Card>
-                <AppText variant="caption" tone="faint">
-                  {t("dashboard.noRecentActivityDescription")}
-                </AppText>
-              </Card>
-            ) : (
-              <Card style={styles.activityList}>
-                {activity.slice(0, MAX_ACTIVITY).map((event) => (
-                  <View key={event.id} style={styles.activityRow}>
-                    <View style={styles.activityDot} />
-                    <AppText
-                      variant="caption"
-                      tone="muted"
-                      numberOfLines={2}
-                      style={styles.flex}
-                    >
-                      {event.message}
-                    </AppText>
-                  </View>
-                ))}
-              </Card>
-            )}
-          </Section>
-        </View>
+        {/* The feed is member-only in the rules (roadmap #59), so a guest
+            never sees the section — not even its empty state. */}
+        {isGuest ? null : (
+          <View style={styles.block}>
+            <Section title={t("dashboard.bandActivity")}>
+              {activity.length === 0 ? (
+                <Card>
+                  <AppText variant="caption" tone="faint">
+                    {t("dashboard.noRecentActivityDescription")}
+                  </AppText>
+                </Card>
+              ) : (
+                <Card style={styles.activityList}>
+                  {activity.slice(0, MAX_ACTIVITY).map((event) => (
+                    <View key={event.id} style={styles.activityRow}>
+                      <View style={styles.activityDot} />
+                      <AppText
+                        variant="caption"
+                        tone="muted"
+                        numberOfLines={2}
+                        style={styles.flex}
+                      >
+                        {event.message}
+                      </AppText>
+                    </View>
+                  ))}
+                </Card>
+              )}
+            </Section>
+          </View>
+        )}
       </View>
     </ScreenContainer>
   )

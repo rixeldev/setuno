@@ -15,7 +15,7 @@ import { AppBackground } from "@/components/app/AppBackground"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrgData } from "@/hooks/useOrgData"
-import { MORE_NAV } from "@/libs/navigation"
+import { MORE_NAV, visibleNavItems } from "@/libs/navigation"
 
 /**
  * Mobile hub for everything that doesn't fit the bottom bar (docs §21). On
@@ -68,7 +68,7 @@ export default function MoreScreen() {
             {organization ? (
               <View style={styles.heroPill}>
                 <AppText variant="caption" tone="inverse" numberOfLines={1}>
-                  {role === "admin" ? t("organizations.admin") : t("organizations.member")}
+                  {t(`organizations.${role ?? "member"}`)}
                 </AppText>
               </View>
             ) : null}
@@ -119,7 +119,7 @@ export default function MoreScreen() {
           </AppText>
 
           <View style={styles.grid}>
-            {MORE_NAV.map((item) => {
+            {visibleNavItems(MORE_NAV, role).map((item) => {
               const Icon = item.icon
               const hint =
                 item.badge === "suggestions" && pendingSuggestions.length > 0

@@ -120,6 +120,7 @@ import { serializeChordPro } from "@/libs/chordpro"
 import { exportTextFile } from "@/libs/exportFile"
 import { songPrintHtml } from "@/libs/songPrint"
 import { setlistStep } from "@/libs/setlistNavigation"
+import { canCollaborate } from "@/libs/membership"
 import * as Clipboard from "expo-clipboard"
 
 /** Stable empty log for readers of songs that are not part of any event. */
@@ -150,7 +151,7 @@ export default function SongScreen() {
   const readerColumns = isMobile ? 1 : 2
 
   const { profile } = useAuth()
-  const { organizationId, isAdmin } = useOrganization()
+  const { organizationId, role, isAdmin } = useOrganization()
   const { songLibrary, songs, setlists, suggestions, performances, loading, songUsage } = useOrgData()
   const [song, setSong] = useState(songId ? (songLibrary.get(songId) ?? null) : null)
   // Derived usage (roadmap #34): only a song the band has actually played
@@ -1125,14 +1126,16 @@ export default function SongScreen() {
             />
           ) : null}
 
-          {isAdmin ? null : (
+          {/* Guests (roadmap #59) read the songbook; the rules deny them
+              suggestions, so the door to that flow stays shut too. */}
+          {canCollaborate(role) && !isAdmin ? (
             <Button
               label={t("songs.suggestChange")}
               variant="secondary"
               icon={<SuggestIcon size={15} color={Theme.colors.text} />}
               onPress={() => router.push(`/songs/${song.id}/suggest`)}
             />
-          )}
+          ) : null}
 
           <View style={styles.footer}>
             {song.tags.length > 0 ? (

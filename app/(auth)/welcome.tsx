@@ -151,7 +151,12 @@ export default function Welcome() {
             : t("auth.joinBandTitle", { name: "" })
         }
         description={t("auth.joinBandDescription", {
-          role: pendingAccept?.role === "admin" ? t("auth.roleAdmin") : t("auth.roleMusician"),
+          role:
+            pendingAccept?.role === "admin"
+              ? t("auth.roleAdmin")
+              : pendingAccept?.role === "guest"
+                ? t("auth.roleGuest")
+                : t("auth.roleMusician"),
         })}
         confirmLabel={t("auth.acceptInvitation")}
         confirmLoading={busy}
@@ -191,7 +196,13 @@ function ViewWelcome({
           </View>
           <View style={{ flexDirection: "row", gap: Theme.spacing.s, alignItems: "center" }}>
             <Badge
-              label={invitation.role === "admin" ? t("organizations.admin") : t("auth.musician")}
+              label={
+                invitation.role === "admin"
+                  ? t("organizations.admin")
+                  : invitation.role === "guest"
+                    ? t("organizations.guest")
+                    : t("auth.musician")
+              }
               tone="primary"
             />
           </View>

@@ -27,12 +27,16 @@ rules_version = '2';
  *   shares/{token}                                    public share snapshot (#56)
  *
  * Invariants enforced here:
- *   • only members can read anything inside their band;
+ *   • any roster member can read the band's music and logistics, the read-only
+ *     `guest` role included (roadmap #59) — while suggestions, their comments,
+ *     the activity feed, date polls and the checklist library stay plain-member:
+ *     a guest reads the night, not the band's conversation;
  *   • only admins can write the *content* of songs, setlists or performances —
  *     members get two narrow event carve-outs (roadmap #45/#47): the show log
  *     and their own attendance answer, plus the event's tasks, which any
- *     member ticks (logistics is not an admin job);
- *   • any member can create a suggestion, nobody can edit a song directly;
+ *     member ticks (logistics is not an admin job) — and a guest gets none of
+ *     them: `isMember` never counts a guest (#59);
+ *   • any plain member can create a suggestion, nobody can edit a song directly;
  *   • nobody can change their own role, admins included;
  *   • membership is granted through an email-keyed invitation that only the
  *     matching authenticated account can accept, in the same batch that creates
@@ -85,6 +89,16 @@ service cloud.firestore {
 
     function isAdmin(organizationId) {
       return signedIn() && roleOf(organizationId) == 'admin';
+    }
+
+    /**
+     * Any roster member, guests included (roadmap #59): the **read** gate for
+     * the band's music and logistics — songs, setlists, events, their tasks.
+     * `isMember` above keeps its write meaning exactly as it was, so every
+     * member-writable carve-out below stays closed to the read-only guest.
+     */
+    function isBandReader(organizationId) {
+      return signedIn() && roleOf(organizationId) in ['admin', 'member', 'guest'];
     }
 
     /**
@@ -256,7 +270,7 @@ service cloud.firestore {
           || (signedIn() && isAdmin(organizationId) && exists(memberPath(organizationId, uid)));
         allow create: if isSelf(uid)
           && request.resource.data.keys().hasOnly(['name', 'role', 'logoURL', 'joinedAt'])
-          && request.resource.data.role in ['admin', 'member']
+          && request.resource.data.role in ['admin', 'member', 'guest']
           && (
             // the creator's own index entry for a band they just made
             isBandOwnerAfterBatch(organizationId)
@@ -402,7 +416,7 @@ service cloud.firestore {
     // ------------------------------------------------------------ organizations
 
     match /organizations/{organizationId} {
-      allow read: if isMember(organizationId);
+      allow read: if isBandReader(organizationId);
 
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly([
@@ -425,13 +439,13 @@ service cloud.firestore {
       // ----------------------------------------------------------------- members
 
       match /members/{memberUid} {
-        allow read: if isMember(organizationId);
+        allow read: if isBandReader(organizationId);
 
         allow create: if request.resource.data.keys().hasOnly([
               'uid', 'displayName', 'email', 'photoURL', 'role', 'joinedAt', 'invitedBy'
             ])
             && request.resource.data.uid == memberUid
-            && request.resource.data.role in ['admin', 'member']
+            && request.resource.data.role in ['admin', 'member', 'guest']
             && (
               // an admin adding somebody by hand
               isAdmin(organizationId)
@@ -449,7 +463,7 @@ service cloud.firestore {
             isAdmin(organizationId)
             && memberUid != request.auth.uid
             && request.resource.data.uid == memberUid
-            && request.resource.data.role in ['admin', 'member']
+            && request.resource.data.role in ['admin', 'member', 'guest']
             && request.resource.data.diff(resource.data).affectedKeys()
                  .hasOnly(['role', 'displayName', 'photoURL', 'email'])
           ) || (
@@ -480,7 +494,7 @@ service cloud.firestore {
             'invitedBy', 'invitedByName', 'createdAt', 'respondedAt'
           ])
           && request.resource.data.organizationId == organizationId
-          && request.resource.data.role in ['admin', 'member']
+          && request.resource.data.role in ['admin', 'member', 'guest']
           && request.resource.data.status == 'pending'
           && validEmail(request.resource.data.email)
           // The document id is the lowercased email, otherwise the invitee could
@@ -496,7 +510,7 @@ service cloud.firestore {
               && request.resource.data.diff(resource.data).affectedKeys()
                    .hasOnly(['status', 'respondedAt'])
               && request.resource.data.status == 'accepted'
-              && getAfter(memberPath(organizationId, request.auth.uid)).data.role in ['admin', 'member']);
+              && getAfter(memberPath(organizationId, request.auth.uid)).data.role in ['admin', 'member', 'guest']);
 
         allow delete: if isAdmin(organizationId);
       }
@@ -504,7 +518,7 @@ service cloud.firestore {
       // ------------------------------------------------------------------- songs
 
       match /songs/{songId} {
-        allow read: if isMember(organizationId);
+        allow read: if isBandReader(organizationId);
         allow create: if isAdmin(organizationId)
           && request.resource.data.organizationId == organizationId
           && request.resource.data.title is string
@@ -541,7 +555,7 @@ service cloud.firestore {
       // ---------------------------------------------------------------- setlists
 
       match /setlists/{setlistId} {
-        allow read: if isMember(organizationId);
+        allow read: if isBandReader(organizationId);
         allow create: if isAdmin(organizationId)
           && request.resource.data.organizationId == organizationId
           && request.resource.data.name is string
@@ -560,7 +574,7 @@ service cloud.firestore {
       // ------------------------------------------------------------ performances
 
       match /performances/{performanceId} {
-        allow read: if isMember(organizationId);
+        allow read: if isBandReader(organizationId);
         allow create: if isAdmin(organizationId)
           && request.resource.data.organizationId == organizationId
           && request.resource.data.name is string
@@ -637,7 +651,10 @@ service cloud.firestore {
         // `createdBy` is immutable at create time and only its creator (or an
         // admin) may delete one.
         match /tasks/{taskId} {
-          allow read: if isMember(organizationId);
+          // Read: guests too (roadmap #59) — a sub/tech needs to know what to
+          // bring. Write stays below on `isMember`, so a guest cannot tick,
+          // add or edit anything.
+          allow read: if isBandReader(organizationId);
           allow create: if isMember(organizationId)
             && request.resource.data.keys().hasOnly([
               'title', 'assignedTo', 'done', 'createdBy', 'createdAt', 'updatedAt'

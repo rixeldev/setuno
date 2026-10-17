@@ -34,6 +34,7 @@ import { setShareLive, createShareLink } from "@/services/shares"
 import { toFriendlyError } from "@/services/errors"
 import { exportPerformancesToIcs } from "@/libs/calendarExport"
 import { AttendanceCard } from "@/components/performances/AttendanceCard"
+import { canCollaborate } from "@/libs/membership"
 import { EventTasksCard } from "@/components/performances/EventTasksCard"
 import { ShareSheet } from "@/components/shares/ShareSheet"
 import { useEventTasks } from "@/hooks/useEventTasks"
@@ -63,7 +64,7 @@ export default function PerformanceDetail() {
   const performanceId = params.id ?? null
 
   const { profile } = useAuth()
-  const { organization, organizationId, isAdmin } = useOrganization()
+  const { organization, organizationId, role, isAdmin } = useOrganization()
   const { performances, setlists, members, loading } = useOrgData()
   const { usesSidebar } = useResponsive()
   // Roadmap #47: the tasks subscribe per screen (the RSVP map rides the event
@@ -435,12 +436,15 @@ export default function PerformanceDetail() {
           is not happening. */}
       {performance.status !== "cancelled" && profile ? (
         <>
+          {/* Roadmap #59: a guest reads the logistics but the rules deny its
+              writes, so both cards render read-only for them. */}
           <AttendanceCard
             organizationId={organizationId ?? ""}
             performanceId={performance.id}
             attendance={performance.attendance}
             members={members}
             currentUid={profile.uid}
+            canWrite={canCollaborate(role)}
           />
           <EventTasksCard
             organizationId={organizationId ?? ""}
@@ -449,6 +453,7 @@ export default function PerformanceDetail() {
             members={members}
             currentUid={profile.uid}
             isAdmin={isAdmin}
+            canWrite={canCollaborate(role)}
           />
         </>
       ) : null}

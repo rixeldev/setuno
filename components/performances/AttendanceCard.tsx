@@ -27,6 +27,12 @@ interface AttendanceCardProps {
   attendance: Record<string, AttendanceStatus>
   members: OrganizationMember[]
   currentUid: string
+  /**
+   * Roadmap #59: the rules pin the RSVP carve-out to plain members, so a
+   * guest sees who answered (the roster's own data) but not the chips that
+   * would write their own key and be rejected.
+   */
+  canWrite: boolean
 }
 
 /**
@@ -42,6 +48,7 @@ export function AttendanceCard({
   attendance,
   members,
   currentUid,
+  canWrite,
 }: AttendanceCardProps) {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
@@ -68,18 +75,20 @@ export function AttendanceCard({
     <Card style={styles.card}>
       <AppText variant="heading">{t("performances.attendance")}</AppText>
 
-      <View style={styles.chipRow}>
-        {ATTENDANCE_STATUSES.map((status) => (
-          <Chip
-            key={status}
-            label={t(ATTENDANCE_STATUS_KEYS[status])}
-            tone={TONE_BY_STATUS[status]}
-            selected={current === status}
-            disabled={busy}
-            onPress={() => answer(status)}
-          />
-        ))}
-      </View>
+      {canWrite ? (
+        <View style={styles.chipRow}>
+          {ATTENDANCE_STATUSES.map((status) => (
+            <Chip
+              key={status}
+              label={t(ATTENDANCE_STATUS_KEYS[status])}
+              tone={TONE_BY_STATUS[status]}
+              selected={current === status}
+              disabled={busy}
+              onPress={() => answer(status)}
+            />
+          ))}
+        </View>
+      ) : null}
 
       {answered === 0 ? (
         <AppText variant="caption" tone="muted">
