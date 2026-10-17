@@ -27,6 +27,7 @@ import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
+import { useResponsive } from "@/hooks/useResponsive"
 import { deletePerformance, updatePerformance } from "@/services/performances"
 import { toFriendlyError } from "@/services/errors"
 import { exportPerformancesToIcs } from "@/libs/calendarExport"
@@ -61,6 +62,7 @@ export default function PerformanceDetail() {
   const { profile } = useAuth()
   const { organization, organizationId, isAdmin } = useOrganization()
   const { performances, setlists, members, loading } = useOrgData()
+  const { usesSidebar } = useResponsive()
   // Roadmap #47: the tasks subscribe per screen (the RSVP map rides the event
   // document above); tagged by band+event inside the hook, so a stale list can
   // never leak across events.
@@ -180,6 +182,9 @@ export default function PerformanceDetail() {
   const hasVenue = Boolean(performance.venue.name || performance.venue.address || performance.venue.notes)
   const hasNotes = performance.notes.trim().length > 0
   const attachedSetlists = performance.setlists
+  const showAdminActions = isAdmin && performance.status !== "completed"
+  /** Wide layout: both action groups side by side, each filling its column. */
+  const inActionGrid = usesSidebar && showAdminActions
 
   return (
     <ScreenContainer
@@ -353,61 +358,65 @@ export default function PerformanceDetail() {
       {/* Anyone can open the post-gig report once a setlist is attached
           (roadmap #45) — the rules' member carve-out lets non-admins mark the
           log too — and anyone can drop the show into their own calendar
-          (roadmap #50). */}
-      <View style={styles.actions}>
-        {attachedSetlists.length > 0 ? (
+          (roadmap #50). On a wide screen (web/desktop) the member and admin
+          groups sit side by side as a two-column grid occupying the whole
+          content width, each button filling its own column; phones and
+          tablets keep the single stacked column, capped at 420. */}
+      <View style={inActionGrid ? styles.actionsGrid : styles.actionsWrap}>
+        <View style={[styles.actions, inActionGrid ? styles.actionsColumn : null]}>
+          {attachedSetlists.length > 0 ? (
+            <Button
+              label={t("performances.reportAction")}
+              variant="secondary"
+              full
+              icon={<ListIcon size={16} color={Theme.colors.text} />}
+              onPress={() => router.push(`/performances/${performance.id}/report`)}
+            />
+          ) : null}
           <Button
-            label={t("performances.reportAction")}
+            label={t("calendar.exportEvent")}
             variant="secondary"
             full
-            icon={<ListIcon size={16} color={Theme.colors.text} />}
-            onPress={() => router.push(`/performances/${performance.id}/report`)}
+            disabled={exporting}
+            loading={exporting}
+            icon={<CalendarCheckIcon size={16} color={Theme.colors.text} />}
+            onPress={() => void exportToCalendar()}
           />
-        ) : null}
-        <Button
-          label={t("calendar.exportEvent")}
-          variant="secondary"
-          full
-          disabled={exporting}
-          loading={exporting}
-          icon={<CalendarCheckIcon size={16} color={Theme.colors.text} />}
-          onPress={() => void exportToCalendar()}
-        />
-      </View>
-
-      {isAdmin && performance.status !== "completed" ? (
-        // Stacked full-width actions: they can never overflow the viewport.
-        <View style={styles.actions}>
-          {performance.status === "scheduled" ? (
-            <Button
-              label={t("performances.markCompleted")}
-              full
-              disabled={busy}
-              icon={<CheckCircleIcon size={16} color={Theme.colors.onPrimary} />}
-              onPress={() => void setStatus("completed")}
-            />
-          ) : null}
-          {performance.status === "scheduled" ? (
-            <Button
-              label={t("performances.cancelShow")}
-              variant="secondary"
-              full
-              disabled={busy}
-              icon={<CloseIcon size={16} color={Theme.colors.danger} />}
-              onPress={() => void setStatus("cancelled")}
-            />
-          ) : null}
-          {performance.status === "cancelled" ? (
-            <Button
-              label={t("performances.markScheduled")}
-              variant="secondary"
-              full
-              disabled={busy}
-              onPress={() => void setStatus("scheduled")}
-            />
-          ) : null}
         </View>
-      ) : null}
+
+        {showAdminActions ? (
+          <View style={[styles.actions, inActionGrid ? styles.actionsColumn : null]}>
+            {performance.status === "scheduled" ? (
+              <Button
+                label={t("performances.markCompleted")}
+                full
+                disabled={busy}
+                icon={<CheckCircleIcon size={16} color={Theme.colors.onPrimary} />}
+                onPress={() => void setStatus("completed")}
+              />
+            ) : null}
+            {performance.status === "scheduled" ? (
+              <Button
+                label={t("performances.cancelShow")}
+                variant="secondary"
+                full
+                disabled={busy}
+                icon={<CloseIcon size={16} color={Theme.colors.danger} />}
+                onPress={() => void setStatus("cancelled")}
+              />
+            ) : null}
+            {performance.status === "cancelled" ? (
+              <Button
+                label={t("performances.markScheduled")}
+                variant="secondary"
+                full
+                disabled={busy}
+                onPress={() => void setStatus("scheduled")}
+              />
+            ) : null}
+          </View>
+        ) : null}
+      </View>
 
       <Dialog
         visible={confirmDelete}
@@ -456,5 +465,16 @@ const createStyles = () =>
     },
     pressed: { opacity: 0.7 },
     emptySetlist: { gap: Theme.spacing.m, alignItems: "flex-start" },
-    actions: { gap: Theme.spacing.s, width: "100%", maxWidth: 420 },
+    // Mobile/tablet: one stacked column, capped so buttons never stretch.
+    actionsWrap: { width: "100%", maxWidth: 420, gap: Theme.spacing.xl },
+    // Wide (web/desktop): the member and admin groups sit side by side and
+    // fill the whole content width — the owner's two-column layout ask.
+    actionsGrid: {
+      width: "100%",
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: Theme.spacing.l,
+    },
+    actions: { gap: Theme.spacing.s, width: "100%" },
+    actionsColumn: { flex: 1, minWidth: 0 },
   })
