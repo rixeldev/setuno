@@ -1498,7 +1498,20 @@
     "languageUpdated": "Idioma actualizado",
     "signOutConfirm": "¿Cerrar sesión de tu cuenta?",
     "version": "Versión {{version}}",
-    "build": "Compilación {{build}}"
+    "build": "Compilación {{build}}",
+    "yourData": "Tus datos",
+    "yourDataHint": "Llévate todo lo que Setuno guarda sobre esta cuenta o elimina la cuenta definitivamente.",
+    "exportData": "Exportar mis datos",
+    "exportDataDone": "Exportación lista para guardar o compartir.",
+    "exportDataFailed": "No pudimos generar tu exportación. Inténtalo de nuevo.",
+    "exportDataUnavailable": "Este dispositivo no puede compartir archivos.",
+    "deleteAccount": "Eliminar mi cuenta",
+    "deleteAccountTitle": "¿Eliminar tu cuenta?",
+    "deleteAccountDescription": "Dejarás todas las bandas a las que perteneces. Tu perfil, favoritos, colecciones, posiciones de lectura, anotaciones y nombre de usuario se eliminan definitivamente; las canciones, listas y eventos que aportaste se quedan en la banda. Una banda de la que seas el único miembro también se elimina. No se puede deshacer.",
+    "deleteAccountPassword": "Confirma con tu contraseña",
+    "deleteAccountGoogleHint": "Se te pedirá confirmar tu cuenta de Google.",
+    "deleteAccountConfirm": "Eliminar definitivamente",
+    "deleteAccountFailed": "No pudimos eliminar tu cuenta. Inténtalo de nuevo."
   },
   "organizations": {
     "bands": "Bandas",

@@ -50,6 +50,11 @@ interface WebAuthApi {
     auth: firebaseAuth.Auth,
     resolver: WebResolver,
   ) => Promise<firebaseAuth.UserCredential | null>
+  reauthenticateWithPopup: (
+    user: firebaseAuth.User,
+    provider: WebProvider,
+    resolver: WebResolver,
+  ) => Promise<firebaseAuth.UserCredential>
 }
 
 const web = firebaseAuth as unknown as WebAuthApi
@@ -103,6 +108,25 @@ export const signInWithGoogle = async (): Promise<boolean> => {
       await web.signInWithRedirect(webAuth, createProvider(), web.browserPopupRedirectResolver)
       return false
     }
+    throw error
+  }
+}
+
+/**
+ * Re-proves the Google identity ahead of a sensitive operation (roadmap #68's
+ * account deletion): the same popup as sign-in, resolved against the
+ * **current** session.
+ *
+ * @returns `true` once the popup resolved, `false` when the user dismissed it.
+ */
+export const reauthenticateWithGoogle = async (): Promise<boolean> => {
+  try {
+    const user = webAuth.currentUser
+    if (!user) throw new Error("You need to be signed in to do that.")
+    await web.reauthenticateWithPopup(user, createProvider(), web.browserPopupRedirectResolver)
+    return true
+  } catch (error) {
+    if (isCancellation(error)) return false
     throw error
   }
 }

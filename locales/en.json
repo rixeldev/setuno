@@ -1647,7 +1647,20 @@
     "usernameHint": "Unique, and only changeable once every 3 months.",
     "usernameTaken": "That name is already taken.",
     "usernameTooSoon": "You can only change your name once every 3 months.",
-    "signOutDescription": "Your songs stay safe on the server. Sign back in any time."
+    "signOutDescription": "Your songs stay safe on the server. Sign back in any time.",
+    "yourData": "Your data",
+    "yourDataHint": "Take everything Setuno stores about this account with you, or delete the account for good.",
+    "exportData": "Export my data",
+    "exportDataDone": "Export ready to save or share.",
+    "exportDataFailed": "We couldn't build your export. Please try again.",
+    "exportDataUnavailable": "This device can't share files.",
+    "deleteAccount": "Delete my account",
+    "deleteAccountTitle": "Delete your account?",
+    "deleteAccountDescription": "You'll leave every band you're in. Your profile, favorites, collections, reading positions, annotations and username are deleted for good; the songs, setlists and events you contributed stay with the band. A band where you're the only member is deleted too. This can't be undone.",
+    "deleteAccountPassword": "Confirm with your password",
+    "deleteAccountGoogleHint": "You'll be asked to confirm your Google account.",
+    "deleteAccountConfirm": "Delete forever",
+    "deleteAccountFailed": "We couldn't delete your account. Please try again."
   },
   "activity": {
     "songCreated": "{{actor}} added \"{{target}}\"",

@@ -14,6 +14,7 @@ import { Dialog } from "@/components/ui/Dialog"
 import { useToast } from "@/components/ui/Toast"
 import { AccountIcon } from "@/components/ui/Icons"
 import { ModalScreen } from "@/components/app/ModalScreen"
+import { AccountDataCard } from "@/components/settings/AccountDataCard"
 import { useAuth } from "@/hooks/useAuth"
 import { toFriendlyError } from "@/services/errors"
 import { updateAuthDisplayName, updateAuthPhotoUrl } from "@/services/auth"
@@ -165,6 +166,8 @@ export default function ProfileSettings() {
           style={styles.action}
         />
       </View>
+
+      <AccountDataCard />
 
       <Dialog
         visible={confirmRemovePhoto}

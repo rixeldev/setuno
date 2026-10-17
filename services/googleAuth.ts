@@ -10,8 +10,15 @@
 // This file is the native implementation. Metro resolves `googleAuth.web.ts`
 // for the web bundle (platform extension), so the browser never pulls in a
 // native-only SDK.
-import { GoogleSignin, isSuccessResponse } from "@react-native-google-signin/google-signin"
-import { GoogleAuthProvider, signInWithCredential } from "@react-native-firebase/auth"
+import {
+  GoogleSignin,
+  isSuccessResponse,
+} from "@react-native-google-signin/google-signin"
+import {
+  GoogleAuthProvider,
+  reauthenticateWithCredential,
+  signInWithCredential,
+} from "@react-native-firebase/auth"
 
 import { auth } from "@/db/firebaseConfig"
 
@@ -70,6 +77,50 @@ export const signInWithGoogle = async (): Promise<boolean> => {
     }
     await signInWithCredential(
       auth,
+      GoogleAuthProvider.credential(tokens.idToken, tokens.accessToken),
+    )
+    return true
+  } catch (error) {
+    if (isCancellation(error)) return false
+    throw error
+  }
+}
+
+/**
+ * Re-proves the Google identity ahead of a sensitive operation (roadmap #68's
+ * account deletion): the same picker as sign-in, exchanged against the
+ * **current** session. The flow mirrors `signInWithGoogle`'s token handling,
+ * access-token-only Android setups included.
+ *
+ * @returns `true` once the credential was accepted, `false` when the user
+ * backed out of the picker (the caller simply stays where it was).
+ */
+export const reauthenticateWithGoogle = async (): Promise<boolean> => {
+  configure()
+  try {
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true })
+    const response = await GoogleSignin.signIn()
+    if (!isSuccessResponse(response)) return false
+
+    const user = auth.currentUser
+    if (!user) throw new Error("You need to be signed in to do that.")
+
+    const responseToken = response.data.idToken?.trim()
+    if (responseToken) {
+      try {
+        await reauthenticateWithCredential(user, GoogleAuthProvider.credential(responseToken))
+        return true
+      } catch {
+        // Fall through to the full token exchange, like sign-in does.
+      }
+    }
+
+    const tokens = await GoogleSignin.getTokens()
+    if (!tokens.idToken && !tokens.accessToken) {
+      throw new Error("Google did not return sign-in tokens.")
+    }
+    await reauthenticateWithCredential(
+      user,
       GoogleAuthProvider.credential(tokens.idToken, tokens.accessToken),
     )
     return true

@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto"
 import { initializeApp } from "firebase-admin/app"
+import { getAuth } from "firebase-admin/auth"
 import { Timestamp, type Firestore, getFirestore } from "firebase-admin/firestore"
 import { logger } from "firebase-functions/v2"
 import {
@@ -11,6 +12,12 @@ import { HttpsError, onCall } from "firebase-functions/v2/https"
 import { onSchedule } from "firebase-functions/v2/scheduler"
 
 import { TRASH_TTL_DAYS, purgeExpiredSongs } from "./purge"
+import {
+  ACCOUNT_EXPORT_BYTES_MAX,
+  accountExportFileName,
+  collectAccountExport,
+  deleteAccountData,
+} from "./accountData"
 import {
   SHARE_EXPIRY_DAYS,
   SHARE_PAYLOAD_BYTES_MAX,
@@ -453,4 +460,63 @@ export const revokeShare = onCall(async (request) => {
   }
   await ref.delete()
   return { revoked: true }
+})
+
+// ------------------------------------------------------- account data (#68)
+//
+// Roadmap #68: the account's own export and the account's own deletion. Both
+// run through the Admin SDK (no `firestore.rules` change ships with them),
+// and the client re-authenticates *before* `deleteMyAccount` — the
+// re-authentication is deliberately client-side, because the password /
+// Google challenge belongs to the provider's own SDK, exactly where the
+// roadmap puts it. `functions/src/accountData.ts` owns every decision that
+// can be made without a database; the wrapper below is thin.
+
+/**
+ * Everything the account owns, as one indented JSON document — the app hands
+ * it straight to the OS share sheet (native) or the browser download (web),
+ * so nothing about the account ever sits behind a URL.
+ */
+export const exportMyData = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to export your data")
+  const uid = request.auth.uid
+  const email = typeof request.auth.token.email === "string" ? request.auth.token.email : null
+
+  const now = new Date()
+  const account = await collectAccountExport(getFirestore(), uid, email, now)
+  const json = JSON.stringify(account, null, 2)
+  if (Buffer.byteLength(json, "utf8") > ACCOUNT_EXPORT_BYTES_MAX) {
+    throw new HttpsError("resource-exhausted", "This account's export is too large to hand over")
+  }
+  return { json, filename: accountExportFileName(now) }
+})
+
+/**
+ * Delete the account for good: the member walks out of every band (a band
+ * left with nobody in it goes too, a band left without an admin promotes its
+ * most senior member and receives the new `ownerId`), the username claim is
+ * released, every document under `users/{uid}` goes, and the Auth user is
+ * removed last — the only step that cannot run twice, so a retry after a
+ * half-finished run finds its `auth/user-not-found` answer to be success.
+ * The band's own content stays behind: it belongs to the band.
+ */
+export const deleteMyAccount = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to delete your account")
+  const uid = request.auth.uid
+  const data = readCallInput(request.data)
+  if (data.confirmed !== true) {
+    throw new HttpsError("failed-precondition", "Confirm the deletion in the app first")
+  }
+
+  const summary = await deleteAccountData(getFirestore(), uid)
+  try {
+    await getAuth().deleteUser(uid)
+  } catch (error) {
+    const code = (error as { code?: unknown }).code
+    if (code !== "auth/user-not-found") {
+      logger.error("deleteMyAccount could not remove the Auth user", error)
+      throw new HttpsError("internal", "We couldn't finish deleting the account. Try again.")
+    }
+  }
+  return { deleted: true, ...summary }
 })

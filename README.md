@@ -50,6 +50,7 @@ a sidebar layout on the web.
 | --- | --- |
 | **Authentication** | Register, sign in (email or Google), sign out, password reset, persistent sessions |
 | **Usernames** | Unique, case-insensitive username per account; one rename every 3 months |
+| **Your data, your call** | Take everything Setuno stores about you with you: one JSON export (profile, bands, songs, your personal data) handed to the share sheet or downloaded. Or delete the account for good behind a password or Google re-confirmation — you walk out of every band (a band left with nobody in it goes too; one left without an admin promotes its most senior member), your username is freed and your private data is erased, while the band keeps what it made together |
 | **Bands (organizations)** | Create a band, rename it, set a logo, delete it, switch between bands |
 | **Members & roles** | Invite by email, accept/decline invitations, admins & members, promote/demote, remove; profiles stay in sync per band |
 | **Songbook** | Create, edit and delete songs with lyrics, chords, tags, genre, BPM, capo and duration; paste a lyric block (section headers, inline `[C]` chords and other apps' metadata are handled) with a live preview |
