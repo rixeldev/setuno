@@ -1,13 +1,22 @@
 import { describe, expect, it } from "vitest"
 
-import { sharedSections, sharedSetlistRows } from "../../libs/shareView"
+import {
+  LIVE_FRESH_WINDOW_MS,
+  sanitizeShareLive,
+  shareLiveFreshness,
+  sharedSections,
+  sharedSetlistRows,
+} from "../../libs/shareView"
 import type { SharedSetlistPayload } from "../../functions/src/shares"
 
 /**
  * The public reader's view layer (roadmap #56): payload → the types the app
  * renders. The one rule worth pinning here is that an unknown section type
  * degrades to `custom` with its stored label instead of rendering blank — the
- * callable must never mirror the app's section-type union.
+ * callable must never mirror the app's section-type union. It also owns the
+ * live position contract of a public setlist (roadmap #57): a stray value
+ * self-heals to "no live", and a position nobody moved for the fresh window
+ * stops calling itself the show.
  */
 
 describe("sharedSections", () => {
@@ -128,5 +137,48 @@ describe("sharedSetlistRows", () => {
       "Break",
       "Set 2",
     ])
+  })
+})
+
+describe("sanitizeShareLive (roadmap #57)", () => {
+  const live = { songId: "song-1", position: 4, updatedAt: 1_760_000_000_000 }
+
+  it("passes a well-formed position through untouched", () => {
+    expect(sanitizeShareLive(live)).toEqual(live)
+  })
+
+  it("heals a stray document back to no-live instead of rendering nonsense", () => {
+    expect(sanitizeShareLive(null)).toBeNull()
+    expect(sanitizeShareLive(undefined)).toBeNull()
+    expect(sanitizeShareLive("live")).toBeNull()
+    expect(sanitizeShareLive({ ...live, songId: "" })).toBeNull()
+    expect(sanitizeShareLive({ ...live, position: 0 })).toBeNull()
+    expect(sanitizeShareLive({ ...live, position: 2.5 })).toBeNull()
+    expect(sanitizeShareLive({ ...live, position: "4" })).toBeNull()
+    expect(sanitizeShareLive({ ...live, updatedAt: 0 })).toBeNull()
+    expect(sanitizeShareLive({ ...live, updatedAt: "now" })).toBeNull()
+  })
+
+  it("keeps an out-of-range position — clamping is the screen's job", () => {
+    // A setlist edited mid-show can leave the stored position past its end;
+    // the position still says where the band was, the page clamps the display.
+    expect(sanitizeShareLive({ ...live, position: 99 })).toEqual({ ...live, position: 99 })
+  })
+})
+
+describe("shareLiveFreshness (roadmap #57)", () => {
+  const live = { songId: "song-1", position: 2, updatedAt: 1_760_000_000_000 }
+
+  it("is current the moment it is written and at the window's edge", () => {
+    expect(shareLiveFreshness(live, live.updatedAt)).toBe("current")
+    expect(shareLiveFreshness(live, live.updatedAt + LIVE_FRESH_WINDOW_MS)).toBe("current")
+  })
+
+  it("goes stale once the band has not moved for the whole window", () => {
+    expect(shareLiveFreshness(live, live.updatedAt + LIVE_FRESH_WINDOW_MS + 1)).toBe("stale")
+  })
+
+  it("a future stamp (a skewed device clock) still reads as current", () => {
+    expect(shareLiveFreshness(live, live.updatedAt - 60_000)).toBe("current")
   })
 })

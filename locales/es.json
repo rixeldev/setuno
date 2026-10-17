@@ -1026,7 +1026,12 @@
     "goneTitle": "Este enlace ya no está disponible",
     "goneMessage": "Puede que se haya revocado o caducado.",
     "errorTitle": "No se pudo cargar este enlace",
-    "errorMessage": "Comprueba tu conexión e inténtalo de nuevo."
+    "errorMessage": "Comprueba tu conexión e inténtalo de nuevo.",
+    "liveBadge": "EN VIVO",
+    "livePosition": "{{position}} de {{total}}",
+    "liveNowPlaying": "Suena ahora — ¡síguelo!",
+    "liveEndedBadge": "ÚLTIMA CANCIÓN",
+    "liveEndedCaption": "El show parece haber terminado — así fue la noche."
   },
   "liveShow": {
     "title": "En directo",
@@ -1209,7 +1214,14 @@
     "taskEmpty": "Nada que llevar aún: añade la primera tarea.",
     "taskSaved": "Tarea guardada.",
     "taskDeleted": "Tarea borrada.",
-    "taskError": "No pudimos guardar esa tarea."
+    "taskError": "No pudimos guardar esa tarea.",
+    "liveSetlistTitle": "Setlist público en vivo",
+    "liveSetlistOff": "Deja que los fans sigan el show canción a canción desde un enlace.",
+    "liveSetlistOn": "En vivo para quien tenga el enlace — sigue \"{{name}}\".",
+    "liveSetlistLink": "Compartir enlace",
+    "liveSetlistEnabled": "Setlist público activado: abre una canción para empezar a emitir.",
+    "liveSetlistDisabled": "Setlist público desactivado. El enlace sigue funcionando como lista estática.",
+    "liveSetlistFailed": "No pudimos actualizar el setlist público."
   },
   "polls": {
     "title": "Votaciones de fecha",

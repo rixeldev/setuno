@@ -20,6 +20,7 @@ import {
   type Unsubscribe,
 } from "@/db/Fire"
 import type {
+  LiveShare,
   Performance,
   PerformanceInput,
   PerformanceStatus,
@@ -54,6 +55,19 @@ const mapSetlists = (data: Record<string, unknown>): Performance["setlists"] => 
   return []
 }
 
+/**
+ * The public live setlist pointer (roadmap #57): absent on every older
+ * document (reads back as no live link) and malformed entries self-heal to
+ * null — the rules pin the shape, this keeps a stray value off the screens.
+ */
+const mapLiveShare = (value: unknown): LiveShare | null => {
+  if (typeof value !== "object" || value === null) return null
+  const data = value as Record<string, unknown>
+  const token = typeof data.token === "string" ? data.token : ""
+  const setlistId = typeof data.setlistId === "string" ? data.setlistId : ""
+  return token.length > 0 && setlistId.length > 0 ? { token, setlistId } : null
+}
+
 const mapPerformance = (data: Record<string, unknown>, id: string): Performance => {
   const venue = (data.venue ?? {}) as Record<string, unknown>
   const status = data.status as PerformanceStatus
@@ -82,6 +96,9 @@ const mapPerformance = (data: Record<string, unknown>, id: string): Performance 
     // Roadmap #47: absent on every older document (no answers yet), and only
     // the caller's own key is ever written — the rules enforce exactly that.
     attendance: mapAttendance(data.attendance),
+    // Roadmap #57: absent on every older document (no live link), and only
+    // written through `setLiveShare` below — never by the event form.
+    liveShare: mapLiveShare(data.liveShare),
     createdBy: String(data.createdBy ?? ""),
     createdAt: data.createdAt as Performance["createdAt"],
     updatedAt: data.updatedAt as Performance["updatedAt"],
@@ -250,6 +267,26 @@ export const saveShowLog = async (
 ): Promise<void> => {
   await updateDoc(doc(firestore, paths.performance(organizationId, performanceId)), {
     showLog: sanitizeShowLog(showLog),
+    updatedAt: serverTimestamp(),
+  })
+}
+
+/**
+ * Points an event at the share link its fans follow live (roadmap #57), or
+ * clears it with `null` — its own field-level update, exactly like
+ * `saveShowLog`: `LiveShare` is deliberately **not** part of
+ * `PerformanceInput`, so the event form and every status tap leave the link
+ * untouched. Turning live off only detaches the event: the share document
+ * survives as #56's static snapshot, so the same URL keeps working as the
+ * plain setlist it always was.
+ */
+export const setLiveShare = async (
+  organizationId: string,
+  performanceId: string,
+  liveShare: LiveShare | null,
+): Promise<void> => {
+  await updateDoc(doc(firestore, paths.performance(organizationId, performanceId)), {
+    liveShare,
     updatedAt: serverTimestamp(),
   })
 }

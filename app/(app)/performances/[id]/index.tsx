@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react"
-import { Pressable, StyleSheet, View } from "react-native"
+import { Pressable, StyleSheet, Switch, View } from "react-native"
 import { useLocalSearchParams, useRouter } from "expo-router"
 import { useTranslation } from "react-i18next"
 
@@ -21,6 +21,7 @@ import {
   ListIcon,
   MapPinIcon,
   MusicIcon,
+  ShareIcon,
   TrashIcon,
 } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
@@ -28,11 +29,13 @@ import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { useResponsive } from "@/hooks/useResponsive"
-import { deletePerformance, updatePerformance } from "@/services/performances"
+import { deletePerformance, setLiveShare, updatePerformance } from "@/services/performances"
+import { setShareLive, createShareLink } from "@/services/shares"
 import { toFriendlyError } from "@/services/errors"
 import { exportPerformancesToIcs } from "@/libs/calendarExport"
 import { AttendanceCard } from "@/components/performances/AttendanceCard"
 import { EventTasksCard } from "@/components/performances/EventTasksCard"
+import { ShareSheet } from "@/components/shares/ShareSheet"
 import { useEventTasks } from "@/hooks/useEventTasks"
 import type { RelativeDayLabels } from "@/libs/format"
 import { formatDateRange, formatDurationLong, formatRelativeDay, formatTime } from "@/libs/format"
@@ -71,6 +74,10 @@ export default function PerformanceDetail() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
   const [exporting, setExporting] = useState(false)
+  // Roadmap #57: the public live setlist gets its own busy flag, so minting
+  // a link never disables the RSVP/tasks controls below.
+  const [togglingLive, setTogglingLive] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
 
   const performance = useMemo(
     () => performances.find((entry) => entry.id === performanceId) ?? null,
@@ -142,6 +149,54 @@ export default function PerformanceDetail() {
     }
   }
 
+  /**
+   * The public live setlist (roadmap #57): turning it on mints (or refreshes)
+   * the first attached setlist's link — #56's callable reuses the active token
+   * in place, so the URL never changes under a fan — and points the event at
+   * it; turning it off only detaches the event, so the same URL keeps working
+   * as the plain static snapshot it always was. The band flips this at the
+   * venue: the reader starts broadcasting positions the moment somebody opens
+   * a song of that exact setlist.
+   */
+  const toggleLive = async (next: boolean): Promise<void> => {
+    if (!performance || !organizationId) return
+    setTogglingLive(true)
+    try {
+      if (next) {
+        const setlist = performance.setlists[0]
+        if (!setlist) return
+        const link = await createShareLink({
+          kind: "setlist",
+          organizationId,
+          sourceId: setlist.id,
+          expiresInDays: null,
+        })
+        await setLiveShare(organizationId, performance.id, {
+          token: link.token,
+          setlistId: setlist.id,
+        })
+        toast.showSuccess(t("performances.liveSetlistEnabled"))
+      } else {
+        const current = performance.liveShare
+        if (current) {
+          // Best effort: the link may already be revoked, and a dead one must
+          // not keep the event attached.
+          try {
+            await setShareLive(current.token, null)
+          } catch {
+            // Ignored on purpose — the detach below is what turns it off.
+          }
+        }
+        await setLiveShare(organizationId, performance.id, null)
+        toast.showSuccess(t("performances.liveSetlistDisabled"))
+      }
+    } catch (error) {
+      toast.showError(toFriendlyError(error, t("performances.liveSetlistFailed")))
+    } finally {
+      setTogglingLive(false)
+    }
+  }
+
   if (!performanceId) {
     return (
       <ScreenContainer back title={t("performances.gig")}>
@@ -182,6 +237,14 @@ export default function PerformanceDetail() {
   const hasVenue = Boolean(performance.venue.name || performance.venue.address || performance.venue.notes)
   const hasNotes = performance.notes.trim().length > 0
   const attachedSetlists = performance.setlists
+  // Roadmap #57: which setlist the public live link follows (the first one
+  // attached), spelled out for the toggle's caption.
+  const liveShare = performance.liveShare
+  const sharedSetlistName = liveShare
+    ? setlists.find((entry) => entry.id === liveShare.setlistId)?.name ||
+      attachedSetlists.find((entry) => entry.id === liveShare.setlistId)?.name ||
+      ""
+    : ""
   const showAdminActions = isAdmin && performance.status !== "completed"
   /** Wide layout: both action groups side by side, each filling its column. */
   const inActionGrid = usesSidebar && showAdminActions
@@ -326,6 +389,47 @@ export default function PerformanceDetail() {
         )}
       </Card>
 
+      {/* Roadmap #57: the public live setlist — the band opts in per event,
+          and the reader moves the position while walking the shared setlist.
+          Only while the night is still on the books: a finished or cancelled
+          event has nothing to follow. */}
+      {performance.status === "scheduled" && attachedSetlists.length > 0 ? (
+        <Card style={styles.liveCard}>
+          <View style={styles.liveRow}>
+            <View style={styles.flex}>
+              <AppText variant="bodyStrong">{t("performances.liveSetlistTitle")}</AppText>
+              <AppText variant="caption" tone="muted">
+                {liveShare
+                  ? t("performances.liveSetlistOn", { name: sharedSetlistName })
+                  : t("performances.liveSetlistOff")}
+              </AppText>
+            </View>
+            <Switch
+              accessibilityLabel={t("performances.liveSetlistTitle")}
+              accessibilityHint={
+                liveShare
+                  ? t("performances.liveSetlistOn", { name: sharedSetlistName })
+                  : t("performances.liveSetlistOff")
+              }
+              disabled={togglingLive}
+              value={Boolean(liveShare)}
+              onValueChange={(next) => void toggleLive(next)}
+              trackColor={{ false: Theme.colors.border, true: Theme.colors.primary }}
+              ios_backgroundColor={Theme.colors.border}
+            />
+          </View>
+          {liveShare ? (
+            <Button
+              label={t("performances.liveSetlistLink")}
+              variant="secondary"
+              size="sm"
+              icon={<ShareIcon size={16} color={Theme.colors.text} />}
+              onPress={() => setShareOpen(true)}
+            />
+          ) : null}
+        </Card>
+      ) : null}
+
       {/* Roadmap #47: RSVP + "who brings what", hidden for a cancelled event
           — there is nothing to answer and nothing to bring to a night that
           is not happening. */}
@@ -418,6 +522,23 @@ export default function PerformanceDetail() {
         ) : null}
       </View>
 
+      {/* #56's sheet, reused: the very link the live toggle minted — QR, copy
+          and system share all keep working, and revoking kills the fan page
+          too (the reader's writes then bounce harmlessly). */}
+      <ShareSheet
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        kind="setlist"
+        organizationId={organizationId ?? ""}
+        sourceId={liveShare?.setlistId ?? attachedSetlists[0]?.id ?? ""}
+        title={
+          setlists.find((entry) => entry.id === (liveShare?.setlistId ?? attachedSetlists[0]?.id))
+            ?.name ||
+          attachedSetlists[0]?.name ||
+          performance.name
+        }
+      />
+
       <Dialog
         visible={confirmDelete}
         onClose={() => setConfirmDelete(false)}
@@ -465,6 +586,9 @@ const createStyles = () =>
     },
     pressed: { opacity: 0.7 },
     emptySetlist: { gap: Theme.spacing.m, alignItems: "flex-start" },
+    // Roadmap #57: the live setlist toggle row.
+    liveCard: { gap: Theme.spacing.m },
+    liveRow: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.m },
     // Mobile/tablet: one stacked column, capped so buttons never stretch.
     actionsWrap: { width: "100%", maxWidth: 420, gap: Theme.spacing.xl },
     // Wide (web/desktop): the member and admin groups sit side by side and

@@ -26,6 +26,7 @@ const performance = (id: string, overrides: Partial<Performance> = {}): Performa
   type: "gig",
   showLog: [],
   attendance: {},
+  liveShare: null,
   createdBy: "uid-1",
   createdAt: TIMESTAMP,
   updatedAt: TIMESTAMP,

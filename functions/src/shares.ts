@@ -107,6 +107,23 @@ export interface SharedPayloadByKind {
   setlist: SharedSetlistPayload
 }
 
+/**
+ * The "current position" a band's own clients keep fresh on a share document
+ * while the show runs (roadmap #57). Never written by the callables: the
+ * rules' member carve-out on `shares/{token}` allows updating **this field
+ * only**, and the public screen reads it through a document listener — the
+ * same `get` rule serves a single-document listener, so `list` stays closed.
+ * Absent (or null) = the link is a plain static snapshot, exactly as #56
+ * shipped it.
+ */
+export interface ShareLive {
+  songId: string
+  /** 1-based position within the shared setlist's entries. */
+  position: number
+  /** Epoch ms of the last position write — client time, offline-safe. */
+  updatedAt: number
+}
+
 const text = (value: unknown, max: number): string =>
   typeof value === "string" ? value.slice(0, max) : ""
 

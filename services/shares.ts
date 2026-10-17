@@ -1,10 +1,20 @@
 import { getFunctions, httpsCallable } from "@react-native-firebase/functions"
 
-import { doc, firestore, getDoc, mapDoc, paths } from "@/db/Fire"
+import {
+  doc,
+  firestore,
+  mapDoc,
+  onSnapshot,
+  paths,
+  updateDoc,
+  type Unsubscribe,
+} from "@/db/Fire"
+import { sanitizeShareLive } from "@/libs/shareView"
 import type {
   SharedSetlistPayload,
   SharedSongPayload,
   ShareKind,
+  ShareLive,
 } from "@/functions/src/shares"
 
 /** Input of the `createShare` callable (functions/src/index.ts). */
@@ -33,6 +43,12 @@ export interface FetchedShare {
   title: string
   payload: SharedSongPayload | SharedSetlistPayload
   expiresAt: number | null
+  /**
+   * The band's current position while the show runs (roadmap #57), `null`
+   * for a static link — sanitized here, so a stray document can never reach
+   * the public screen half-valid.
+   */
+  live: ShareLive | null
 }
 
 const epochMillis = (value: unknown): number | null => {
@@ -62,6 +78,7 @@ const mapShare = (data: Record<string, unknown>): FetchedShare | null => {
     title: typeof data.title === "string" ? data.title : "",
     payload: payload as SharedSongPayload | SharedSetlistPayload,
     expiresAt: epochMillis(data.expiresAt),
+    live: sanitizeShareLive(data.live),
   }
 }
 
@@ -87,17 +104,36 @@ export const revokeShareLink = async (token: string): Promise<boolean> => {
 }
 
 /**
- * Public read by exact token — the only share operation that touches
- * Firestore directly. A revoked link answers `null` (no document), and the
- * rules answer an *expired* one with `permission-denied`; both mean the same
- * thing to every caller, so both collapse to `null`. Real failures (offline,
- * misconfiguration) still throw for the screen to render.
+ * Keep the "current position" fresh while the show runs (roadmap #57): one
+ * field-level update on the share document, which the rules allow only for a
+ * member of the owning band and only on the `live` field. `null` clears it —
+ * the link itself stays alive as the static #56 snapshot. Callers treat a
+ * rejection as fire-and-forget (a revoked link must never break the reader).
  */
-export const fetchShare = async (token: string): Promise<FetchedShare | null> => {
-  try {
-    return mapDoc(await getDoc(doc(firestore, paths.share(token))), mapShare)
-  } catch (error) {
-    if (isPermissionDenied(error)) return null
-    throw error
-  }
+export const setShareLive = async (token: string, live: ShareLive | null): Promise<void> => {
+  await updateDoc(doc(firestore, paths.share(token)), { live })
 }
+
+/**
+ * The public screen's read by exact token — a document listener, because a
+ * live setlist (roadmap #57) updates while the page is open and a static
+ * share simply never changes again. A single-document listener is served by
+ * the same `get` rule a fetch evaluates (`list` stays closed, so the
+ * collection still cannot be enumerated). A revoked link answers `null` (no
+ * document), and the rules answer an *expired* one with `permission-denied`;
+ * both collapse to `null` so every caller sees one "gone" state. Real
+ * failures (offline, misconfiguration) flow to `onError`.
+ */
+export const subscribeShare = (
+  token: string,
+  onChange: (share: FetchedShare | null) => void,
+  onError: (error: unknown) => void,
+): Unsubscribe =>
+  onSnapshot(
+    doc(firestore, paths.share(token)),
+    (snapshot) => onChange(mapDoc(snapshot, mapShare)),
+    (error) => {
+      if (isPermissionDenied(error)) onChange(null)
+      else onError(error)
+    },
+  )

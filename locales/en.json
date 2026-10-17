@@ -1121,7 +1121,12 @@
     "goneTitle": "This link is no longer available",
     "goneMessage": "It may have been revoked or expired.",
     "errorTitle": "Could not load this link",
-    "errorMessage": "Check your connection and try again."
+    "errorMessage": "Check your connection and try again.",
+    "liveBadge": "LIVE",
+    "livePosition": "{{position}} of {{total}}",
+    "liveNowPlaying": "Now playing — follow along!",
+    "liveEndedBadge": "LAST SONG",
+    "liveEndedCaption": "The show looks like it's over — this is how the night ran."
   },
   "liveShow": {
     "title": "Live show",
@@ -1304,7 +1309,14 @@
     "taskEmpty": "Nothing to bring yet — add the first task.",
     "taskSaved": "Task saved.",
     "taskDeleted": "Task deleted.",
-    "taskError": "We couldn't save that task."
+    "taskError": "We couldn't save that task.",
+    "liveSetlistTitle": "Public live setlist",
+    "liveSetlistOff": "Let fans follow the show song by song from a link.",
+    "liveSetlistOn": "Live for anyone with the link — following \"{{name}}\".",
+    "liveSetlistLink": "Share link",
+    "liveSetlistEnabled": "Live setlist on — open a song to start broadcasting.",
+    "liveSetlistDisabled": "Live setlist off. The link still works as a static setlist.",
+    "liveSetlistFailed": "We couldn't update the live setlist."
   },
   "polls": {
     "title": "Date polls",

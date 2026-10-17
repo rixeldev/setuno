@@ -87,6 +87,7 @@ import { useFavorites } from "@/hooks/useFavorites"
 import { usePaletteCommands } from "@/hooks/usePaletteCommands"
 import { duplicateSong, subscribeSong, trashSong } from "@/services/songs"
 import { mergeSongs } from "@/services/songMerge"
+import { setShareLive } from "@/services/shares"
 import { saveReaderState, type ReaderState } from "@/services/readerState"
 import { updatePreferences } from "@/services/users"
 import { updateCachedPreferences, usePreferences } from "@/services/prefs"
@@ -231,6 +232,25 @@ export default function SongScreen() {
     touchShowSong(setlistId, songId)
     return () => releaseShowSong(setlistId, songId)
   }, [songId, setlistId])
+
+  // Public live setlist (roadmap #57): arriving at a song of the event's
+  // *shared* setlist moves the fan page's "now playing" marker. Only that
+  // exact list counts — an event can carry several setlists and the link
+  // follows one of them — and the write is fire-and-forget like
+  // `logActivity`: a revoked link or a dead venue network must never break
+  // reading. Keyed on primitives only, because the owning event re-renders
+  // on every show-log tick and re-sending the same position would spam it.
+  const liveShareToken = livePerformance?.liveShare?.token ?? null
+  const liveShareSetlistId = livePerformance?.liveShare?.setlistId ?? null
+  useEffect(() => {
+    if (!liveShareToken || !songId || !liveShareSetlistId || eventSetlist?.id !== liveShareSetlistId)
+      return
+    const position = liveIndex + 1
+    if (position < 1) return
+    void setShareLive(liveShareToken, { songId, position, updatedAt: Date.now() }).catch(
+      () => undefined,
+    )
+  }, [liveShareToken, liveShareSetlistId, eventSetlist?.id, songId, liveIndex])
 
   // Reader display settings come from the local preference cache so they are
   // restored instantly on every start-up (docs §32), then mirrored to the

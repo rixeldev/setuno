@@ -7,8 +7,9 @@
  * member-writable show log (roadmap #45), the event's attendance map and
  * "who brings what" tasks (roadmap #47), the member-proposed date polls
  * (roadmap #48), the suggestion comment threads (roadmap #55), the
- * owner-only push registrations (roadmap #52) and the anonymous share-link
- * snapshots (roadmap #56).
+ * owner-only push registrations (roadmap #52), the anonymous share-link
+ * snapshots (roadmap #56) and the live setlist positions a member may write
+ * onto them (roadmap #57).
  *
  * Run through `firebase emulators:exec --only firestore,storage "pnpm
  * test:integration"`, which starts the emulators, exports their host variables
@@ -1318,5 +1319,145 @@ describe("share links are public, token-addressed snapshots (#56)", () => {
     await assertFails(alice().firestore().doc(sharePath(seeded)).update({ title: "hijacked" }))
     await assertFails(alice().firestore().doc(sharePath(seeded)).delete())
     await assertFails(bob().firestore().doc(sharePath(seeded)).delete())
+  })
+
+  // ------------------------------------------------------------------ #57 --
+  // The public live setlist: a member's client keeps the "current position"
+  // fresh through one field-level carve-out — `live` and nothing else.
+
+  const live = (overrides: Record<string, unknown> = {}) => ({
+    songId: "song-live",
+    position: 3,
+    updatedAt: 1_760_000_000_000,
+    ...overrides,
+  })
+
+  it("lets a band member refresh the live position and clear it again", async () => {
+    const token = createId("share")
+    await seedShare(token)
+    await assertSucceeds(bob().firestore().doc(sharePath(token)).update({ live: live() }))
+    await assertSucceeds(bob().firestore().doc(sharePath(token)).update({ live: null }))
+  })
+
+  it("never lets a live update touch anything else on the document", async () => {
+    const token = createId("share")
+    await seedShare(token)
+    await assertFails(
+      bob().firestore().doc(sharePath(token)).update({ live: live(), title: "hijacked" }),
+    )
+  })
+
+  it("rejects a live value outside the pinned shape", async () => {
+    const token = createId("share")
+    await seedShare(token)
+    for (const bad of [
+      live({ songId: "" }),
+      live({ position: 0 }),
+      live({ position: "3" }),
+      live({ updatedAt: "now" }),
+      live({ extra: true }),
+    ]) {
+      await assertFails(bob().firestore().doc(sharePath(token)).update({ live: bad }))
+    }
+  })
+
+  it("denies anonymous writers and members of other bands", async () => {
+    const token = createId("share")
+    await seedShare(token)
+    await assertFails(guest().firestore().doc(sharePath(token)).update({ live: live() }))
+    await assertFails(
+      env.authenticatedContext("carol").firestore().doc(sharePath(token)).update({ live: live() }),
+    )
+  })
+
+  it("serves an anonymous document listener — the fan page's live position", async () => {
+    // The keystone of the feature: a single-document listener is served by
+    // the `get` rule (not `list`, which stays closed) and keeps receiving the
+    // band's writes while the page is open.
+    const token = createId("share")
+    await seedShare(token)
+    const expected = live()
+    const collector = new Promise<Record<string, unknown>>((resolve, reject) => {
+      const unsubscribe = guest()
+        .firestore()
+        .doc(sharePath(token))
+        .onSnapshot(
+          (snapshot) => {
+            const data = snapshot.data() as Record<string, unknown> | undefined
+            if (data && "live" in data) {
+              unsubscribe()
+              resolve(data)
+            }
+          },
+          (error) => {
+            unsubscribe()
+            reject(error)
+          },
+        )
+    })
+    await assertSucceeds(bob().firestore().doc(sharePath(token)).update({ live: expected }))
+    const seen = await assertSucceeds(collector)
+    expect(seen.live).toEqual(expected)
+  })
+})
+
+describe("the live setlist pointer is member-writable (#57)", () => {
+  const pathFor = (id: string) => `organizations/${orgId}/performances/${id}`
+  const pointer = { token: "share-token-abc", setlistId: "setlist-1" }
+
+  const seedShow = async (): Promise<string> => {
+    const id = createId("show")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(pathFor(id)).set({
+        organizationId: orgId,
+        name: "Sala Sur",
+        date: "2026-10-17",
+        setlists: [{ id: "setlist-1", name: "Main" }],
+        venue: { name: "Sala Sur", address: "", notes: "" },
+        status: "scheduled",
+        type: "gig",
+      })
+    })
+    return id
+  }
+
+  it("lets a member point the event at its live link — and detach it", async () => {
+    const id = await seedShow()
+    await assertSucceeds(
+      bob().firestore().doc(pathFor(id)).update({ liveShare: pointer, updatedAt: new Date() }),
+    )
+    await assertSucceeds(
+      bob().firestore().doc(pathFor(id)).update({ liveShare: null, updatedAt: new Date() }),
+    )
+  })
+
+  it("lets an admin write it through the full-edit whitelist too", async () => {
+    const id = await seedShow()
+    await assertSucceeds(
+      alice().firestore().doc(pathFor(id)).update({ liveShare: pointer, updatedAt: new Date() }),
+    )
+  })
+
+  it("rejects a pointer outside the pinned shape", async () => {
+    const id = await seedShow()
+    for (const bad of [
+      { token: "", setlistId: "setlist-1" },
+      { token: "t" },
+      { token: "t", setlistId: 5 },
+    ]) {
+      await assertFails(
+        bob().firestore().doc(pathFor(id)).update({ liveShare: bad, updatedAt: new Date() }),
+      )
+    }
+  })
+
+  it("never lets the live pointer smuggle another field change", async () => {
+    const id = await seedShow()
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(pathFor(id))
+        .update({ liveShare: pointer, name: "Renamed by a member", updatedAt: new Date() }),
+    )
   })
 })

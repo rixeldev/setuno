@@ -48,6 +48,7 @@ const performance = (overrides: Partial<Performance> = {}): Performance => ({
   type: "gig",
   showLog: [],
   attendance: {},
+  liveShare: null,
   createdBy: "uid-1",
   createdAt: TIMESTAMP,
   updatedAt: TIMESTAMP,

@@ -86,6 +86,22 @@ export const ATTENDANCE_STATUS_KEYS: Record<AttendanceStatus, string> = {
 }
 
 /**
+ * The public live setlist (roadmap #57): the share link whose "current
+ * position" the band's clients keep fresh while the show runs. Absent on every
+ * older document (reads back as null = off) and **not** part of
+ * `PerformanceInput` below — it is written only through
+ * `services/performances.ts#setLiveShare` (its own field-level update), so the
+ * event form and every status tap can never clobber the link, and vice versa.
+ * `setlistId` pins which of the event's attached setlists the link follows
+ * (events can carry several), and the reader only writes positions while
+ * walking that exact list.
+ */
+export interface LiveShare {
+  token: string
+  setlistId: string
+}
+
+/**
  * "Who brings what" (roadmap #47): one task per thing, assigned to a member
  * (or to nobody = anyone's job), with a done tick. Lives in the event's
  * `tasks` subcollection — logistics belongs to the event, and a subcollection
@@ -140,6 +156,14 @@ export interface Performance {
    * status tap can never clobber the band's answers, and vice versa.
    */
   attendance: Record<string, AttendanceStatus>
+  /**
+   * The public live setlist (roadmap #57): token + the setlist it follows,
+   * or null when the band is not sharing live. Absent on every older document
+   * and **not** part of `PerformanceInput` — written only through
+   * `services/performances.ts#setLiveShare`, so the event form and every
+   * status tap leave the link alone.
+   */
+  liveShare: LiveShare | null
   createdBy: string
   createdAt: TimestampLike
   updatedAt: TimestampLike

@@ -87,6 +87,40 @@ service cloud.firestore {
       return signedIn() && roleOf(organizationId) == 'admin';
     }
 
+    /**
+     * The "current position" of a public live setlist (roadmap #57): the
+     * exact shape a member's client may write onto `shares/{token}` — and
+     * `null` to clear it. The reader stamps `updatedAt` with client time (a
+     * server timestamp would be null while an offline write queues, and the
+     * fan page judges staleness off this field).
+     */
+    function validShareLive(v) {
+      return v == null
+        || (v is map
+          && v.keys().hasOnly(['songId', 'position', 'updatedAt'])
+          && v.songId is string
+          && v.songId.size() > 0
+          && v.songId.size() <= 128
+          && v.position is int
+          && v.position >= 1
+          && v.position <= 500
+          && v.updatedAt is int
+          && v.updatedAt > 0);
+    }
+
+    /** The event's pointer at its live link (roadmap #57): token + list. */
+    function validLiveShare(v) {
+      return v == null
+        || (v is map
+          && v.keys().hasOnly(['token', 'setlistId'])
+          && v.token is string
+          && v.token.size() > 0
+          && v.token.size() <= 256
+          && v.setlistId is string
+          && v.setlistId.size() > 0
+          && v.setlistId.size() <= 128);
+    }
+
     function isSelf(uid) {
       return signedIn() && request.auth.uid == uid;
     }
@@ -542,16 +576,20 @@ service cloud.firestore {
             || request.resource.data.type in ['gig', 'rehearsal']);
         // Update: admins of this band (full edit) — the whitelist carries the
         // event fields plus `showLog`, the per-song outcome/time record that
-        // the post-gig report writes (roadmap #45), and `attendance`, the
-        // uid → RSVP map (roadmap #47).
+        // the post-gig report writes (roadmap #45), `attendance`, the
+        // uid → RSVP map (roadmap #47), and `liveShare`, the public live
+        // setlist's link pointer (roadmap #57).
         //
-        // Members get two narrow carve-outs: writing `showLog` alone (plus the
-        // `updatedAt` touch that always rides a write) — whoever is running the
-        // show marks songs from the reader even when they are not an admin —
-        // or writing `attendance` with **only their own key** changed, one
-        // dot-path per member so two answers at once can never clobber each
-        // other. Operational data about the night, not an edit of the event:
-        // every other field stays admin-only.
+        // Members get three narrow carve-outs: writing `showLog` alone (plus
+        // the `updatedAt` touch that always rides a write) — whoever is
+        // running the show marks songs from the reader even when they are not
+        // an admin — writing `attendance` with **only their own key** changed,
+        // one dot-path per member so two answers at once can never clobber
+        // each other, or pointing the event at its live share link (roadmap
+        // #57) — publishing the band's setlist to fans is a band decision,
+        // not an admin job, exactly like #56's link minting. Operational data
+        // about the night, not an edit of the event: every other field stays
+        // admin-only.
         //
         // Rules cannot iterate the list or the map, so the document-level
         // shapes (list ≤ 500, map ≤ 100) are pinned here and each entry's
@@ -562,14 +600,17 @@ service cloud.firestore {
                           && request.resource.data.organizationId == organizationId
                           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                             'name', 'date', 'endDate', 'startTime', 'endTime', 'venue', 'notes',
-                            'setlists', 'status', 'type', 'updatedAt', 'showLog', 'attendance'
+                            'setlists', 'status', 'type', 'updatedAt', 'showLog', 'attendance',
+                            'liveShare'
                           ])
                           && (!('showLog' in request.resource.data)
                               || (request.resource.data.showLog is list
                                   && request.resource.data.showLog.size() <= 500))
                           && (!('attendance' in request.resource.data)
                               || (request.resource.data.attendance is map
-                                  && request.resource.data.attendance.size() <= 100)))
+                                  && request.resource.data.attendance.size() <= 100))
+                          && (!('liveShare' in request.resource.data)
+                              || validLiveShare(request.resource.data.liveShare)))
           || (isMember(organizationId)
               && ((request.resource.data.diff(resource.data).affectedKeys()
                     .hasOnly(['showLog', 'updatedAt'])
@@ -584,7 +625,10 @@ service cloud.firestore {
                            .affectedKeys().hasOnly([request.auth.uid])
                       && (!(request.auth.uid in request.resource.data.attendance)
                           || request.resource.data.attendance[request.auth.uid]
-                               in ['yes', 'maybe', 'no']))));
+                               in ['yes', 'maybe', 'no']))
+                  || (request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['liveShare', 'updatedAt'])
+                      && validLiveShare(request.resource.data.liveShare))));
         allow delete: if isAdmin(organizationId);
 
         // "Who brings what" (roadmap #47): one small document per thing to
@@ -829,7 +873,17 @@ service cloud.firestore {
       allow get: if resource == null
         || resource.data.get("expiresAt", null) == null
         || resource.data.get("expiresAt", null) > request.time;
-      allow list, write: if false;
+      // The band's own clients keep the "current position" fresh while the
+      // show runs (roadmap #57): one field-level update that may touch
+      // `live` and nothing else, by a member of the owning band only. A
+      // single-document listener is served by the `get` rule above — the
+      // fan page subscribes — while create, delete and every other field
+      // stay callable-owned and `list` stays closed, so holding the token
+      // remains the only way in.
+      allow update: if isMember(resource.data.organizationId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['live'])
+        && validShareLive(request.resource.data.get('live', null));
+      allow list, create, delete: if false;
     }
 
     // ---------------------------------------------------------------- version
