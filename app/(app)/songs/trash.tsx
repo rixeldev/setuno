@@ -3,6 +3,7 @@ import { StyleSheet, View } from "react-native"
 import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
+import { TRASH_TTL_DAYS } from "@/functions/src/purge"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
@@ -90,14 +91,14 @@ export default function SongTrashScreen() {
         <EmptyState
           icon={<TrashIcon size={40} color={Theme.colors.textFaint} />}
           title={t("songs.trashEmpty")}
-          message={t("songs.trashEmptyDescription")}
+          message={t("songs.trashEmptyDescription", { days: TRASH_TTL_DAYS })}
         />
       ) : null}
 
       {!loading && !error && trashedSongs.length > 0 ? (
         <View>
           <AppText variant="caption" tone="muted" style={styles.hint}>
-            {t("songs.trashDescription")}
+            {t("songs.trashDescription", { days: TRASH_TTL_DAYS })}
           </AppText>
           <View style={styles.list}>
             {trashedSongs.map((song) => (

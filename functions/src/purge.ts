@@ -13,6 +13,11 @@ import type { Firestore } from "firebase-admin/firestore"
  * The Admin SDK bypasses the security rules, so this needs no rules change.
  * Every decision that can be made without a database lives here as a plain
  * function; the scheduled wrapper in `index.ts` is a thin shell over this.
+ *
+ * `TRASH_TTL_DAYS` is **imported by the app** (the trash screen's captions and
+ * the move-to-trash dialog spell the retention to the user), which is why this
+ * module keeps its firebase imports type-only: a value import here would end up
+ * in the Metro bundle.
  */
 export const TRASH_TTL_DAYS = 30
 

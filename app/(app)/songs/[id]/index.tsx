@@ -13,6 +13,7 @@ import { useLocalSearchParams, useRouter } from "expo-router"
 import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
+import { TRASH_TTL_DAYS } from "@/functions/src/purge"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { Badge } from "@/components/ui/Card"
@@ -1322,7 +1323,7 @@ export default function SongScreen() {
         visible={confirmDelete}
         onClose={() => setConfirmDelete(false)}
         title={t("songs.moveToTrashConfirm", { title: song.title })}
-        description={t("songs.moveToTrashDescription")}
+        description={t("songs.moveToTrashDescription", { days: TRASH_TTL_DAYS })}
         confirmLabel={t("songs.moveToTrash")}
         tone="danger"
         confirmLoading={deleting}
