@@ -110,6 +110,9 @@ export const paths = {
   userCollection: (uid: string, collectionId: string) => `users/${uid}/collections/${collectionId}`,
   organizations: "organizations",
   organization: (orgId: string) => `organizations/${orgId}`,
+  // Opt-in directory entry (#60): exists only while the band chose to be found.
+  discoverable: "discoverable",
+  discoverableOrg: (orgId: string) => `discoverable/${orgId}`,
   members: (orgId: string) => `organizations/${orgId}/members`,
   member: (orgId: string, uid: string) => `organizations/${orgId}/members/${uid}`,
   songs: (orgId: string) => `organizations/${orgId}/songs`,
@@ -148,6 +151,8 @@ export const paths = {
   activityEvent: (orgId: string, id: string) => `organizations/${orgId}/activity/${id}`,
   invitations: (orgId: string) => `organizations/${orgId}/invitations`,
   invitation: (orgId: string, id: string) => `organizations/${orgId}/invitations/${id}`,
+  joinRequests: (orgId: string) => `organizations/${orgId}/joinRequests`,
+  joinRequest: (orgId: string, uid: string) => `organizations/${orgId}/joinRequests/${uid}`,
   /**
    * Public share snapshots (roadmap #56), keyed by their unguessable token —
    * readable by anyone holding the exact id, unreachable by listing.

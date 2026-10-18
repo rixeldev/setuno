@@ -18,10 +18,12 @@ import { ModalScreen } from "@/components/app/ModalScreen"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
+import { useJoinRequestQueue } from "@/hooks/useJoinRequests"
 import { addMemberByEmail, removeMember, revokeInvitation, updateMemberRole } from "@/services/organizations"
+import { approveJoinRequest, rejectJoinRequest } from "@/services/joinRequests"
 import { toFriendlyError } from "@/services/errors"
 import { validateEmail } from "@/libs/validation"
-import type { OrganizationMember, OrganizationRole } from "@/interfaces"
+import type { JoinRequest, OrganizationMember, OrganizationRole } from "@/interfaces"
 
 /** The role each sheet row moves a member *to* ("Make admin"…). */
 const ROLE_MOVE_LABELS: Record<OrganizationRole, string> = {
@@ -60,6 +62,13 @@ export default function MembersScreen() {
   const [busy, setBusy] = useState(false)
   const [menuMember, setMenuMember] = useState<OrganizationMember | null>(null)
   const [pendingRemoval, setPendingRemoval] = useState<OrganizationMember | null>(null)
+  // Join requests (roadmap #60): the queue is admin-only in the rules, so
+  // anyone else never opens the listener at all (#59's law).
+  const [approving, setApproving] = useState<JoinRequest | null>(null)
+  const [rejecting, setRejecting] = useState<JoinRequest | null>(null)
+  const [approveOpen, setApproveOpen] = useState(false)
+  const [rejectOpen, setRejectOpen] = useState(false)
+  const [approveRole, setApproveRole] = useState<OrganizationRole>("member")
   // Visibility is separate from the entity so the sheet/dialog keep the member
   // information while they fade out (no fallback text flashing for a frame).
   const [menuOpen, setMenuOpen] = useState(false)
@@ -69,6 +78,11 @@ export default function MembersScreen() {
   const pendingInvitations = useMemo(
     () => invitations.filter((entry) => entry.status === "pending"),
     [invitations],
+  )
+  const { requests: joinRequests } = useJoinRequestQueue(isAdmin ? organizationId : null)
+  const pendingRequests = useMemo(
+    () => joinRequests.filter((entry) => entry.status === "pending"),
+    [joinRequests],
   )
 
   /** Only admins manage people, and never themselves nor the band owner. */
@@ -134,6 +148,38 @@ export default function MembersScreen() {
       toast.showSuccess(t("members.invitationRevokedFor", { email: invitee }))
     } catch (err) {
       toast.showError(toFriendlyError(err, t("members.couldNotRevoke")))
+    }
+  }
+
+  /**
+   * Approving a join request mints the band's ordinary invitation (#60), so
+   * the requester accepts it themselves — membership never skips that step.
+   */
+  const approve = async (): Promise<void> => {
+    if (!approving) return
+    setBusy(true)
+    try {
+      await approveJoinRequest(organizationId ?? "", approving, approveRole, actor)
+      setApproveOpen(false)
+      toast.showSuccess(t("members.requestApproved", { name: approving.displayName }))
+    } catch (err) {
+      toast.showError(toFriendlyError(err, t("members.couldNotReview")))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const reject = async (): Promise<void> => {
+    if (!rejecting) return
+    setBusy(true)
+    try {
+      await rejectJoinRequest(organizationId ?? "", rejecting, actor)
+      setRejectOpen(false)
+      toast.showSuccess(t("members.requestRejected", { name: rejecting.displayName }))
+    } catch (err) {
+      toast.showError(toFriendlyError(err, t("members.couldNotReview")))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -262,6 +308,60 @@ export default function MembersScreen() {
         </View>
       ) : null}
 
+      {/* Join requests (roadmap #60): pending asks, newest first. */}
+      {isAdmin && pendingRequests.length > 0 ? (
+        <View style={styles.block}>
+          <AppText variant="label" tone="faint">
+            {t("members.joinRequestsCount", { count: pendingRequests.length })}
+          </AppText>
+          <Card padded={false} style={styles.surface}>
+            {pendingRequests.map((request, index) => (
+              <View key={request.uid} style={[styles.row, index > 0 && styles.divider]}>
+                <Avatar
+                  photoURL={null}
+                  name={request.displayName}
+                  size={40}
+                  accessibilityLabel={`${request.displayName}, ${request.email}`}
+                />
+                <View style={styles.flex}>
+                  <AppText variant="bodyStrong" numberOfLines={1}>
+                    {request.displayName}
+                  </AppText>
+                  <AppText variant="caption" tone="muted" numberOfLines={1}>
+                    {request.email}
+                  </AppText>
+                  {request.note ? (
+                    <AppText variant="caption" tone="faint" numberOfLines={2}>
+                      {request.note}
+                    </AppText>
+                  ) : null}
+                </View>
+                <View style={styles.requestButtons}>
+                  <Button
+                    label={t("members.approve")}
+                    size="sm"
+                    onPress={() => {
+                      setApproving(request)
+                      setApproveRole("member")
+                      setApproveOpen(true)
+                    }}
+                  />
+                  <Button
+                    label={t("members.reject")}
+                    size="sm"
+                    variant="ghost"
+                    onPress={() => {
+                      setRejecting(request)
+                      setRejectOpen(true)
+                    }}
+                  />
+                </View>
+              </View>
+            ))}
+          </Card>
+        </View>
+      ) : null}
+
       <AppText variant="caption" tone="faint">
         {isAdmin
           ? t("members.adminFooter")
@@ -349,6 +449,41 @@ export default function MembersScreen() {
         confirmLoading={busy}
         onConfirm={() => void remove()}
       />
+
+      <Dialog
+        visible={approveOpen}
+        onClose={() => setApproveOpen(false)}
+        title={t("members.approveTitle", { name: approving?.displayName ?? "" })}
+        description={t("members.approveDescription", { email: approving?.email ?? "" })}
+        confirmLabel={t("members.approve")}
+        confirmLoading={busy}
+        onConfirm={() => void approve()}
+      >
+        {/* The requester joined as a plain member, but the same three roles the
+            invite dialog offers can be chosen right here (#60). */}
+        <View style={styles.roleRow}>
+          {INVITE_ROLES.map((entry) => (
+            <Chip
+              key={entry}
+              label={t(INVITE_ROLE_LABELS[entry])}
+              tone="primary"
+              selected={approveRole === entry}
+              onPress={() => setApproveRole(entry)}
+            />
+          ))}
+        </View>
+      </Dialog>
+
+      <Dialog
+        visible={rejectOpen}
+        onClose={() => setRejectOpen(false)}
+        title={t("members.rejectTitle", { name: rejecting?.displayName ?? "" })}
+        description={t("members.rejectDescription")}
+        confirmLabel={t("members.reject")}
+        tone="danger"
+        confirmLoading={busy}
+        onConfirm={() => void reject()}
+      />
     </ModalScreen>
   )
 }
@@ -367,5 +502,6 @@ const createStyles = () =>
     divider: { borderTopWidth: 1, borderTopColor: Theme.colors.borderSoft },
     flex: { flex: 1, minWidth: 0, gap: 2 },
     nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+    requestButtons: { gap: Theme.spacing.xs },
     roleRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   })

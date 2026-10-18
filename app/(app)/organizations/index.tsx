@@ -180,6 +180,15 @@ export default function OrganizationsScreen() {
         </AppText>
       ) : null}
 
+      {/* Join requests (#60): the door to bands that chose to be findable. */}
+      <View style={styles.find}>
+        <Button
+          label={t("organizations.findBand")}
+          variant="ghost"
+          onPress={() => router.push("/discover")}
+        />
+      </View>
+
       <Dialog
         visible={joinOpen}
         onClose={() => setJoinOpen(false)}
@@ -215,4 +224,5 @@ const createStyles = () =>
       backgroundColor: Theme.colors.primarySoft,
     },
     flex: { flex: 1, minWidth: 0 },
+    find: { marginTop: Theme.spacing.m },
   })

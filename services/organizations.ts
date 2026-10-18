@@ -38,6 +38,7 @@ import {
 import { logActivity } from "@/services/activity"
 import { ValidationError } from "@/services/errors"
 import { normalizeRole } from "@/libs/membership"
+import { directoryName } from "@/libs/joinRequests"
 
 const mapOrganization = (data: Record<string, unknown>, id: string): Organization =>
   ({
@@ -45,6 +46,7 @@ const mapOrganization = (data: Record<string, unknown>, id: string): Organizatio
     name: String(data.name ?? ""),
     description: String(data.description ?? ""),
     logoURL: (data.logoURL as string | null) ?? null,
+    discoverable: data.discoverable === true,
     ownerId: String(data.ownerId ?? ""),
     createdAt: data.createdAt as Organization["createdAt"],
     updatedAt: data.updatedAt as Organization["updatedAt"],
@@ -157,7 +159,24 @@ export const updateOrganization = async (
   if (input.description !== undefined) patch.description = input.description.trim()
   if (input.logoURL !== undefined) patch.logoURL = input.logoURL
 
-  await updateDoc(doc(firestore, paths.organization(organizationId)), clean(patch))
+  const target = doc(firestore, paths.organization(organizationId))
+  const data = clean(patch)
+  if (input.name !== undefined) {
+    // A band in the opt-in directory publishes its name (roadmap #60), so a
+    // rename keeps the entry in step — both writes travel in one batch.
+    const current = await fetchOrganization(organizationId)
+    if (current?.discoverable === true) {
+      const entry = directoryName(String(patch.name ?? current.name))
+      const batch = writeBatch(firestore)
+      batch.update(target, data)
+      if (entry) batch.set(doc(firestore, paths.discoverableOrg(organizationId)), entry)
+      await batch.commit()
+    } else {
+      await updateDoc(target, data)
+    }
+  } else {
+    await updateDoc(target, data)
+  }
   void logActivity({
     organizationId,
     type: "organization_updated",
@@ -167,6 +186,35 @@ export const updateOrganization = async (
     targetType: "organization",
     targetId: organizationId,
   })
+}
+
+/**
+ * Toggles the band's opt-in discoverability (roadmap #60): the organization
+ * flag and the `discoverable/{organizationId}` entry move in one batch,
+ * because the security rules pin them together — turning it off deletes the
+ * entry, which is what actually removes the band's name from the search.
+ */
+export const setOrganizationDiscoverable = async (
+  organizationId: string,
+  enabled: boolean,
+): Promise<void> => {
+  const current = await fetchOrganization(organizationId)
+  if (!current) throw new ValidationError("Band not found.")
+  const entry = enabled ? directoryName(current.name) : null
+  if (enabled && !entry) {
+    throw new ValidationError("The band needs a name before it can be found.")
+  }
+
+  const batch = writeBatch(firestore)
+  batch.set(
+    doc(firestore, paths.organization(organizationId)),
+    { discoverable: enabled, updatedAt: serverTimestamp() },
+    { merge: true },
+  )
+  const directoryRef = doc(firestore, paths.discoverableOrg(organizationId))
+  if (entry) batch.set(directoryRef, entry)
+  else batch.delete(directoryRef)
+  await batch.commit()
 }
 
 /** Removes the organization and every sub-collection it owns. */
@@ -180,6 +228,7 @@ export const deleteOrganization = async (organizationId: string): Promise<void> 
     paths.suggestions(organizationId),
     paths.activity(organizationId),
     paths.invitations(organizationId),
+    paths.joinRequests(organizationId),
   ]
 
   for (const path of subCollections) {
@@ -192,6 +241,9 @@ export const deleteOrganization = async (organizationId: string): Promise<void> 
     batch.delete(doc(firestore, paths.userOrganization(member.id, organizationId)))
   }
 
+  // The opt-in directory entry dies with the band too (#60): a stale name must
+  // never keep pointing at a band that is gone.
+  batch.delete(doc(firestore, paths.discoverableOrg(organizationId)))
   batch.delete(doc(firestore, paths.organization(organizationId)))
   await batch.commit()
 }

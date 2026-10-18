@@ -7,6 +7,11 @@ export interface Organization {
   name: string
   description: string
   logoURL: string | null
+  /**
+   * Opt-in discoverability by exact name (roadmap #60): absent on every older
+   * document, so it reads `false` and no band became findable by accident.
+   */
+  discoverable: boolean
   /** Firebase uid of the owner (always an admin). */
   ownerId: string
   createdAt: TimestampLike

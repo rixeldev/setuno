@@ -1,5 +1,5 @@
 import React, { useState } from "react"
-import { Image, StyleSheet, View } from "react-native"
+import { Image, StyleSheet, Switch, View } from "react-native"
 import { useRouter } from "expo-router"
 import { useTranslation } from "react-i18next"
 
@@ -16,7 +16,7 @@ import { ModalScreen } from "@/components/app/ModalScreen"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
-import { deleteOrganization, updateOrganization } from "@/services/organizations"
+import { deleteOrganization, setOrganizationDiscoverable, updateOrganization } from "@/services/organizations"
 import { toFriendlyError } from "@/services/errors"
 import { uploadImage } from "@/services/uploads"
 import { pickImageBase64 } from "@/libs/imagePicker"
@@ -40,6 +40,7 @@ export default function OrganizationSettings() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [togglingDiscoverable, setTogglingDiscoverable] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [typedName, setTypedName] = useState("")
 
@@ -86,6 +87,23 @@ export default function OrganizationSettings() {
       toast.showError(toFriendlyError(error, t("settings.couldNotSaveBand")))
     } finally {
       setSaving(false)
+    }
+  }
+
+  /**
+   * Discoverability (#60): the flag and the directory entry move in one batch
+   * server-side, and the subscribed organization document carries the result
+   * back — the switch simply follows it.
+   */
+  const toggleDiscoverable = async (value: boolean): Promise<void> => {
+    setTogglingDiscoverable(true)
+    try {
+      await setOrganizationDiscoverable(organizationId ?? "", value)
+      toast.showSuccess(t("settings.discoverabilitySaved"))
+    } catch (error) {
+      toast.showError(toFriendlyError(error, t("settings.couldNotSaveBand")))
+    } finally {
+      setTogglingDiscoverable(false)
     }
   }
 
@@ -199,6 +217,27 @@ export default function OrganizationSettings() {
         </AppText>
       </Card>
 
+      {isAdmin ? (
+        <Card style={styles.card}>
+          <View style={styles.switchRow}>
+            <View style={styles.switchText}>
+              <AppText variant="label" tone="faint">
+                {t("settings.discoverable")}
+              </AppText>
+              <AppText variant="caption" tone="muted">
+                {t("settings.discoverableHint")}
+              </AppText>
+            </View>
+            <Switch
+              value={organization?.discoverable === true}
+              disabled={togglingDiscoverable}
+              onValueChange={(value) => void toggleDiscoverable(value)}
+              accessibilityLabel={t("settings.discoverable")}
+            />
+          </View>
+        </Card>
+      ) : null}
+
       {isAdmin && isOwner ? (
         <Card style={[styles.card, styles.dangerCard]}>
           <AppText variant="label" tone="danger">
@@ -256,5 +295,11 @@ const createStyles = () =>
     logoEmpty: { backgroundColor: Theme.colors.background2 },
     logoImage: { width: 56, height: 56, borderRadius: Theme.radii.lg },
     flex: { flex: 1, gap: 6 },
+    switchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.m,
+    },
+    switchText: { flex: 1, gap: 2 },
     dangerCard: { borderColor: Theme.colors.danger },
   })

@@ -310,7 +310,8 @@
     "bandSwitched": "Band switched.",
     "couldNotSwitch": "We couldn't switch bands.",
     "invitationHint": "No pending invitations. When a band invites {{email}}, it will show up here to join with one tap.",
-    "invitationsUnavailable": "We could not check your invitations. Please try again in a moment."
+    "invitationsUnavailable": "We could not check your invitations. Please try again in a moment.",
+    "findBand": "Find a band"
   },
   "members": {
     "inviteSomeone": "Invite someone",
@@ -344,7 +345,44 @@
     "makeAdmin": "Make admin",
     "makeMember": "Make member",
     "makeGuest": "Make guest",
-    "revoke": "Revoke"
+    "revoke": "Revoke",
+    "joinRequestsCount_one": "{{count}} join request",
+    "joinRequestsCount_other": "{{count}} join requests",
+    "approve": "Approve",
+    "approveTitle": "Approve {{name}}?",
+    "approveDescription": "{{email}} receives an invitation to join as a member. They accept it themselves, like any invitation.",
+    "reject": "Reject",
+    "rejectTitle": "Reject {{name}}?",
+    "rejectDescription": "They can ask again later.",
+    "requestApproved": "{{name}} was invited to the band.",
+    "requestRejected": "{{name}}'s request was rejected.",
+    "couldNotReview": "We couldn't review that request."
+  },
+  "discover": {
+    "title": "Find your band",
+    "subtitle": "Search bands that chose to appear by name",
+    "searchLabel": "Band name",
+    "searchPlaceholder": "The Wrens",
+    "search": "Search",
+    "hint": "Only bands that chose to be discoverable show up here, and only by their exact name.",
+    "noResults": "No band with that name",
+    "noResultsHint": "Bands only appear here when their admins turn discovery on, and the name must match exactly.",
+    "requestToJoin": "Request to join",
+    "waiting": "Waiting for the band's answer",
+    "withdraw": "Withdraw",
+    "withdrawn": "Request withdrawn.",
+    "approved": "Approved",
+    "approvedHint": "Accept your invitation from the bands list.",
+    "askAgain": "Ask again",
+    "confirmTitle": "Ask to join {{name}}?",
+    "confirmDescription": "The band's admins review your request and, if they approve it, send you an invitation.",
+    "noteLabel": "A note for the admins (optional)",
+    "notePlaceholder": "I play bass — I saw you need one!",
+    "shareNote": "They will see your name, {{email}} and your note.",
+    "send": "Send request",
+    "requestSent": "Your request to join {{name}} was sent.",
+    "searchFailed": "We couldn't search right now.",
+    "requestFailed": "We couldn't send that request."
   },
   "collections": {
     "title": "Collections",
@@ -1687,7 +1725,10 @@
     "deleteAccountPassword": "Confirm with your password",
     "deleteAccountGoogleHint": "You'll be asked to confirm your Google account.",
     "deleteAccountConfirm": "Delete forever",
-    "deleteAccountFailed": "We couldn't delete your account. Please try again."
+    "deleteAccountFailed": "We couldn't delete your account. Please try again.",
+    "discoverable": "Discoverable by name",
+    "discoverableHint": "Bands that turn this on show up when someone searches their exact name and can ask to join. Only the band's name is shared — never emails or members — and approving a request sends a normal invitation.",
+    "discoverabilitySaved": "Band discovery updated."
   },
   "activity": {
     "songCreated": "{{actor}} added \"{{target}}\"",

@@ -1,5 +1,6 @@
 export * from "./user"
 export * from "./organization"
+export * from "./joinRequest"
 export * from "./song"
 export * from "./suggestion"
 export * from "./setlist"

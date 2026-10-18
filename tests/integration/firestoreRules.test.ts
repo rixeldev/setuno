@@ -11,8 +11,9 @@
  * snapshots (roadmap #56), the live setlist positions a member may write
  * onto them (roadmap #57), the read-only guest role that reads the band's
  * music and logistics while every collaboration surface stays denied
- * (roadmap #59) and the one-field suggestion assignments any member writes
- * (roadmap #58).
+ * (roadmap #59), the one-field suggestion assignments any member writes
+ * (roadmap #58) and the opt-in directory plus the join requests that can only
+ * ever mint an invitation (roadmap #60).
  *
  * Run through `firebase emulators:exec --only firestore,storage "pnpm
  * test:integration"`, which starts the emulators, exports their host variables
@@ -893,6 +894,276 @@ describe("suggestion assignments are lightweight member writes (#58)", () => {
         .firestore()
         .doc(assignPath(id))
         .set({ ...suggestion("bob"), assigneeId: "bob" }),
+    )
+  })
+})
+
+describe("join requests and the opt-in directory (#60)", () => {
+  /** A signed-in stranger: no membership in this band, asking to join. */
+  const dave = () => env.authenticatedContext("dave")
+  const directoryPath = (id = orgId) => `discoverable/${id}`
+  const requestPath = (uid = "dave", id = orgId) => `organizations/${id}/joinRequests/${uid}`
+
+  const ask = (uid: string, over: Record<string, unknown> = {}) => ({
+    uid,
+    displayName: "Dave",
+    email: "dave@example.com",
+    note: "I play bass",
+    createdAt: new Date(),
+    status: "pending",
+    ...over,
+  })
+
+  const seedOrg = async (over: Record<string, unknown> = {}, id = orgId): Promise<void> => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx
+        .firestore()
+        .doc(`organizations/${id}`)
+        .set(
+          { name: "The Wrens", description: "", logoURL: "", ownerId: "alice", ...over },
+          { merge: true },
+        )
+    })
+  }
+
+  /** The band opted in: flag and directory entry, exactly like the app's batch. */
+  const makeDiscoverable = async (): Promise<void> => {
+    await seedOrg({ discoverable: true })
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(directoryPath()).set({ name: "The Wrens", nameKey: "the wrens" })
+    })
+  }
+
+  const seedAsk = async (
+    uid = "dave",
+    id = orgId,
+    over: Record<string, unknown> = {},
+  ): Promise<void> => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(requestPath(uid, id)).set(ask(uid, over))
+    })
+  }
+
+  it("lets a signed-in stranger find a band that opted in", async () => {
+    await makeDiscoverable()
+    await assertSucceeds(
+      dave().firestore().collection("discoverable").where("nameKey", "==", "the wrens").limit(10).get(),
+    )
+  })
+
+  it("denies the search to signed-out visitors", async () => {
+    await makeDiscoverable()
+    await assertFails(
+      guest().firestore().collection("discoverable").where("nameKey", "==", "the wrens").limit(10).get(),
+    )
+  })
+
+  it("denies every shape of a scan: sorts, offsets, big or missing limits", async () => {
+    await makeDiscoverable()
+    const db = dave().firestore()
+    await assertFails(db.collection("discoverable").orderBy("nameKey").limit(10).get())
+    await assertFails(db.collection("discoverable").where("nameKey", "==", "the wrens").limit(11).get())
+    await assertFails(db.collection("discoverable").where("nameKey", "==", "the wrens").get())
+  })
+
+  it("lets the band's admin publish the entry with the flag in one batch", async () => {
+    await seedOrg()
+    const db = alice().firestore()
+    const batch = db.batch()
+    batch.update(db.doc(`organizations/${orgId}`), { discoverable: true, updatedAt: new Date() })
+    batch.set(db.doc(directoryPath()), { name: "The Wrens", nameKey: "the wrens" })
+    await assertSucceeds(batch.commit())
+  })
+
+  it("stops publishing the entry while the flag is off, and the reverse", async () => {
+    await seedOrg()
+    const db = alice().firestore()
+    // The entry without the flag…
+    await assertFails(db.doc(directoryPath()).set({ name: "The Wrens", nameKey: "the wrens" }))
+    // …and the flag without the entry.
+    const batch = db.batch()
+    batch.update(db.doc(`organizations/${orgId}`), { discoverable: true, updatedAt: new Date() })
+    await assertFails(batch.commit())
+  })
+
+  it("lets an admin opt out only by deleting the entry in the same batch", async () => {
+    await makeDiscoverable()
+    const db = alice().firestore()
+    await assertFails(db.doc(directoryPath()).delete())
+    const batch = db.batch()
+    batch.update(db.doc(`organizations/${orgId}`), { discoverable: false, updatedAt: new Date() })
+    batch.delete(db.doc(directoryPath()))
+    await assertSucceeds(batch.commit())
+  })
+
+  it("stops another band's admin from publishing this band's entry", async () => {
+    await makeDiscoverable()
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`organizations/${createId("org")}/members/carol`).set({
+        uid: "carol",
+        displayName: "carol",
+        email: "carol@example.com",
+        photoURL: "",
+        role: "admin",
+        joinedAt: new Date(),
+        invitedBy: "",
+      })
+    })
+    await assertFails(
+      env
+        .authenticatedContext("carol")
+        .firestore()
+        .doc(directoryPath())
+        .set({ name: "The Wrens", nameKey: "the wrens" }),
+    )
+  })
+
+  it("stops a plain member from touching the entry", async () => {
+    await makeDiscoverable()
+    await assertFails(
+      bob().firestore().doc(directoryPath()).set({ name: "Sneaky", nameKey: "sneaky" }),
+    )
+  })
+
+  it("stops an entry that carries more than the name, or a name over the clamp", async () => {
+    await seedOrg()
+    const db = alice().firestore()
+    const batch = db.batch()
+    batch.update(db.doc(`organizations/${orgId}`), { discoverable: true, updatedAt: new Date() })
+    batch.set(db.doc(directoryPath()), {
+      name: "The Wrens",
+      nameKey: "the wrens",
+      email: "secret@example.com",
+    })
+    await assertFails(batch.commit())
+
+    const oversized = db.batch()
+    oversized.update(db.doc(`organizations/${orgId}`), { discoverable: true, updatedAt: new Date() })
+    oversized.set(db.doc(directoryPath()), {
+      name: "x".repeat(81),
+      nameKey: "x".repeat(81),
+    })
+    await assertFails(oversized.commit())
+  })
+
+  it("stops a non-admin from setting the flag at all", async () => {
+    await seedOrg()
+    await assertFails(
+      bob().firestore().doc(`organizations/${orgId}`).update({ discoverable: true }),
+    )
+  })
+
+  it("lets a stranger ask to join, carrying only their own words", async () => {
+    await assertSucceeds(dave().firestore().doc(requestPath()).set(ask("dave")))
+  })
+
+  it("stops asking in somebody else's name", async () => {
+    await assertFails(
+      dave().firestore().doc(requestPath("eve")).set(ask("eve")),
+    )
+  })
+
+  it("stops a member or a guest from asking again", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`organizations/${orgId}/members/gus`).set({
+        uid: "gus",
+        displayName: "gus",
+        email: "gus@example.com",
+        photoURL: "",
+        role: "guest",
+        joinedAt: new Date(),
+        invitedBy: "",
+      })
+    })
+    await assertFails(bob().firestore().doc(requestPath("bob")).set(ask("bob")))
+    await assertFails(
+      env.authenticatedContext("gus").firestore().doc(requestPath("gus")).set(ask("gus")),
+    )
+  })
+
+  it("stops a create that smuggles a field, skips pending or mangles the email", async () => {
+    const db = dave().firestore()
+    await assertFails(db.doc(requestPath()).set({ ...ask("dave"), role: "admin" }))
+    await assertFails(db.doc(requestPath()).set(ask("dave", { status: "approved" })))
+    await assertFails(db.doc(requestPath()).set(ask("dave", { email: "Dave@Example.com" })))
+  })
+
+  it("stops the requester from approving themselves", async () => {
+    await seedAsk()
+    await assertFails(
+      dave().firestore().doc(requestPath()).update({ status: "approved" }),
+    )
+  })
+
+  it("lets the requester withdraw and lets a rejected ask be asked again", async () => {
+    await seedAsk()
+    await assertSucceeds(dave().firestore().doc(requestPath()).delete())
+    await assertSucceeds(dave().firestore().doc(requestPath()).set(ask("dave")))
+
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(requestPath()).update({ status: "rejected" })
+    })
+    await assertSucceeds(
+      dave().firestore().doc(requestPath()).update({ status: "pending", createdAt: new Date() }),
+    )
+  })
+
+  it("lets an admin approve and reject with their own review stamps", async () => {
+    await seedAsk()
+    const db = alice().firestore()
+    const stamps = {
+      reviewedBy: "alice",
+      reviewedByName: "alice",
+      reviewedAt: new Date(),
+    }
+    await assertSucceeds(db.doc(requestPath()).update({ status: "approved", ...stamps }))
+    await assertSucceeds(db.doc(requestPath()).update({ status: "rejected", ...stamps }))
+  })
+
+  it("stops an admin review that forgets who reviewed, or touches the ask", async () => {
+    await seedAsk()
+    const db = alice().firestore()
+    await assertFails(db.doc(requestPath()).update({ status: "approved" }))
+    await assertFails(
+      db.doc(requestPath()).update({
+        status: "rejected",
+        reviewedBy: "alice",
+        reviewedByName: "alice",
+        reviewedAt: new Date(),
+        displayName: "Sneaky",
+      }),
+    )
+  })
+
+  it("stops a plain member from reviewing, and a stranger from reading the queue", async () => {
+    await seedAsk()
+    await assertFails(
+      bob().firestore().doc(requestPath()).update({ status: "rejected", reviewedBy: "bob" }),
+    )
+    await assertFails(bob().firestore().doc(requestPath()).get())
+    await assertFails(guest().firestore().doc(requestPath()).get())
+    await assertSucceeds(alice().firestore().doc(requestPath()).get())
+    await assertSucceeds(dave().firestore().doc(requestPath()).get())
+  })
+
+  it("lets the admins list the band's queue and stops members from reading it", async () => {
+    await seedAsk()
+    const queue = alice().firestore().collection(`organizations/${orgId}/joinRequests`)
+    await assertSucceeds(queue.orderBy("createdAt", "desc").get())
+    await assertFails(
+      bob().firestore().collection(`organizations/${orgId}/joinRequests`).orderBy("createdAt", "desc").get(),
+    )
+  })
+
+  it("lets the requester find their own asks across bands and nobody else's", async () => {
+    const otherOrg = createId("org")
+    await seedAsk("dave", otherOrg)
+    await seedAsk()
+    await assertSucceeds(
+      dave().firestore().collectionGroup("joinRequests").where("uid", "==", "dave").get(),
+    )
+    await assertFails(
+      bob().firestore().collectionGroup("joinRequests").where("uid", "==", "dave").get(),
     )
   })
 })

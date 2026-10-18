@@ -319,7 +319,12 @@ each tab.
   may also flip a pending suggestion's assignee and nothing else with it (one field, one update).
 - Membership is granted only through an **email-keyed invitation** that the matching authenticated
   account accepts in the same batch that creates the membership — nobody can add another person's
-  account for them.
+  account for them. A **join request** can only ever mint that invitation: approving never grants
+  membership directly, and the requester can never approve themselves.
+- A band can opt into a **discoverable directory**: the top-level `discoverable/{orgId}` entry
+  carries the band's **name only** (never emails, uids or rosters), may exist only while the band's
+  own flag says so — both move in one batch or the write is denied — and reads are exact-name
+  searches pinned through `nameKey` and capped at ten, so the list can never be paged.
 - **`users/{uid}` is private**: no client can look up another account by email, which is what keeps
   invite-by-email honest.
 - **Usernames** are claimed atomically in the public `usernames/{name}` registry (case-insensitive);

@@ -84,6 +84,8 @@ export default function AppLayout() {
         <Stack.Screen name="more" options={{ animation: "none" }} />
         <Stack.Screen name="organizations/index" options={modalOptions} />
         <Stack.Screen name="organizations/new" options={modalOptions} />
+        {/* Join requests (#60): search the opt-in directory and ask to join. */}
+        <Stack.Screen name="discover" />
       </Stack>
     </AppShell>
   )

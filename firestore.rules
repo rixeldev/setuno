@@ -24,6 +24,8 @@ rules_version = '2';
  *   organizations/{organizationId}/suggestions/{suggestionId}/comments
  *   organizations/{organizationId}/activity
  *   organizations/{organizationId}/invitations/{lowercased email}
+ *   organizations/{organizationId}/joinRequests/{uid}  a musician asking to join (#60)
+ *   discoverable/{organizationId}                      opt-in directory: name only (#60)
  *   shares/{token}                                    public share snapshot (#56)
  *
  * Invariants enforced here:
@@ -40,7 +42,12 @@ rules_version = '2';
  *   • nobody can change their own role, admins included;
  *   • membership is granted through an email-keyed invitation that only the
  *     matching authenticated account can accept, in the same batch that creates
- *     the membership;
+ *     the membership — a join request (roadmap #60) can only ever *mint* that
+ *     invitation: approving never grants membership directly;
+ *   • discoverability is opt-in and name-only (roadmap #60): the
+ *     `discoverable/{organizationId}` entry exists only while the band's own
+ *     `discoverable` flag says so — the two move in one batch or the write is
+ *     denied — and it carries the band's name, never emails, uids or rosters;
  *   • `users/{uid}` is private: no client can look up another person's account,
  *     which is what keeps invite-by-email honest;
  *   • `shares/{token}` is the only anonymous read: a public link works signed
@@ -70,6 +77,25 @@ service cloud.firestore {
 
     function organizationPath(organizationId) {
       return /databases/$(database)/documents/organizations/$(organizationId);
+    }
+
+    function directoryPath(organizationId) {
+      return /databases/$(database)/documents/discoverable/$(organizationId);
+    }
+
+    /**
+     * The `discoverable` flag and the `discoverable/{organizationId}` entry are
+     * one fact in two documents (roadmap #60): the flag may only move in the
+     * same batch that publishes the entry (true) or deletes it (false), so the
+     * pair can never drift. `getAfter`/`existsAfter` see the post-batch state.
+     */
+    function discoverableFlagMatchesDirectory(organizationId, before, after) {
+      return (after.get('discoverable', false) == before.get('discoverable', false))
+        || (after.get('discoverable', false) == true
+            && existsAfter(directoryPath(organizationId))
+            && getAfter(directoryPath(organizationId)).data.name is string)
+        || (after.get('discoverable', false) == false
+            && !existsAfter(directoryPath(organizationId)));
     }
 
     function invitationPath(organizationId) {
@@ -413,6 +439,57 @@ service cloud.firestore {
         && resource.data.email == tokenEmail();
     }
 
+    // The requester finds their own asks across every band (roadmap #60),
+    // exactly like the invitation query above. A document id cannot pin a
+    // query (a collection-group query never constrains ids), so the ask's own
+    // `uid` field is what keeps every result the caller's — the id is checked
+    // by the nested rule for single-document reads instead.
+    match /{path=**}/joinRequests/{requesterUid} {
+      allow read: if signedIn()
+        && resource.data.uid == request.auth.uid;
+    }
+
+    // ------------------------------------------------------ directory (#60)
+
+    /**
+     * The opt-in directory: the document's *existence* is the band's consent to
+     * be found by name, and its contents stop at the name and its search key —
+     * never emails, uids or rosters. Rules are not filters, so the exact-name
+     * search is pinned through `resource.data.nameKey` (a where clause surfaces
+     * as the document field it constrains, exactly like the invitation query's
+     * email): a query that does not filter by the key cannot prove it holds for
+     * every result, so only equality searches get through — each one names a
+     * single band, which is what keeps the directory un-enumerable.
+     */
+    match /discoverable/{organizationId} {
+      allow list: if signedIn()
+        && resource.data.nameKey is string
+        && resource.data.nameKey.size() >= 1
+        && request.query.limit != null
+        && request.query.limit <= 10
+        && (request.query.offset == null || request.query.offset == 0);
+
+      // Only an admin of that very band may publish or rename the entry, and
+      // only while the band's own flag says so — the organization update below
+      // pins the other direction, so the pair can never drift.
+      allow create, update: if isAdmin(organizationId)
+        && getAfter(organizationPath(organizationId)).data.get('discoverable', false) == true
+        && request.resource.data.keys().hasOnly(['name', 'nameKey'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.nameKey is string
+        && request.resource.data.nameKey.size() >= 1
+        && request.resource.data.nameKey.size() <= 80;
+
+      // Removing the entry is what "opt out" means, so it only closes the loop:
+      // the band's flag must read false after this batch — or the band itself
+      // must be gone, which is the deletion cascade's own batch.
+      allow delete: if isAdmin(organizationId)
+        && (getAfter(organizationPath(organizationId)) == null
+            || getAfter(organizationPath(organizationId)).data.get('discoverable', false) == false);
+    }
+
     // ------------------------------------------------------------ organizations
 
     match /organizations/{organizationId} {
@@ -431,7 +508,10 @@ service cloud.firestore {
       allow update: if isAdmin(organizationId)
         && request.resource.data.ownerId == resource.data.ownerId
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['name', 'description', 'logoURL', 'updatedAt']);
+             .hasOnly(['name', 'description', 'logoURL', 'updatedAt', 'discoverable'])
+        // Discoverability is a pair (roadmap #60): the flag only moves
+        // together with its directory entry, in either direction.
+        && discoverableFlagMatchesDirectory(organizationId, resource.data, request.resource.data);
 
       // Only the owner can delete the band.
       allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
@@ -513,6 +593,53 @@ service cloud.firestore {
               && getAfter(memberPath(organizationId, request.auth.uid)).data.role in ['admin', 'member', 'guest']);
 
         allow delete: if isAdmin(organizationId);
+      }
+
+      // --------------------------------------------------------- join requests
+
+      // Roadmap #60: a musician asks to join an opt-in band. Approving turns
+      // the ask into the ordinary invitation, so membership keeps the one rule
+      // it has always had — only the account's own identity can join.
+      match /joinRequests/{requesterUid} {
+        // The requester reads their own ask; the band's admins review the rest.
+        allow read: if isSelf(requesterUid) || isAdmin(organizationId);
+
+        // Any signed-in account that is not already in the band may ask (a
+        // guest has a member document, so they are out too), carrying only what
+        // the admins need to recognise them: the requester's own name, their
+        // own email and an optional note. Nothing of the band's rides along.
+        allow create: if isSelf(requesterUid)
+          && !exists(memberPath(organizationId, requesterUid))
+          && request.resource.data.keys().hasOnly([
+            'uid', 'displayName', 'email', 'note', 'createdAt', 'status'
+          ])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.status == 'pending'
+          && request.resource.data.displayName is string
+          && request.resource.data.displayName.size() >= 1
+          && request.resource.data.displayName.size() <= 80
+          && validEmail(request.resource.data.email)
+          && request.resource.data.note is string
+          && request.resource.data.note.size() <= 200
+          && request.resource.data.createdAt is timestamp;
+
+        // The requester may withdraw, cancel a rejection and ask again (a fresh
+        // timestamp keeps the admin's ordering honest) — but never approve
+        // themselves: the pending-only pin is what makes that impossible.
+        allow update: if (
+            isSelf(requesterUid)
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['note', 'createdAt', 'status'])
+            && request.resource.data.status == 'pending'
+          ) || (
+            isAdmin(organizationId)
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['status', 'reviewedBy', 'reviewedByName', 'reviewedAt'])
+            && request.resource.data.status in ['approved', 'rejected']
+            && request.resource.data.reviewedBy == request.auth.uid
+          );
+
+        allow delete: if isSelf(requesterUid) || isAdmin(organizationId);
       }
 
       // ------------------------------------------------------------------- songs

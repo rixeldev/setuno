@@ -1534,7 +1534,10 @@
     "deleteAccountPassword": "Confirma con tu contraseña",
     "deleteAccountGoogleHint": "Se te pedirá confirmar tu cuenta de Google.",
     "deleteAccountConfirm": "Eliminar definitivamente",
-    "deleteAccountFailed": "No pudimos eliminar tu cuenta. Inténtalo de nuevo."
+    "deleteAccountFailed": "No pudimos eliminar tu cuenta. Inténtalo de nuevo.",
+    "discoverable": "Encontrable por nombre",
+    "discoverableHint": "Las bandas que activan esto aparecen cuando alguien busca su nombre exacto y pueden pedir unirse. Solo se comparte el nombre de la banda — nunca correos ni miembros — y aprobar una solicitud envía una invitación normal.",
+    "discoverabilitySaved": "Búsqueda de la banda actualizada."
   },
   "organizations": {
     "bands": "Bandas",
@@ -1613,7 +1616,8 @@
     "invitationRevoked": "Invitación revocada.",
     "invitationAccepted": "¡Bienvenido a la banda!",
     "selectBand": "Elige una banda",
-    "noMembersDescription": "Invita a tu primer músico para empezar a colaborar."
+    "noMembersDescription": "Invita a tu primer músico para empezar a colaborar.",
+    "findBand": "Buscar una banda"
   },
   "members": {
     "inviteSomeone": "Invitar a alguien",
@@ -1647,7 +1651,44 @@
     "makeAdmin": "Hacer admin",
     "makeMember": "Hacer miembro",
     "makeGuest": "Hacer invitado",
-    "revoke": "Revocar"
+    "revoke": "Revocar",
+    "joinRequestsCount_one": "{{count}} solicitud de unión",
+    "joinRequestsCount_other": "{{count}} solicitudes de unión",
+    "approve": "Aprobar",
+    "approveTitle": "¿Aprobar a {{name}}?",
+    "approveDescription": "{{email}} recibirá una invitación para unirse como miembro. La acepta él mismo, como cualquier invitación.",
+    "reject": "Rechazar",
+    "rejectTitle": "¿Rechazar a {{name}}?",
+    "rejectDescription": "Podrá pedirlo de nuevo más tarde.",
+    "requestApproved": "{{name}} recibió una invitación a la banda.",
+    "requestRejected": "Se rechazó la solicitud de {{name}}.",
+    "couldNotReview": "No pudimos revisar esa solicitud."
+  },
+  "discover": {
+    "title": "Encuentra tu banda",
+    "subtitle": "Busca bandas que eligieron aparecer por su nombre",
+    "searchLabel": "Nombre de la banda",
+    "searchPlaceholder": "The Wrens",
+    "search": "Buscar",
+    "hint": "Solo aparecen aquí las bandas que activaron para ser encontradas, y solo con su nombre exacto.",
+    "noResults": "Ninguna banda con ese nombre",
+    "noResultsHint": "Las bandas solo aparecen aquí cuando sus admins activan la búsqueda, y el nombre debe coincidir exactamente.",
+    "requestToJoin": "Solicitar unirse",
+    "waiting": "Esperando la respuesta de la banda",
+    "withdraw": "Retirar",
+    "withdrawn": "Solicitud retirada.",
+    "approved": "Aprobada",
+    "approvedHint": "Acepta tu invitación desde la lista de bandas.",
+    "askAgain": "Volver a pedir",
+    "confirmTitle": "¿Solicitar unirse a {{name}}?",
+    "confirmDescription": "Los admins de la banda revisan tu solicitud y, si la aprueban, te envían una invitación.",
+    "noteLabel": "Una nota para los admins (opcional)",
+    "notePlaceholder": "Toco el bajo — ¡vi que necesitan uno!",
+    "shareNote": "Verán tu nombre, {{email}} y tu nota.",
+    "send": "Enviar solicitud",
+    "requestSent": "Se envió tu solicitud para unirte a {{name}}.",
+    "searchFailed": "No pudimos buscar ahora mismo.",
+    "requestFailed": "No pudimos enviar esa solicitud."
   },
   "toasts": {
     "languageUpdated": "Idioma actualizado",
