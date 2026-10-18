@@ -317,6 +317,9 @@ each tab.
 - Only **admins** can create/edit songs, setlists and performances; **any member** can create a
   suggestion but nobody can resolve their own — and a guest can create nothing at all. A member
   may also flip a pending suggestion's assignee and nothing else with it (one field, one update).
+- An open song editor stamps a **presence dot** of its own (`songs/{id}/presence/{uid}`): only the
+  editor who owns that dot may write it (never a guest), the whole band may read it, and it is a
+  soft "somebody is editing" hint that goes dark by itself — never a lock.
 - Membership is granted only through an **email-keyed invitation** that the matching authenticated
   account accepts in the same batch that creates the membership — nobody can add another person's
   account for them. A **join request** can only ever mint that invitation: approving never grants

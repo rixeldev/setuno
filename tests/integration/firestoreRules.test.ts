@@ -12,7 +12,8 @@
  * onto them (roadmap #57), the read-only guest role that reads the band's
  * music and logistics while every collaboration surface stays denied
  * (roadmap #59), the one-field suggestion assignments any member writes
- * (roadmap #58) and the opt-in directory plus the join requests that can only
+ * (roadmap #58), the song edit-presence dots only their own owner may stamp
+ * (roadmap #28) and the opt-in directory plus the join requests that can only
  * ever mint an invitation (roadmap #60).
  *
  * Run through `firebase emulators:exec --only firestore,storage "pnpm
@@ -2075,5 +2076,85 @@ describe("the guest role reads the band and nothing else (roadmap #59)", () => {
     await assertSucceeds(batch.commit())
     const mirror = await assertSucceeds(ivansDb.doc(`users/ivan/organizations/${orgId}`).get())
     expect(mirror.data()?.role).toBe("guest")
+  })
+})
+
+describe("song edit presence is a soft heartbeat (roadmap #28)", () => {
+  const roger = () => env.authenticatedContext("roger")
+  const zed = () => env.authenticatedContext("zed")
+  const dot = (uid: string, displayName = "The editor") => ({
+    uid,
+    displayName,
+    updatedAt: new Date(),
+  })
+  const presencePath = (uid: string) => `${songPath()}/presence/${uid}`
+
+  /** The roster fresh: earlier describes must not colour this one. */
+  const seedRoster = async (): Promise<void> => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore()
+      const member = (uid: string, role: string, invitedBy: string) => ({
+        uid,
+        displayName: uid,
+        email: `${uid}@example.com`,
+        photoURL: "",
+        role,
+        joinedAt: new Date(),
+        invitedBy,
+      })
+      await db.doc(`organizations/${orgId}/members/alice`).set(member("alice", "admin", ""))
+      await db.doc(`organizations/${orgId}/members/bob`).set(member("bob", "member", "alice"))
+      await db.doc(`organizations/${orgId}/members/roger`).set(member("roger", "guest", "alice"))
+    })
+  }
+
+  beforeEach(seedRoster)
+
+  it("lets the editor stamp and refresh their own dot", async () => {
+    const db = alice().firestore()
+    await assertSucceeds(db.doc(presencePath("alice")).set(dot("alice")))
+    await assertSucceeds(db.doc(presencePath("alice")).set(dot("alice", "Alice the editor")))
+  })
+
+  it("never lets an editor claim somebody else's dot", async () => {
+    const db = alice().firestore()
+    // their name on somebody else's id
+    await assertFails(db.doc(presencePath("bob")).set(dot("alice")))
+    // somebody else's name on their own id
+    await assertFails(db.doc(presencePath("alice")).set(dot("bob")))
+  })
+
+  it("rejects extra fields, oversized names and a clock that is not a timestamp", async () => {
+    const db = alice().firestore()
+    await assertFails(db.doc(presencePath("alice")).set({ ...dot("alice"), editing: true }))
+    await assertFails(db.doc(presencePath("alice")).set(dot("alice", "x".repeat(81))))
+    await assertFails(
+      db.doc(presencePath("alice")).set({ uid: "alice", displayName: "Alice", updatedAt: "yesterday" }),
+    )
+  })
+
+  it("shows the whole band who is inside and keeps outsiders out", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(presencePath("alice")).set(dot("alice"))
+    })
+    await assertSucceeds(bob().firestore().collection(`${songPath()}/presence`).get())
+    await assertSucceeds(roger().firestore().collection(`${songPath()}/presence`).get())
+    await assertFails(zed().firestore().collection(`${songPath()}/presence`).get())
+    await assertFails(guest().firestore().collection(`${songPath()}/presence`).get())
+  })
+
+  it("keeps guests out of the dot", async () => {
+    await assertFails(roger().firestore().doc(presencePath("roger")).set(dot("roger")))
+  })
+
+  it("lets the editor retire their own dot and an admin sweep one, but no other member", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore()
+      await db.doc(presencePath("alice")).set(dot("alice"))
+      await db.doc(presencePath("bob")).set(dot("bob"))
+    })
+    await assertFails(bob().firestore().doc(presencePath("alice")).delete())
+    await assertSucceeds(alice().firestore().doc(presencePath("alice")).delete())
+    await assertSucceeds(alice().firestore().doc(presencePath("bob")).delete())
   })
 })

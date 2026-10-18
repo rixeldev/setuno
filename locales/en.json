@@ -425,6 +425,8 @@
     "song": "Song",
     "newSong": "New song",
     "editSong": "Edit song",
+    "editingOne": "{{name}} is editing this song",
+    "editingMany": "{{names}} are editing this song",
     "songTitle": "Song title",
     "artist": "Artist",
     "key": "Key",

@@ -178,6 +178,24 @@ npx expo-doctor         # diagnose dependency and config issues
   `pnpm deploy:rules`**. The **scheduled 30-day hard-delete ships with the functions workspace**
   (roadmap P0.1): `purgeTrashedSongs` purges the expired trash daily with the same cascade, so the
   trash holds forever only until that function is deployed — see the Cloud Functions section.
+- **The song editor says who is inside** (roadmap #28): `organizations/{orgId}/songs/{songId}/presence/{uid}`
+  holds one tiny dot per open editor (`uid`, `displayName`, **client-time** `updatedAt`, refreshed
+  every `PRESENCE_HEARTBEAT_MS` = 30 s and retired on the way out). `hooks/useEditPresence.ts` owns
+  the heartbeat — band+song-tagged snapshot (#37B), best-effort like `logActivity` — and returns the
+  *other* editors still inside `PRESENCE_TTL_MS` (75 s), so a killed app goes dark by itself with
+  nobody to sweep it; the freshness flip is a **timer in an effect**, never `Date.now()` in render
+  (the React Compiler purity rule). The UI is `components/songs/EditingPresenceNotice.tsx`: a
+  polite live-region line pinned under the editor's header through `SongForm`'s `notice` prop — a
+  **soft warning, never a lock** (the create form renders no notice: there is no id until the song
+  is saved). The pure core `libs/editPresence.ts` (+12 tests): `presenceName` trim/collapse/clamp 80,
+  `mapPresence` self-heals a dot whose id and uid disagree (the mapper precedent), `liveEditors`
+  drops caller + stale dots and sorts name-then-uid so the line cannot shuffle. `firestore.rules`
+  nests `presence` under the songs match: read = `isBandReader`, create/update = `isSelf` +
+  `isMember` (a guest has no editor door) + `keys().hasOnly(['uid','displayName','updatedAt'])` +
+  name 1..80 + `updatedAt is timestamp`, delete = self or admin (the crashed-dot sweep). The
+  **hard-delete cascade** grew the same day: `purgeSong` and `functions/src/purge.ts` sweep
+  `presence` beside `versions` (`PurgeResult.presence` rides the log) → **needs `pnpm deploy:rules`**
+  (seventeenth push) **and `pnpm deploy:functions`** (seventh) — both run by the agent.
 - **The activity feed knows what you have read** (roadmap #53): one personal marker per band at
   `users/{uid}/activityRead/{orgId}` — `services/activity.ts#subscribeActivityRead` +
   `#markActivityRead` (**client** time, exactly like a trashed song or a version's `savedAt`: a

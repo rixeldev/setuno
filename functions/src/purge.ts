@@ -5,10 +5,11 @@ import type { Firestore } from "firebase-admin/firestore"
  * Functions workspace of roadmap P0.1). A trashed song stays 30 days in the
  * trash — restorable the whole time — and this purge then deletes it **for
  * good**, with the same cascade as the trash's "Delete forever"
- * (`services/songs.ts#purgeSong`): the document and its `versions` history,
- * because Firestore never cascades. The per-user documents keyed by the song
- * id (annotations, reader state, favorites) stay behind on purpose, exactly
- * like a manual purge: the owner-only rules make them unreachable anyway.
+ * (`services/songs.ts#purgeSong`): the document, its `versions` history and
+ * its edit-presence dots (roadmap #28), because Firestore never cascades. The
+ * per-user documents keyed by the song id (annotations, reader state,
+ * favorites) stay behind on purpose, exactly like a manual purge: the
+ * owner-only rules make them unreachable anyway.
  *
  * The Admin SDK bypasses the security rules, so this needs no rules change.
  * Every decision that can be made without a database lives here as a plain
@@ -46,17 +47,19 @@ export const chunksOf = <T>(items: readonly T[], size: number): T[][] => {
 export interface PurgeResult {
   songs: number
   versions: number
+  presence: number
 }
 
 /**
  * Deletes every song whose `deletedAt` is older than the TTL, together with
- * its version history, and reports what went. `deletedAt` is the only field
- * this query touches and it rides Firestore's automatic collection-group
- * single-field index, so no index ships with it. The two range filters on the
- * same field are what spare a live song in **both** shapes it exists in: the
- * field missing, and the explicit `null` that `restoreSong` writes — `null`
- * orders before every timestamp, so an upper bound alone would match it. The
- * integration suite pins that behaviour against the emulator.
+ * its version history and its edit-presence dots (roadmap #28 — no subcollection may outlive its song), and reports what went. `deletedAt` is the
+ * only field this query touches and it rides Firestore's automatic
+ * collection-group single-field index, so no index ships with it. The two
+ * range filters on the same field are what spare a live song in **both**
+ * shapes it exists in: the field missing, and the explicit `null` that
+ * `restoreSong` writes — `null` orders before every timestamp, so an upper
+ * bound alone would match it. The integration suite pins that behaviour
+ * against the emulator.
  */
 export const purgeExpiredSongs = async (db: Firestore, now: Date): Promise<PurgeResult> => {
   const snapshot = await db
@@ -67,16 +70,19 @@ export const purgeExpiredSongs = async (db: Firestore, now: Date): Promise<Purge
     .get()
   let songs = 0
   let versions = 0
+  let presence = 0
   for (const song of snapshot.docs) {
     const versionDocs = await song.ref.collection("versions").listDocuments()
-    // The song document rides the last batch of its own versions.
-    for (const group of chunksOf([...versionDocs, song.ref], WRITES_PER_BATCH)) {
+    const presenceDocs = await song.ref.collection("presence").listDocuments()
+    // The song document rides the last batch of its own subcollections.
+    for (const group of chunksOf([...versionDocs, ...presenceDocs, song.ref], WRITES_PER_BATCH)) {
       const batch = db.batch()
       for (const target of group) batch.delete(target)
       await batch.commit()
     }
     songs += 1
     versions += versionDocs.length
+    presence += presenceDocs.length
   }
-  return { songs, versions }
+  return { songs, versions, presence }
 }

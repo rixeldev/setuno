@@ -120,6 +120,9 @@ export const paths = {
   /** Saved states of a song's content, one per admin save (roadmap #26). */
   songVersions: (orgId: string, songId: string) =>
     `organizations/${orgId}/songs/${songId}/versions`,
+  /** One dot per editor while the song editor is open (roadmap #28). */
+  songPresence: (orgId: string, songId: string) =>
+    `organizations/${orgId}/songs/${songId}/presence`,
   setlists: (orgId: string) => `organizations/${orgId}/setlists`,
   setlist: (orgId: string, setlistId: string) => `organizations/${orgId}/setlists/${setlistId}`,
   performances: (orgId: string) => `organizations/${orgId}/performances`,

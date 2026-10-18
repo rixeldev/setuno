@@ -288,6 +288,8 @@
     "song": "Canción",
     "newSong": "Nueva canción",
     "editSong": "Editar canción",
+    "editingOne": "{{name}} está editando esta canción",
+    "editingMany": "{{names}} están editando esta canción",
     "songTitle": "Título",
     "artist": "Artista",
     "key": "Tono",

@@ -55,6 +55,8 @@ interface SongFormProps {
   title?: string
   subtitle?: string
   headerRight?: React.ReactNode
+  /** Sticky line under the header, above the scroll (edit presence, #28). */
+  notice?: React.ReactNode
   /** Extra block rendered above the form (used by the guided tour, #65). */
   tourHint?: React.ReactNode
 }
@@ -104,7 +106,7 @@ const formStateFrom = (
  * “More details”. The primary action lives in a sticky footer so it is always
  * one tap away, no matter how long the lyrics are.
  */
-export function SongForm({ song, onSaved, title, subtitle, headerRight, tourHint }: SongFormProps) {
+export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, tourHint }: SongFormProps) {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
   const router = useRouter()
@@ -375,6 +377,8 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, tourHint
         elevated
         right={headerRight}
       />
+
+      {notice}
 
       <ScreenContainer scroll style={styles.body}>
         {tourHint}

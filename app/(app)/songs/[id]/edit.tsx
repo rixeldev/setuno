@@ -7,6 +7,7 @@ import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { TourHint } from "@/components/onboarding/TourHint"
 import { SongForm } from "@/components/songs/SongForm"
+import { EditingPresenceNotice } from "@/components/songs/EditingPresenceNotice"
 import { AppBackground } from "@/components/app/AppBackground"
 import { EmptyState, Skeleton } from "@/components/ui/States"
 import { useOrganization } from "@/hooks/useOrganization"
@@ -64,6 +65,7 @@ export default function EditSong() {
     <SongForm
       song={song}
       onSaved={() => router.replace(`/songs/${song.id}`)}
+      notice={<EditingPresenceNotice songId={song.id} />}
       tourHint={
         tourActive ? (
           <TourHint

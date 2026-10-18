@@ -21,6 +21,7 @@ import {
 } from "@/db/Fire"
 import type { LyricLine, Song, SongInput, SongSection } from "@/interfaces"
 import { logActivity } from "@/services/activity"
+import { deleteSongPresence } from "@/services/songPresence"
 import { deleteVersions, writeVersion } from "@/services/songVersions"
 import { ValidationError } from "@/services/errors"
 import { countSongChords, countSongLines, clampSectionBars, normalizeSectionLabels } from "@/libs/songUtils"
@@ -386,8 +387,10 @@ export const purgeSong = async (
   const song = await fetchSong(organizationId, songId)
   await deleteDocFor(organizationId, songId)
   // Firestore does not cascade: the song's version history goes with it
-  // (roadmap #26), best-effort like the activity log below.
+  // (roadmap #26) and so do its edit-presence dots (roadmap #28),
+  // best-effort like the activity log below.
   void deleteVersions(organizationId, songId)
+  void deleteSongPresence(organizationId, songId)
 
   void logActivity({
     organizationId,

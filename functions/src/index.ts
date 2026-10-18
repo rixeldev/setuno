@@ -65,6 +65,7 @@ export const purgeTrashedSongs = onSchedule(
       ttlDays: TRASH_TTL_DAYS,
       songs: result.songs,
       versions: result.versions,
+      presence: result.presence,
     })
   },
 )

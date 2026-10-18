@@ -677,6 +677,27 @@ service cloud.firestore {
           allow update: if false;
           allow delete: if isAdmin(organizationId);
         }
+
+        // Edit presence (roadmap #28): a soft "X is editing" heartbeat, never
+        // a lock. One dot per editor (id = uid) that only its own owner may
+        // write — a guest has no editor door, so the writes sit behind
+        // `isMember`, while the whole band may read who is inside. The clock
+        // is client time: freshness is judged offline, and a serverTimestamp
+        // would read null while a heartbeat queues.
+        match /presence/{editorUid} {
+          allow read: if isBandReader(organizationId);
+          allow create, update: if isSelf(editorUid)
+            && isMember(organizationId)
+            && request.resource.data.keys().hasOnly(['uid', 'displayName', 'updatedAt'])
+            && request.resource.data.uid == editorUid
+            && request.resource.data.displayName is string
+            && request.resource.data.displayName.size() >= 1
+            && request.resource.data.displayName.size() <= 80
+            && request.resource.data.updatedAt is timestamp;
+          // The editor retires their own dot; an admin may sweep one left
+          // behind by a crash that outlived its window.
+          allow delete: if isSelf(editorUid) || isAdmin(organizationId);
+        }
       }
 
       // ---------------------------------------------------------------- setlists
