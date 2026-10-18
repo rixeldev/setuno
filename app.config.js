@@ -1,3 +1,11 @@
+// Staging builds (roadmap #80 / P0.7) select the staging Firebase project:
+// APP_ENV=staging swaps the native config files (the JS half comes from
+// db/firebaseConfig.ts, generated from the FIREBASE_STAGING_* variables —
+// both halves must flip together). On EAS the staging files ride as file-type
+// environment variables; locally the gitignored *-staging files sit beside
+// the production ones.
+const stagingEnv = process.env.APP_ENV === "staging"
+
 export default {
   expo: {
     owner: "rikirilis",
@@ -18,7 +26,9 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.rixeldev.setuno",
-      googleServicesFile: "./GoogleService-Info.plist",
+      googleServicesFile: stagingEnv
+        ? (process.env.GOOGLE_SERVICES_PLIST_STAGING ?? "./GoogleService-Info-staging.plist")
+        : "./GoogleService-Info.plist",
       buildNumber: "1",
     },
     android: {
@@ -28,7 +38,9 @@ export default {
       minSdkVersion: 24,
       ndkVersion: "29.0.14206865",
       targetSdkVersion: 36,
-      googleServicesFile: "./google-services.json",
+      googleServicesFile: stagingEnv
+        ? (process.env.GOOGLE_SERVICES_JSON_STAGING ?? "./google-services-staging.json")
+        : "./google-services.json",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#0B0B14",

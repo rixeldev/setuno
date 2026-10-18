@@ -53,13 +53,17 @@ functions/package-lock.json
 # Service files
 google-services.json
 GoogleService-Info.plist
+google-services-staging.json
+GoogleService-Info-staging.plist
 
 # DB config file
 /db/firebaseConfig.ts
+/db/firebaseConfig.ts.bak
 
 # local env files (see .env.example)
 .env
 .env.local
+.env.staging
 
 # Vercel CLI project link
 .vercel

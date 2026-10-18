@@ -34,9 +34,12 @@ const PROJECT = JSON.parse(readFileSync(join(process.cwd(), ".firebaserc"), "utf
 const DB = "(default)"
 const DRILL_DB_ID = "setuno-restore-drill"
 const API = "https://firestore.googleapis.com/v1"
+const RULES_API = "https://firebaserules.googleapis.com/v1"
 const POLL_MS = 5000
 const WAIT_POLL_MS = 60_000
 const TIMEOUT_MS = 10 * 60 * 1000
+// A restore of this dataset took ~11 min end to end; give the operation room.
+const RESTORE_TIMEOUT_MS = 25 * 60 * 1000
 
 const fail = (message) => {
   console.error(`[backup] ${message}`)
@@ -99,7 +102,8 @@ const runCli = (args, { quiet = false } = {}) => {
       },
     )
   } catch (error) {
-    throw new Error(`firebase ${args.join(" ")} failed: ${error.stderr?.toString().trim() || error.message}`)
+    const detail = error.stderr?.toString().trim() || error.stdout?.toString().trim() || error.message
+    throw new Error(`firebase ${args.join(" ")} failed: ${detail}`)
   }
 }
 
@@ -116,8 +120,8 @@ const accessToken = async () => {
 }
 
 /** REST call; throws on any non-OK response (401 exits: not recoverable). */
-const call = async (method, path, body) => {
-  const response = await fetch(`${API}${path}`, {
+const call = async (method, path, body, base = API) => {
+  const response = await fetch(`${base}${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${await accessToken()}`,
@@ -151,18 +155,31 @@ const latestReadyBackup = async () => {
 }
 
 const waitForDatabase = async (databaseId) => {
-  const deadline = Date.now() + TIMEOUT_MS
+  const deadline = Date.now() + RESTORE_TIMEOUT_MS
   for (;;) {
     try {
       const database = await call("GET", dbPath(databaseId))
-      if (database.state === "ACTIVE") return database
-      if (database.state === "FAILED") fail(`Database ${databaseId} entered state FAILED`)
-      process.stdout.write(`[backup] restored database state: ${database.state}...\r`)
+      // The database resource carries no `state` on this API surface: the
+      // authoritative completion signal is the restore operation itself.
+      const operationPath = database.sourceInfo?.operation
+      if (operationPath) {
+        const operation = await call("GET", `/${operationPath}`)
+        if (operation.done) {
+          if (operation.error) fail(`Restore failed: ${JSON.stringify(operation.error)}`)
+          return call("GET", dbPath(databaseId))
+        }
+        process.stdout.write("[backup] restore operation running...\r")
+      } else if (database.earliestVersionTime) {
+        // Settled before we looked: data (and versions) already exist.
+        return database
+      } else {
+        process.stdout.write("[backup] restored database: creating...\r")
+      }
     } catch (error) {
       if (!String(error).includes("404")) throw error
       process.stdout.write("[backup] restored database: creating...\r")
     }
-    if (Date.now() > deadline) fail(`Database ${databaseId} not ACTIVE after ${TIMEOUT_MS / 60000} min`)
+    if (Date.now() > deadline) fail(`Database ${databaseId} not restored after ${RESTORE_TIMEOUT_MS / 60000} min`)
     await sleep(POLL_MS)
   }
 }
@@ -172,11 +189,32 @@ const hasDrillDatabase = () =>
     .split("\n")
     .some((line) => line.includes(DRILL_DB_ID))
 
-const removeDrillDatabase = () => {
+const waitForDrillDatabaseGone = async () => {
+  const deadline = Date.now() + TIMEOUT_MS
+  while (hasDrillDatabase()) {
+    if (Date.now() > deadline) fail("Scratch database is still being deleted after 10 min")
+    process.stdout.write("[backup] waiting for the previous scratch database to finish deleting...\r")
+    await sleep(POLL_MS)
+  }
+}
+
+const removeDrillDatabase = async () => {
   if (!hasDrillDatabase()) return false
   console.log(`[backup] removing scratch database ${DRILL_DB_ID}...`)
-  cli("firestore:databases:delete", DRILL_DB_ID, "--force")
-  return true
+  // A scratch database still settling a previous restore refuses deletion
+  // ("in the middle of restore"); wait it out instead of failing the drill.
+  const deadline = Date.now() + RESTORE_TIMEOUT_MS
+  for (;;) {
+    try {
+      cli("firestore:databases:delete", DRILL_DB_ID, "--force")
+      return true
+    } catch (error) {
+      if (!String(error).includes("middle of restore")) throw error
+      if (Date.now() > deadline) throw error
+      process.stdout.write("[backup] previous restore still settling; retrying deletion...\r")
+      await sleep(POLL_MS)
+    }
+  }
 }
 
 const status = () => {
@@ -204,9 +242,27 @@ const wait = async () => {
   }
 }
 
+/** Deleting a database keeps its id in a tombstone for ~2 minutes; retry. */
+const restoreDrillDatabase = async (backupName) => {
+  const deadline = Date.now() + TIMEOUT_MS
+  for (;;) {
+    try {
+      cli("firestore:databases:restore", "-d", DRILL_DB_ID, "-b", backupName)
+      return
+    } catch (error) {
+      if (!String(error).includes("not available")) throw error
+      if (Date.now() > deadline) throw error
+      process.stdout.write("[backup] id still tombstoned from a previous drill; retrying...\r")
+      await sleep(65_000)
+    }
+  }
+}
+
 const drill = async (keep) => {
-  // A leftover drill database would make the restore fail on a reused id.
-  removeDrillDatabase()
+  // A leftover drill database would make the restore fail on a reused id,
+  // and deletion is asynchronous - wait until it actually disappears.
+  await removeDrillDatabase()
+  await waitForDrillDatabaseGone()
 
   const backup = await latestReadyBackup()
   if (!backup) {
@@ -216,20 +272,32 @@ const drill = async (keep) => {
     )
   }
   console.log(`[backup] restoring ${backup.name} into ${DRILL_DB_ID}...`)
-  cli("firestore:databases:restore", "-d", DRILL_DB_ID, "-b", backup.name)
+  await restoreDrillDatabase(backup.name)
 
   const database = await waitForDatabase(DRILL_DB_ID)
-  let reads = "unknown"
-  try {
-    await call("GET", `${dbPath(DRILL_DB_ID)}/documents?pageSize=1`)
-    reads = "open (unexpected on a fresh restore)"
-  } catch (error) {
-    // The restored database ships with closed rules, so a data-plane read
-    // is denied - which is exactly the documented default.
-    reads = String(error).includes("403") ? "closed (rules block reads - documented default)" : "unknown"
+  // Rules live outside the backup (Google's docs: a backup carries neither
+  // security rules nor TTL) and are bound to a database id through a
+  // release, so ask the Firebase Rules API what this copy's id has. A
+  // data-plane probe cannot measure rules: the CLI's Google OAuth token is
+  // not a Firebase client, and listCollectionIds only reports which root
+  // collections exist (it listed the live production roots identically -
+  // a control that turned an earlier "OPEN" alarm into a non-finding).
+  let rulesState = null
+  for (let attempt = 0; attempt < 3 && rulesState === null; attempt += 1) {
+    try {
+      const releases = await call("GET", `/projects/${PROJECT}/releases?pageSize=100`, undefined, RULES_API)
+      const drillRules = (releases.releases ?? []).filter((r) => r.name.includes(DRILL_DB_ID))
+      rulesState =
+        drillRules.length === 0
+          ? "closed (no rules release bound to this database id - a fresh id denies all web/mobile client reads, per Google's docs)"
+          : `rules RELEASED for this copy: ${drillRules.map((r) => r.name).join(", ")} - review before anyone touches it`
+    } catch (error) {
+      if (attempt === 2) rulesState = `unknown (${String(error).slice(0, 120)})`
+      else await sleep(10_000)
+    }
   }
-  console.log(`\n[backup] RESTORE OK: ${DRILL_DB_ID} state=${database.state}, created ${database.createTime}`)
-  console.log(`[backup] data-plane read on the restored copy: ${reads}`)
+  console.log(`\n[backup] RESTORE OK: ${DRILL_DB_ID}, restored from snapshot ${database.sourceInfo?.backup?.snapshotTime ?? "?"}`)
+  console.log(`[backup] rules state of the restored copy: ${rulesState}`)
 
   if (keep) {
     console.log(
@@ -237,7 +305,7 @@ const drill = async (keep) => {
     )
     return
   }
-  removeDrillDatabase()
+  await removeDrillDatabase()
   console.log("[backup] drill complete: restore proven, scratch database deleted")
 }
 
@@ -249,7 +317,7 @@ try {
   else if (command === "wait") await wait()
   else if (command === "drill") await drill(keep)
   else if (command === "cleanup") {
-    if (!removeDrillDatabase()) console.log("[backup] no scratch database to remove")
+    if (!(await removeDrillDatabase())) console.log("[backup] no scratch database to remove")
   } else {
     console.log("Usage: node scripts/firestoreBackup.mjs <status|wait|drill|cleanup> [--keep]")
     process.exit(command ? 1 : 0)

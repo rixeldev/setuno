@@ -39,6 +39,7 @@ a sidebar layout on the web.
 - [Security rules](#security-rules)
 - [App Check](#app-check)
 - [Backups](#backups)
+- [Staging](#staging)
 - [Internationalization](#internationalization)
 - [Testing](#testing)
 - [Deploy](#deploy)
@@ -406,7 +407,7 @@ no credentials live in the repo, and `npx firebase-tools login` is the only prer
 | --- | --- |
 | `pnpm backup:status` | List the schedule(s) and the backups that exist |
 | `pnpm backup:wait` | Poll until the first READY backup shows up (after enabling a schedule) |
-| `pnpm backup:drill` | Restore the newest backup into a scratch database, wait until it is `ACTIVE`, delete it again |
+| `pnpm backup:drill` | Restore the newest backup into a scratch database, watch its restore operation to completion, verify no rules are bound to the copy, delete it again |
 | `pnpm backup:drill -- --keep` | Same, but leaves the restored database around for inspection |
 
 ### Restore runbook
@@ -418,9 +419,12 @@ then the data gets home deliberately:
    from before the incident.
 2. **Restore into a fresh database** (this is what the drill automates):
    `npx firebase-tools firestore:databases:restore -d setuno-restore-20261018 -b <backup-name> --project setuno-be01d`,
-   then wait until `firestore:databases:get -d setuno-restore-20261018` reports `ACTIVE`.
+   then wait for the operation to finish — `firestore:databases:get -d setuno-restore-20261018`
+   carries a `sourceInfo.operation` while it runs and an `earliestVersionTime` once it settles
+   (the database resource exposes no `state` field; the drill does this wait itself).
 3. **Post-restore checklist** (the copy starts deliberately bare):
-   - **Rules**: new databases ship with closed rules — deploy the current `firestore.rules`
+   - **Rules**: a fresh database id has no rules of its own, so every web/mobile client read and
+     write is denied — deploy the current `firestore.rules`
      before any client touches the copy.
    - **IAM**: a restore copies data, not memberships — re-add whoever needs the restored
      database.
@@ -438,10 +442,19 @@ then the data gets home deliberately:
 ### Restore drill
 
 A backup nobody has restored is a hope, not a plan. `pnpm backup:drill` proves the whole path —
-backup readable, restore accepted, database reaches `ACTIVE` — **without touching production**:
-the restored copy is a separate scratch database (`setuno-restore-drill`) with closed rules,
-deleted again at the end. Re-run it after major data-shape changes and before any release that
-migrates data; once the staging project exists, run it there instead.
+backup readable, restore accepted, the restore operation running to completion, and **no
+security rules bound to the copy's database id** — **without touching production**: the
+restored copy is a separate scratch database (`setuno-restore-drill`), deleted again at the
+end. That rules check deliberately goes through the **Rules API** and not the data plane: the
+CLI's Google OAuth token is not a Firebase client, and `listCollectionIds` only reports which
+root collections *exist* (a control against live production caught both traps — the drill's
+first probes were vacuous or misread). Backups carry no rules (Google's docs), a database id
+that never had a release denies all web/mobile client reads by default, and the drill fails if
+one ever appears bound to the scratch id. Re-run it after major data-shape changes and before
+any release that migrates data; once the staging project exists, run it there instead (it
+does — see [Staging](#staging)). Measured on the first full drill (2026-10-18): the restore
+took **~11 minutes**, the scratch id stays tombstoned **~2 minutes** after deletion, and a
+database still settling a restore refuses deletion — the script already waits out all three.
 
 ### What backups do not cover
 
@@ -451,6 +464,78 @@ migrates data; once the staging project exists, run it there instead.
   is possible future work.
 - **Config and secrets** — they all live in the repo (`app.config.js`, `eas.json`, `firebase.json`,
   `firestore.rules`).
+
+---
+
+## Staging
+
+Roadmap #80. A second Firebase project — **`setuno-be01d-staging`** ("Setuno Staging") — so every
+Phase 0+ feature lands on staging before production. Same app, same code; only the Firebase
+project behind it changes.
+
+### What is provisioned (all agent-run, 2026-10-18)
+
+- Firestore `(default)` in **nam5**, the same multi-region as production.
+- `firestore.rules` + `firestore.indexes.json` deployed — rules and indexes are per project:
+  `npx firebase-tools deploy --only firestore --project setuno-be01d-staging`.
+- Apps registered in the project (web, Android + iOS, both `com.rixeldev.setuno`) and their
+  config pulled as `google-services-staging.json` / `GoogleService-Info-staging.plist`
+  (gitignored like the production files).
+- Cloud Functions: **not deployed** — staging is on the Spark plan (see the owner steps below).
+
+### How the app selects an environment
+
+`APP_ENV=staging` is the single switch, honored in the two places that must move together:
+
+- **JS config** — `scripts/ensure-firebase-config.mjs` reads the `FIREBASE_STAGING_*` variables
+  (the same six required names) instead of `FIREBASE_*` and stamps the generated
+  `db/firebaseConfig.ts` with `firebaseEnvironment`. A config generated for one environment is
+  never reused for the other: flipping validates the new variables **first**, backs the old file
+  up to `db/firebaseConfig.ts.bak` and only then overwrites, so a half-set flip can never
+  destroy the working config. Staging leaves `APP_VERSION_ID` and the `ADMOB_*` units empty on
+  purpose — no update gate, no ads.
+- **Native config** — `app.config.js` points `googleServicesFile` at
+  `google-services-staging.json` / `GoogleService-Info-staging.plist`, or at the
+  `GOOGLE_SERVICES_JSON_STAGING` / `GOOGLE_SERVICES_PLIST_STAGING` file-type EAS variables on
+  cloud builds.
+
+### Running against staging
+
+Local (web, dev server or a native run): the gitignored `.env.staging` beside the repo root
+carries the staging values (regenerate them any time with
+`npx firebase-tools apps:sdkconfig web --project setuno-be01d-staging`), then run with the
+variable set:
+
+```powershell
+$env:APP_ENV = "staging"; pnpm export:web   # or: pnpm web / pnpm android
+```
+
+EAS builds: the `development-staging` and `preview-staging` profiles set `APP_ENV=staging`
+themselves and read the `FIREBASE_STAGING_*` values from the EAS **preview** environment
+(`npx eas-cli env:set --name FIREBASE_STAGING_PROJECT_ID --value … --environment preview` — six
+names, listed in `.env.example`), plus the two google-services files as file-type variables
+(`GOOGLE_SERVICES_JSON_STAGING`, `GOOGLE_SERVICES_PLIST_STAGING`). The `eas-build-pre-install`
+script runs the config generator on the build machine, so the JS half needs no checked-in file.
+Plain `development` / `preview` / `production` profiles keep pointing at production; their
+values belong in the matching EAS environment (`development` / `preview` / `production`).
+
+### Owner steps (console, in order)
+
+1. **Authentication → Sign-in method** on the staging project: enable *Email/Password* and
+   *Google* (new projects ship with providers off). The Google flow also needs the staging web
+   client ID in `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` for staging runs.
+2. **Storage → Get Started**: staging has no billing account, so the default bucket cannot be
+   provisioned through the API (403 `accountDisabled`); the console flow creates it under the
+   Spark free tier.
+3. **Blaze plan**, only when staging needs Cloud Functions (share/export callables, push):
+   console → Upgrade. Everything else — Auth, Firestore, rules, web builds — runs on Spark.
+
+### Policy
+
+Every Phase 0+ feature deploys to staging first — rules and functions included (pass
+`--project setuno-be01d-staging`). Staging data is disposable; production keeps its backups
+(§Backups), and restore drills and migration rehearsals run against staging instead of
+production's scratch database from now on.
 
 ---
 

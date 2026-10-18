@@ -10,6 +10,7 @@
     "web": "expo start --web",
     "assets:generate": "node scripts/generate-assets.mjs",
     "assets:store": "node scripts/generate-store-assets.mjs",
+    "eas-build-pre-install": "node scripts/ensure-firebase-config.mjs",
     "typecheck": "tsc --noEmit && pnpm --dir functions run typecheck",
     "lint": "expo lint",
     "lint:fix": "expo lint --fix",
