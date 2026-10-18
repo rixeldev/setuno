@@ -37,6 +37,7 @@ a sidebar layout on the web.
 - [Project structure](#project-structure)
 - [Architecture](#architecture)
 - [Security rules](#security-rules)
+- [App Check](#app-check)
 - [Internationalization](#internationalization)
 - [Testing](#testing)
 - [Deploy](#deploy)
@@ -336,6 +337,46 @@ each tab.
   `role` of a member's private band index (or remove that mirror when removing them), and every user
   keeps their own name/email/photo copy in step with their profile.
 - `activity` is append-only; organizations are deletable only by their owner.
+
+---
+
+## App Check
+
+Every Firestore/Storage/callable request can carry an **App Check attestation** token, so a leaked
+API key cannot burn the project's bill. `services/appCheck.ts` — initialized once from
+`app/_layout.tsx` before the data providers mount; `services/appCheck.web.ts` no-ops — picks
+**Play Integrity** on Android and **App Attest with DeviceCheck fallback** on Apple in release
+builds, and the **debug** provider in development. Attestation is anti-abuse protection, not
+telemetry: it is deliberately *not* gated on the analytics consent, because once enforcement is
+on, a client that never fetches tokens simply stops working. No security rule changes with it.
+
+### Rollout (console work, in order)
+
+1. Firebase console → Project settings → **App Check**: enroll the Android app (Play Integrity;
+   register the package name + SHA-1/SHA-256) and the iOS app (App Attest/DeviceCheck; the bundle
+   id).
+2. Leave **enforce off** (monitor mode) for Firestore, Storage and callable functions, and watch
+   the App Check metrics until the unattested traffic is understood.
+3. **Web is not enrolled yet** — the browser provider needs a reCAPTCHA Enterprise site key — so
+   enforcement must stay in monitor mode until it is (or until the owner decides web stays
+   unattested on purpose).
+4. Flip **enforce** per product once the metrics look clean.
+
+### Debug flow (development builds)
+
+Dev builds attest through the **debug** provider, whose token must be allow-listed once in the
+console (Project settings → App Check → *Manage debug tokens*):
+
+- **Ad-hoc**: run the dev build and read the temporary secret from the device logs —
+  `adb logcat | grep DebugAppCheckProvider` on Android, the Xcode console on iOS — then paste it
+  into *Manage debug tokens*.
+- **Pinned** (CI/EAS): generate a token in that same dialog and bake it into the development
+  profile's `env` as `EXPO_PUBLIC_APP_CHECK_DEBUG_TOKEN` in `eas.json`, then rebuild the dev
+  client. Never add it to a release profile.
+
+A device that already passed App Check keeps passing whether the token is rebuilt in or not —
+uninstall the app to reset it. Until the console enrolls anything, `initializeAppCheck` failing is
+harmless by design: the band keeps playing, because monitor mode tolerates unattested traffic.
 
 ---
 

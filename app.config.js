@@ -47,6 +47,7 @@ export default {
     plugins: [
       "@react-native-firebase/app",
       "@react-native-firebase/crashlytics",
+      "@react-native-firebase/app-check",
       "expo-router",
       "expo-font",
       "@react-native-google-signin/google-signin",

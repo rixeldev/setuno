@@ -24,6 +24,7 @@ import { hydratePreferences } from "@/services/prefs"
 import { hydrateRecentChords } from "@/services/recentChords"
 import { hydrateSongbookState } from "@/services/songbookState"
 import { initializeAds } from "@/services/ads"
+import { startAppCheck } from "@/services/appCheck"
 import { startSyncWatcher } from "@/services/sync"
 import { installWebDocumentStyles } from "@/libs/webStyles"
 
@@ -77,6 +78,12 @@ export default function Layout() {
   // Google Mobile Ads warm-up (no-op on web, see `services/ads.web.ts`).
   useEffect(() => {
     initializeAds()
+  }, [])
+
+  // App Check attestation before the providers mount and any Firestore
+  // traffic starts (roadmap #72; no-op on web — see `services/appCheck.web.ts`).
+  useEffect(() => {
+    startAppCheck()
   }, [])
 
   // Clears the browser's default focus ring around text fields (web only).
