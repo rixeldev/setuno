@@ -64,6 +64,10 @@ GoogleService-Info-staging.plist
 .env
 .env.local
 .env.staging
+.env.e2e
+# E2E harness (roadmap #75 / P0.8): throwaway CI keystore + local recordings
+e2e-release.keystore
+e2e/artifacts/
 
 # Vercel CLI project link
 .vercel

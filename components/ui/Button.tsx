@@ -118,6 +118,7 @@ export function IconButton({
   variant = "ghost",
   disabled = false,
   style,
+  testID,
 }: {
   icon: React.ReactNode
   onPress?: () => void
@@ -127,6 +128,8 @@ export function IconButton({
   variant?: "ghost" | "secondary" | "danger"
   disabled?: boolean
   style?: StyleProp<ViewStyle>
+  /** Stable selector for the E2E harness (Maestro matches it as resource-id). */
+  testID?: string
 }) {
   const styles = useThemedStyles(createStyles)
   return (
@@ -137,6 +140,7 @@ export function IconButton({
       disabled={disabled}
       onPress={onPress}
       hitSlop={Theme.hitSlop}
+      testID={testID}
       style={({ pressed }) => [
         styles.iconButton,
         { width: size, height: size },

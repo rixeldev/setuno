@@ -284,6 +284,7 @@ export function BottomBar() {
             accessibilityRole="link"
             accessibilityLabel={t(item.label)}
             accessibilityState={{ selected: active }}
+            testID={`tab-${item.href.replace(/\//g, "") || "home"}`}
             onPress={() => {
               hapticSelection()
               goToTab(item.href)

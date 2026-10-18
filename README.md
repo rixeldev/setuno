@@ -42,6 +42,7 @@ a sidebar layout on the web.
 - [Staging](#staging)
 - [Internationalization](#internationalization)
 - [Testing](#testing)
+- [E2E](#e2e)
 - [Deploy](#deploy)
 - [Documentation](#documentation)
 
@@ -575,6 +576,43 @@ pnpm test:integration  # requires the Firebase emulator (see tests/integration/R
 ```
 
 Manual QA checklist for permissions and flows lives in `docs/app_implementation.md` §47.
+
+---
+
+## E2E
+
+The Maestro journey (`e2e/journey.yaml`) walks the core against **staging**: sign-in → create song
+→ create setlist → create event → open reader. Every run clears app state, signs in with a
+dedicated runner account and creates its own `E2E … ${RUN_ID}` data, so runs never collide and the
+duplicate-song warning (#39) never trips.
+
+**One-time setup**
+
+1. **Provision Authentication on staging** (console, once): staging Firebase console →
+   Authentication → *Get started* → Sign-in method → **Email/Password**. An API-created project
+   has no auth configuration at all — `accounts:signUp` answers `CONFIGURATION_NOT_FOUND` and
+   there is no REST path around it, which is why this is the only console step.
+2. Put the runner credentials in the gitignored `.env.e2e` (`E2E_EMAIL=`, `E2E_PASSWORD=` —
+   `.env.example` has the block) or export them.
+3. `pnpm e2e:setup` — creates the account **through the public client APIs under the same rules a
+   signed-in user gets** (username claim + profile with `onboarded: true` + the `E2E Band`
+   organization + membership + profile mirror, one `batchWrite` because the rules evaluate them
+   with `getAfter()`). Idempotent: re-running signs in and fills in what is missing. It refuses to
+   run against anything that is not a `*-staging` project — never point it at production.
+
+**Running locally**: install the app on a device/emulator (development build, `pnpm android` with
+Metro, or the same release APK CI builds), then `pnpm e2e` (= `maestro test e2e/journey.yaml --env
+E2E_EMAIL=… --env E2E_PASSWORD=… --env RUN_ID=local-$(date +%s)`). Selectors: on Android Maestro's
+`id` matches resource-id, content-desc or text — the tab bar is tapped through its `tab-*`
+testIDs (never by label: the dashboard prints "Songs" too), forms through the `Input` accessibility
+labels and buttons through their labels; the emulator must run **English**.
+
+**CI** (`.github/workflows/e2e.yml`): nightly 03:17 UTC plus `workflow_dispatch` (Actions → Run
+workflow — the quickest first validation). Enables KVM, writes the staging config from secrets
+(`FIREBASE_STAGING_*` ×6, `GOOGLE_SERVICES_JSON_STAGING`, `E2E_EMAIL`, `E2E_PASSWORD` — all in the
+Actions environment), seeds the account, builds a standalone **release** APK with a throwaway CI
+keystore (`expo prebuild` + injected signing, no Metro), installs it on an API 34 emulator and
+runs the journey; failure uploads `~/.maestro/tests` (flow output + screenshots) as an artifact.
 
 ---
 

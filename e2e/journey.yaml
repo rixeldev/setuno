@@ -1,0 +1,114 @@
+# The E2E journey (roadmap #75 / P0.8): sign-in → create song → create setlist
+# → create event → open reader, against the STAGING project. The runner account
+# comes from `scripts/e2eSetup.mjs` (see e2e/README or README.md §E2E).
+#
+# Selectors: on Android Maestro's `id` matches resource-id, content-desc or
+# text. The tab bar is selected by the `tab-*` testIDs (never by label — the
+# dashboard prints "Songs" too), forms by their accessibility labels (the
+# Input forwards them as content-desc), and buttons by label. The emulator
+# runs in English; run_id keeps every run's data unique so re-runs never trip
+# the duplicate-song warning (#39).
+appId: com.rixeldev.setuno
+name: Setuno E2E journey (staging)
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "Sign in"
+    timeout: 30000
+- tapOn:
+    id: "Email"
+- inputText: ${E2E_EMAIL}
+- tapOn:
+    id: "Password"
+- inputText: ${E2E_PASSWORD}
+- tapOn:
+    id: "Sign in"
+- extendedWaitUntil:
+    visible:
+      id: "tab-songs"
+    timeout: 90000
+
+# 1/5 Create a song — saving replaces into the new song's reader.
+- tapOn:
+    id: "tab-songs"
+- extendedWaitUntil:
+    visible:
+      id: "New song"
+    timeout: 30000
+- tapOn:
+    id: "New song"
+- extendedWaitUntil:
+    visible:
+      id: "Song title"
+    timeout: 30000
+- tapOn:
+    id: "Song title"
+- inputText: "E2E Song ${RUN_ID}"
+- hideKeyboard
+- tapOn:
+    id: "Create song"
+- extendedWaitUntil:
+    visible: "E2E Song ${RUN_ID}"
+    timeout: 90000
+
+# 2/5 Create a setlist — saving replaces into the setlist's detail.
+- tapOn:
+    id: "tab-setlists"
+- extendedWaitUntil:
+    visible:
+      id: "New setlist"
+    timeout: 30000
+- tapOn:
+    id: "New setlist"
+- extendedWaitUntil:
+    visible:
+      id: "Name"
+    timeout: 30000
+- tapOn:
+    id: "Name"
+- inputText: "E2E List ${RUN_ID}"
+- hideKeyboard
+- tapOn:
+    id: "Create setlist"
+- extendedWaitUntil:
+    visible: "E2E List ${RUN_ID}"
+    timeout: 90000
+
+# 3/5 Create an event — saving replaces into the event's detail.
+- tapOn:
+    id: "tab-performances"
+- extendedWaitUntil:
+    visible:
+      id: "Schedule an event"
+    timeout: 30000
+- tapOn:
+    id: "Schedule an event"
+- extendedWaitUntil:
+    visible:
+      id: "Event name"
+    timeout: 30000
+- tapOn:
+    id: "Event name"
+- inputText: "E2E Gig ${RUN_ID}"
+- hideKeyboard
+- tapOn:
+    id: "Add event"
+- extendedWaitUntil:
+    visible: "E2E Gig ${RUN_ID}"
+    timeout: 90000
+
+# 4/5 Open the reader from the songbook and assert the song renders.
+- tapOn:
+    id: "tab-songs"
+- extendedWaitUntil:
+    visible: "E2E Song ${RUN_ID}"
+    timeout: 30000
+- tapOn: "E2E Song ${RUN_ID}"
+- extendedWaitUntil:
+    visible: "E2E Song ${RUN_ID}"
+    timeout: 30000
+
+# 5/5 The journey completed.
+- assertVisible: "E2E Song ${RUN_ID}"

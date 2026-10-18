@@ -12,6 +12,8 @@
     "assets:store": "node scripts/generate-store-assets.mjs",
     "eas-build-pre-install": "node scripts/ensure-firebase-config.mjs",
     "typecheck": "tsc --noEmit && pnpm --dir functions run typecheck",
+    "e2e:setup": "node scripts/e2eSetup.mjs",
+    "e2e": "maestro test e2e/journey.yaml",
     "lint": "expo lint",
     "lint:fix": "expo lint --fix",
     "test": "vitest run --project unit",

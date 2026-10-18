@@ -1,0 +1,105 @@
+name: e2e
+
+# The Maestro journey against staging (roadmap #75 / P0.8): sign-in → song →
+# setlist → event → reader. Nightly plus a manual trigger (Actions → Run
+# workflow); the account comes from scripts/e2eSetup.mjs and every run creates
+# its own timestamped data, so runs never collide.
+on:
+  schedule:
+    - cron: "17 3 * * *" # 03:17 UTC, the nightly slot
+  workflow_dispatch:
+
+concurrency:
+  group: e2e
+  cancel-in-progress: false
+
+jobs:
+  maestro:
+    name: Maestro journey (staging)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      APP_ENV: staging
+      FIREBASE_STAGING_API_KEY: ${{ secrets.FIREBASE_STAGING_API_KEY }}
+      FIREBASE_STAGING_AUTH_DOMAIN: ${{ secrets.FIREBASE_STAGING_AUTH_DOMAIN }}
+      FIREBASE_STAGING_PROJECT_ID: ${{ secrets.FIREBASE_STAGING_PROJECT_ID }}
+      FIREBASE_STAGING_STORAGE_BUCKET: ${{ secrets.FIREBASE_STAGING_STORAGE_BUCKET }}
+      FIREBASE_STAGING_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_STAGING_MESSAGING_SENDER_ID }}
+      FIREBASE_STAGING_APP_ID: ${{ secrets.FIREBASE_STAGING_APP_ID }}
+      E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - run: pnpm install --frozen-lockfile
+
+      # Nested virtualization for the emulator (the standard udev rule).
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # Both halves of the staging switch: the native google-services file
+      # (gitignored — its content rides a file-type secret) and the JS config
+      # (generated from the FIREBASE_STAGING_* secrets above).
+      - name: Write the staging google-services file
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON_STAGING }}" > google-services-staging.json
+
+      - name: Generate the staging JS config
+        run: node scripts/ensure-firebase-config.mjs
+
+      - name: Seed the runner account (idempotent)
+        run: node scripts/e2eSetup.mjs
+
+      # A standalone release APK signed with a throwaway CI keystore: no Metro,
+      # no dev client — the emulator installs exactly what the store would get.
+      - name: Build the Android APK
+        run: |
+          keytool -genkeypair -v -keystore e2e-release.keystore -alias e2e -keyalg RSA -keysize 2048 -validity 1 -storepass e2ekeystore -keypass e2ekeystore -dname "CN=setuno-e2e"
+          npx expo prebuild --platform android --no-install
+          cd android
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/e2e-release.keystore" \
+            -Pandroid.injected.signing.store.password=e2ekeystore \
+            -Pandroid.injected.signing.key.alias=e2e \
+            -Pandroid.injected.signing.key.password=e2ekeystore
+
+      - name: Run the journey on the emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            adb install -r android/app/build/outputs/apk/release/app-release.apk
+            curl -Ls https://get.maestro.mobile.dev | bash
+            export PATH="$PATH:$HOME/.maestro/bin"
+            maestro test e2e/journey.yaml \
+              --env E2E_EMAIL="$E2E_EMAIL" \
+              --env E2E_PASSWORD="$E2E_PASSWORD" \
+              --env RUN_ID="ci-${{ github.run_number }}"
+
+      - name: Upload Maestro artifacts (flows, screenshots, videos)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-artifacts
+          path: ~/.maestro/tests
+          if-no-files-found: ignore
