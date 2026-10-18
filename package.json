@@ -22,6 +22,10 @@
     "deploy:storage": "npx firebase-tools@latest deploy --only storage",
     "deploy:functions": "pnpm --dir functions run build && npx firebase-tools@latest deploy --only functions",
     "serve:functions": "pnpm --dir functions run build && npx firebase-tools@latest emulators:start --only functions,firestore",
+    "backup:status": "node scripts/firestoreBackup.mjs status",
+    "backup:wait": "node scripts/firestoreBackup.mjs wait",
+    "backup:drill": "node scripts/firestoreBackup.mjs drill",
+    "backup:cleanup": "node scripts/firestoreBackup.mjs cleanup",
     "export:web": "node scripts/ensure-firebase-config.mjs && expo export --platform web"
   },
   "dependencies": {

@@ -38,6 +38,7 @@ a sidebar layout on the web.
 - [Architecture](#architecture)
 - [Security rules](#security-rules)
 - [App Check](#app-check)
+- [Backups](#backups)
 - [Internationalization](#internationalization)
 - [Testing](#testing)
 - [Deploy](#deploy)
@@ -198,6 +199,10 @@ pnpm start      # Expo dev server, pick a target from the menu
 | `pnpm deploy:rules` | Publish `firestore.rules` to the pinned Firebase project |
 | `pnpm deploy:indexes` | Publish `firestore.indexes.json` |
 | `pnpm deploy:storage` | Publish `storage.rules` |
+| `pnpm backup:status` | List the Firestore backup schedule(s) and backups ([Backups](#backups)) |
+| `pnpm backup:wait` | Poll until the first scheduled backup is READY |
+| `pnpm backup:drill` | Restore the newest backup into a scratch database and delete it again |
+| `pnpm backup:cleanup` | Remove the scratch drill database left by `backup:drill -- --keep` |
 | `pnpm assets:generate` | Regenerate the launcher icons in `assets/icons` from the brand masters |
 | `pnpm assets:store [es\|en]` | Build the Play Store graphics (feature graphic + 5 screenshots) from the captures in `docs/images/` |
 
@@ -377,6 +382,75 @@ console (Project settings → App Check → *Manage debug tokens*):
 A device that already passed App Check keeps passing whether the token is rebuilt in or not —
 uninstall the app to reset it. Until the console enrolls anything, `initializeAppCheck` failing is
 harmless by design: the band keeps playing, because monitor mode tolerates unattested traffic.
+
+---
+
+## Backups
+
+The band's data lives in one Firestore database, so it gets **managed backups**: a daily
+scheduled backup of the whole `(default)` database into Google's backup storage in the database's
+own region, kept for 30 days. Backups are immutable — a retention policy locks them, so not even
+an owner can delete one before its window expires, which is what makes them the trustworthy last
+line of defense (schedule created 2026-10-18; at this data size it costs cents per month).
+
+Managed backups are **schedule-driven**: the v1 API exposes no "create a backup now" call, so the
+first backup lands within ~24 h of enabling a schedule and every later one at the daily window
+Google picks.
+
+### Driving them
+
+`scripts/firestoreBackup.mjs` drives everything through the owner's own `firebase-tools` login —
+no credentials live in the repo, and `npx firebase-tools login` is the only prerequisite:
+
+| Command | What it does |
+| --- | --- |
+| `pnpm backup:status` | List the schedule(s) and the backups that exist |
+| `pnpm backup:wait` | Poll until the first READY backup shows up (after enabling a schedule) |
+| `pnpm backup:drill` | Restore the newest backup into a scratch database, wait until it is `ACTIVE`, delete it again |
+| `pnpm backup:drill -- --keep` | Same, but leaves the restored database around for inspection |
+
+### Restore runbook
+
+A restore never overwrites `(default)` — it materializes the backup as a **new** database, and
+then the data gets home deliberately:
+
+1. **Pick a restore point**: `pnpm backup:status` — backups are immutable; choose the newest one
+   from before the incident.
+2. **Restore into a fresh database** (this is what the drill automates):
+   `npx firebase-tools firestore:databases:restore -d setuno-restore-20261018 -b <backup-name> --project setuno-be01d`,
+   then wait until `firestore:databases:get -d setuno-restore-20261018` reports `ACTIVE`.
+3. **Post-restore checklist** (the copy starts deliberately bare):
+   - **Rules**: new databases ship with closed rules — deploy the current `firestore.rules`
+     before any client touches the copy.
+   - **IAM**: a restore copies data, not memberships — re-add whoever needs the restored
+     database.
+   - **TTL policies**: re-create any field configurations the console had.
+4. **Get the data home**, shaped by the incident:
+   - *Some documents lost* — re-import just those collections from the restored copy into
+     `(default)` (`exportDocuments`/`importDocuments` or the console).
+   - *Whole database gone* — re-import everything into a fresh `(default)`, or point the app's
+     config at the restored database. Google also offers an
+     [in-place restore](https://firebase.google.com/docs/firestore/restore-in-place) that
+     rewrites a database from a backup directly; read its caveats before touching production.
+5. **Delete the scratch database** when done (`pnpm backup:cleanup` if it was left with
+   `--keep`) — it bills for storage while it exists.
+
+### Restore drill
+
+A backup nobody has restored is a hope, not a plan. `pnpm backup:drill` proves the whole path —
+backup readable, restore accepted, database reaches `ACTIVE` — **without touching production**:
+the restored copy is a separate scratch database (`setuno-restore-drill`) with closed rules,
+deleted again at the end. Re-run it after major data-shape changes and before any release that
+migrates data; once the staging project exists, run it there instead.
+
+### What backups do not cover
+
+- **Firebase Auth users** — export them from the console (Authentication → Users → *Export
+  users*) or through the Identity Toolkit API.
+- **Storage files** (avatars, band logos) — small and re-uploadable; a lifecycle or transfer job
+  is possible future work.
+- **Config and secrets** — they all live in the repo (`app.config.js`, `eas.json`, `firebase.json`,
+  `firestore.rules`).
 
 ---
 
