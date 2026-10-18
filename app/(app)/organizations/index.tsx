@@ -180,12 +180,15 @@ export default function OrganizationsScreen() {
         </AppText>
       ) : null}
 
-      {/* Join requests (#60): the door to bands that chose to be findable. */}
+      {/* Join requests (#60): the door to bands that chose to be findable.
+          This screen is a modal, so the door uses `replace`: a push would
+          leave the modal mounted under the new route and its backdrop would
+          still swallow taps meant for the search screen. */}
       <View style={styles.find}>
         <Button
           label={t("organizations.findBand")}
           variant="ghost"
-          onPress={() => router.push("/discover")}
+          onPress={() => router.replace("/discover")}
         />
       </View>
 
