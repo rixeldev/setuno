@@ -22,8 +22,10 @@ import { useOrgData } from "@/hooks/useOrgData"
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges"
 import { createPerformance, updatePerformance } from "@/services/performances"
 import { toFriendlyError } from "@/services/errors"
+import { logFunnelEvent } from "@/services/telemetry"
 import { formatDurationLong } from "@/libs/format"
 import { ISO_DATE_PATTERN, validateRequired, validateTime } from "@/libs/validation"
+import { firstFunnelEvent, FUNNEL_EVENTS } from "@/libs/telemetry"
 import { PERFORMANCE_TYPE_KEYS } from "@/interfaces/performance"
 import type { Performance, PerformanceInput, PerformanceStatus, PerformanceType } from "@/interfaces"
 
@@ -83,7 +85,7 @@ export function PerformanceForm({ performance, onSaved }: PerformanceFormProps) 
   const toast = useToast()
   const { profile } = useAuth()
   const { organizationId } = useOrganization()
-  const { setlists } = useOrgData()
+  const { performances, setlists } = useOrgData()
 
   const [name, setName] = useState(performance?.name ?? "")
   const [date, setDate] = useState(performance?.date ?? "")
@@ -188,6 +190,11 @@ export function PerformanceForm({ performance, onSaved }: PerformanceFormProps) 
         onSaved?.(performance.id)
       } else {
         const id = await createPerformance(organizationId ?? "", input, author)
+        // The band's first calendar entry is the funnel's step (#73): every
+        // kind counts — a rehearsal is real usage (#46) — and the subscribed
+        // list refreshes only after this write lands.
+        const first = firstFunnelEvent(performances.length, FUNNEL_EVENTS.firstPerformance)
+        if (first) logFunnelEvent(first, { organization_id: organizationId ?? "" })
         toast.showSuccess(t("performances.performanceCreated", { name: input.name }))
         setBaseline(serializeForm(currentState))
         onSaved?.(id)

@@ -15,8 +15,10 @@ import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { createSuggestion } from "@/services/suggestions"
 import { toFriendlyError } from "@/services/errors"
+import { logFunnelEvent } from "@/services/telemetry"
 import { MAJOR_KEYS, MINOR_KEYS } from "@/libs/chords"
 import { validateRequired } from "@/libs/validation"
+import { FUNNEL_EVENTS } from "@/libs/telemetry"
 
 /**
  * Propose a song the band doesn't have yet (docs §13), as a modal. Accepting the
@@ -63,6 +65,8 @@ export default function NewSuggestion() {
         { id: profile?.uid ?? "", name: profile?.displayName || "A member" },
       )
       toast.showSuccess(t("suggestions.suggestionSentAdmin"))
+      // Funnel (#73): a suggestion is a member leaning in.
+      logFunnelEvent(FUNNEL_EVENTS.suggestionCreated)
       router.replace("/suggestions")
     } catch (error) {
       const message = toFriendlyError(error, t("suggestions.couldNotSend"))

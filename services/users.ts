@@ -21,6 +21,8 @@ import { applyAccent, applyAppearanceMode, applyAppearance } from "@/services/th
 import { updateCachedPreferences, writeCachedPreferences } from "@/services/prefs"
 import { claimUsername } from "@/services/usernames"
 import { isAccentId, isAppearanceMode } from "@/libs/appearance"
+import { takePendingSignupConsent } from "@/libs/telemetry"
+import { applyTelemetryConsent, noteSignUpCompleted } from "@/services/telemetry"
 
 const mapUser = (data: Record<string, unknown>, id: string): UserProfile =>
   ({
@@ -60,6 +62,9 @@ export const ensureUserProfile = async (input: EnsureProfileInput): Promise<User
   if (!snapshot.exists()) {
     // Brand new account: reserve a unique username first (with a `-1234` suffix
     // when the plain one is taken), then create the profile that owns it.
+    // The sign-up screen's asked telemetry answer rides in here (#73): stamped
+    // only on create — a backfill never re-asks or overwrites the choice.
+    const telemetry = takePendingSignupConsent()
     const username = await claimUsername(input.uid, input.displayName)
     const payload = {
       displayName: username,
@@ -67,13 +72,19 @@ export const ensureUserProfile = async (input: EnsureProfileInput): Promise<User
       photoURL: input.photoURL ?? null,
       organizationIds: [],
       activeOrganizationId: null,
-      preferences: DEFAULT_PREFERENCES,
+      preferences: {
+        ...DEFAULT_PREFERENCES,
+        ...(telemetry === null ? {} : { telemetry }),
+      },
       onboarded: false,
       usernameChangedAt: null,
       createdAt: now,
       updatedAt: now,
     }
     await setDoc(reference, payload)
+    // A profile coming into existence *is* the completed sign-up: the funnel's
+    // first step, released by the consent snapshot this very write triggers.
+    noteSignUpCompleted()
     return mapUser({ ...payload, createdAt: now, updatedAt: now }, input.uid)
   }
 
@@ -109,6 +120,7 @@ export const subscribeUserProfile = (
   onChange: (profile: UserProfile | null) => void,
 ): Unsubscribe => {
   if (!uid) {
+    applyTelemetryConsent(false)
     onChange(null)
     return () => undefined
   }
@@ -118,10 +130,21 @@ export const subscribeUserProfile = (
       const profile = mapDoc(snapshot, mapUser)
       // Keep the local preference cache in step with the profile so settings
       // survive a restart even when this device is offline next time.
-      if (profile) writeCachedPreferences(profile.preferences)
+      if (profile) {
+        writeCachedPreferences(profile.preferences)
+        // The single seam for the telemetry choice (#73): it rides every
+        // snapshot, so sign-up, a Settings toggle and another device all
+        // converge here — and a profile we cannot read fails safe to *off*.
+        applyTelemetryConsent(profile.preferences.telemetry === true)
+      } else {
+        applyTelemetryConsent(false)
+      }
       onChange(profile)
     },
-    () => onChange(null),
+    () => {
+      applyTelemetryConsent(false)
+      onChange(null)
+    },
   )
 }
 
@@ -130,6 +153,9 @@ const applyPreferencesToRuntime = (preferences: UserPreferences): void => {
   const accent = isAccentId(preferences.accent) ? preferences.accent : undefined
   const mode = isAppearanceMode(preferences.appearance) ? preferences.appearance : undefined
   applyAppearance({ accent, mode })
+  // A Settings toggle answers in the same motion; the snapshot that follows
+  // simply re-confirms it (#73).
+  applyTelemetryConsent(preferences.telemetry === true)
 }
 
 export const updateUserProfile = async (

@@ -2,7 +2,7 @@ import React, { useState } from "react"
 import { Link, useRouter } from "expo-router"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { View } from "react-native"
+import { StyleSheet, Switch, View } from "react-native"
 
 import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
@@ -10,9 +10,11 @@ import { AppText } from "@/components/ui/AppText"
 import { AuthLayout } from "@/components/app/AuthLayout"
 import { LockIcon, MailIcon, UserIcon } from "@/components/ui/Icons"
 import { Theme } from "@/constants/Theme"
+import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { useAuth } from "@/hooks/useAuth"
 import { toFriendlyError } from "@/services/errors"
 import { validateEmail, validatePassword, validateRequired } from "@/libs/validation"
+import { setPendingSignupConsent } from "@/libs/telemetry"
 
 interface FormValues {
   displayName: string
@@ -23,16 +25,22 @@ interface FormValues {
 
 /** Account creation (docs §5) followed by band onboarding. */
 export default function SignUp() {
+  const styles = useThemedStyles(createStyles)
   const router = useRouter()
   const { t } = useTranslation()
   const { signUp, signInWithGoogle } = useAuth()
   const [formError, setFormError] = useState<string | null>(null)
   const [googleLoading, setGoogleLoading] = useState(false)
+  // Telemetry consent (#73): opt-in, asked here because the profile that
+  // stores the choice is created by the very submit that follows it.
+  const [telemetry, setTelemetry] = useState(false)
 
   const onGoogle = async () => {
     setFormError(null)
     setGoogleLoading(true)
     try {
+      // Stamped into the profile on create by `ensureUserProfile` (#73).
+      setPendingSignupConsent(telemetry)
       const completed = await signInWithGoogle()
       // Returning `false` means the picker was dismissed: stay on the form.
       if (completed) router.replace("/")
@@ -55,6 +63,8 @@ export default function SignUp() {
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null)
     try {
+      // Stamped into the profile on create by `ensureUserProfile` (#73).
+      setPendingSignupConsent(telemetry)
       await signUp({ email: values.email, password: values.password, displayName: values.displayName })
       router.replace("/")
     } catch (error) {
@@ -126,6 +136,24 @@ export default function SignUp() {
         })}
       />
 
+      {/* Telemetry consent (#73): off by default, declining changes nothing. */}
+      <View style={styles.consent}>
+        <Switch
+          value={telemetry}
+          onValueChange={setTelemetry}
+          trackColor={{ false: Theme.colors.borderSoft, true: Theme.colors.primary }}
+          accessibilityLabel={t("auth.telemetryOptIn")}
+        />
+        <View style={styles.consentText}>
+          <AppText variant="body" style={styles.consentTitle}>
+            {t("auth.telemetryOptIn")}
+          </AppText>
+          <AppText variant="caption" tone="muted">
+            {t("auth.telemetryOptInHint")}
+          </AppText>
+        </View>
+      </View>
+
       {formError ? (
         <AppText variant="caption" tone="danger" accessibilityRole="alert">
           {formError}
@@ -158,3 +186,20 @@ export default function SignUp() {
     </AuthLayout>
   )
 }
+
+const createStyles = () =>
+  StyleSheet.create({
+    consent: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: Theme.spacing.s,
+      paddingVertical: Theme.spacing.xs,
+    },
+    consentText: {
+      flex: 1,
+      gap: 2,
+    },
+    consentTitle: {
+      fontWeight: "600",
+    },
+  })

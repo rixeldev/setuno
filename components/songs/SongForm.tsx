@@ -37,6 +37,7 @@ import { useUndoRedo } from "@/hooks/useUndoRedo"
 import { useUndoRedoShortcuts } from "@/hooks/useUndoRedoShortcuts"
 import { createSong, updateSong } from "@/services/songs"
 import { toFriendlyError } from "@/services/errors"
+import { logFunnelEvent } from "@/services/telemetry"
 import { MAJOR_KEYS, MINOR_KEYS, collectSongChords } from "@/libs/chords"
 import { createSection, emptyLine, sectionLabel } from "@/libs/songUtils"
 import { parseTags, validateBpm, validateCapo, validateDuration, validateRequired } from "@/libs/validation"
@@ -45,6 +46,7 @@ import { parseChordPro } from "@/libs/chordpro"
 import { findDuplicateSongs, type SongDuplicate } from "@/libs/songSearch"
 import { SONG_STATUSES, SONG_STATUS_LABEL_KEYS } from "@/libs/songStatus"
 import { editIsStale, songStamp } from "@/libs/songConflict"
+import { firstFunnelEvent, FUNNEL_EVENTS } from "@/libs/telemetry"
 import { EMPTY_SONG_LINKS } from "@/interfaces/song"
 import type { SongInput, SongLinks, SongSection, Song, SongStatus } from "@/interfaces"
 
@@ -371,6 +373,11 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, 
         onSaved?.(song.id)
       } else {
         const id = await createSong(organizationId, input, actor)
+        // The band's very first song is the funnel's activation step (#73);
+        // the subscribed list refreshes only after this write lands, so
+        // `songs.length` still counts what the band had a moment ago.
+        const first = firstFunnelEvent(songs.length, FUNNEL_EVENTS.firstSongCreated)
+        if (first) logFunnelEvent(first, { organization_id: organizationId })
         toast.showSuccess(t("songs.songCreated", { title: input.title.trim() }))
         setBaseline(serializeForm(currentState))
         onSaved?.(id)

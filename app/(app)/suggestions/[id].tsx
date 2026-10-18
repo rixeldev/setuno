@@ -21,8 +21,10 @@ import { useOrgData } from "@/hooks/useOrgData"
 import { acceptSuggestion, rejectSuggestion, setSuggestionAssignee } from "@/services/suggestions"
 import { canCollaborate } from "@/libs/membership"
 import { toFriendlyError } from "@/services/errors"
+import { logFunnelEvent } from "@/services/telemetry"
 import { formatRelativeTime } from "@/libs/format"
 import { diffChordLine, diffWords } from "@/libs/songDiff"
+import { FUNNEL_EVENTS } from "@/libs/telemetry"
 import { DiffText } from "@/components/ui/DiffText"
 import { toDate } from "@/interfaces/timestamp"
 
@@ -122,10 +124,14 @@ export default function SuggestionDetail() {
       if (action === "accept") {
         await acceptSuggestion(organizationId, suggestion.id, reviewer)
         toast.showSuccess(t("suggestions.acceptedApplied"))
+        // Funnel (#73): an accepted suggestion is the loop closing for real.
+        logFunnelEvent(FUNNEL_EVENTS.suggestionResolved, { resolution: "accepted" })
         router.replace(suggestion.songId ? `/songs/${suggestion.songId}` : "/songs")
         return
       }
       await rejectSuggestion(organizationId, suggestion.id, reviewer, note)
+      // Funnel (#73): closing the loop counts either way the reviewer lands it.
+      logFunnelEvent(FUNNEL_EVENTS.suggestionResolved, { resolution: "rejected" })
       setRejectOpen(false)
       setNote("")
       toast.showSuccess(t("suggestions.suggestionRejected"))

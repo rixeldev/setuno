@@ -57,6 +57,15 @@ export interface UserPreferences {
    * map.
    */
   notifications?: Partial<Record<PushNotificationType, boolean>>
+  /**
+   * Telemetry consent (roadmap #73): **opt-in only** — absent or false keeps
+   * analytics and Crashlytics collection off (`firebase.json` starts both
+   * disabled at build time), so every profile created before #73 collects
+   * nothing until its owner flips the switch in Settings. At sign-up the
+   * screen's asked answer is stamped here (`libs/telemetry.ts`'s pending
+   * handshake, consumed by `ensureUserProfile`'s create branch).
+   */
+  telemetry?: boolean
 }
 
 /** Minimal, shareable profile written to `users/{uid}`. */

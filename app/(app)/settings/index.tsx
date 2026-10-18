@@ -1,5 +1,5 @@
 import React, { useState } from "react"
-import { Linking, Pressable, StyleSheet, View } from "react-native"
+import { Linking, Pressable, StyleSheet, Switch, View } from "react-native"
 import { useRouter } from "expo-router"
 import Constants from "expo-constants"
 import { useTranslation } from "react-i18next"
@@ -13,6 +13,7 @@ import { Dialog } from "@/components/ui/Dialog"
 import { useToast } from "@/components/ui/Toast"
 import {
   ChevronRightIcon,
+  EyeIcon,
   GroupIcon,
   LanguageIcon,
   LinkIcon,
@@ -31,6 +32,7 @@ import { useOrgData } from "@/hooks/useOrgData"
 import { getAppearance } from "@/services/themeManager"
 import { useLanguagePreference } from "@/services/i18next"
 import { disablePushForThisDevice } from "@/services/notifications"
+import { updatePreferences } from "@/services/users"
 import { getDeviceLanguage } from "@/libs/deviceLanguage"
 import { PRIVACY_URL, TERMS_URL } from "@/libs/appLinks"
 import { LANGUAGE_NAMES, matchLanguage } from "@/libs/language"
@@ -95,6 +97,19 @@ export default function SettingsScreen() {
     } finally {
       setSigningOut(false)
       setConfirmSignOut(false)
+    }
+  }
+
+  // The telemetry consent gate (#73): the write rides the profile snapshot
+  // back into `applyTelemetryConsent`, so the native collection flags flip
+  // the moment the preference lands — offline, the queued write carries it.
+  const toggleTelemetry = async (next: boolean): Promise<void> => {
+    const uid = user?.uid
+    if (!uid) return
+    try {
+      await updatePreferences(uid, { telemetry: next })
+    } catch (error) {
+      toast.showError(toFriendlyError(error))
     }
   }
 
@@ -202,6 +217,26 @@ export default function SettingsScreen() {
           title={t("settings.privacy")}
           onPress={() => void Linking.openURL(PRIVACY_URL).catch(() => undefined)}
         />
+        <Divider />
+        {/* The consent gate (#73): off until the owner of the account says
+            otherwise, exactly as `firebase.json` starts the native SDKs. */}
+        <View style={styles.row}>
+          <View style={styles.rowIcon}>
+            <EyeIcon size={20} color={Theme.colors.primary} />
+          </View>
+          <View style={styles.rowBody}>
+            <AppText variant="bodyStrong">{t("settings.telemetry")}</AppText>
+            <AppText variant="caption" tone="muted" numberOfLines={2}>
+              {t("settings.telemetryHint")}
+            </AppText>
+          </View>
+          <Switch
+            value={profile?.preferences.telemetry === true}
+            onValueChange={(next) => void toggleTelemetry(next)}
+            trackColor={{ false: Theme.colors.borderSoft, true: Theme.colors.primary }}
+            accessibilityLabel={t("settings.telemetry")}
+          />
+        </View>
       </Card>
 
       <Card padded={false}>

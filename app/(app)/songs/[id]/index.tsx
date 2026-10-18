@@ -92,6 +92,7 @@ import { saveReaderState, type ReaderState } from "@/services/readerState"
 import { updatePreferences } from "@/services/users"
 import { updateCachedPreferences, usePreferences } from "@/services/prefs"
 import { toFriendlyError } from "@/services/errors"
+import { logFunnelEvent } from "@/services/telemetry"
 import { displayKey as spellKey, semitonesBetweenKeys, transposeKey } from "@/libs/chords"
 import type { PaletteCommand } from "@/libs/commandPalette"
 import { voicingPrefKey } from "@/libs/chordShapes"
@@ -121,6 +122,7 @@ import { exportTextFile } from "@/libs/exportFile"
 import { songPrintHtml } from "@/libs/songPrint"
 import { setlistStep } from "@/libs/setlistNavigation"
 import { canCollaborate } from "@/libs/membership"
+import { FUNNEL_EVENTS } from "@/libs/telemetry"
 import * as Clipboard from "expo-clipboard"
 
 /** Stable empty log for readers of songs that are not part of any event. */
@@ -178,6 +180,12 @@ export default function SongScreen() {
 
   // Live document: reflects admin edits and accepted suggestions immediately.
   useEffect(() => subscribeSong(organizationId, songId, setSong), [organizationId, songId])
+
+  // Funnel (#73): one event per reader visit — dropped while the user has
+  // not opted in, which is most sessions by design.
+  useEffect(() => {
+    if (songId) logFunnelEvent(FUNNEL_EVENTS.readerOpened, { song_id: songId })
+  }, [songId])
 
   // Corner arrows to walk the running order: only for songs opened from a
   // setlist screen, and only when that list really belongs to a live event —
@@ -485,6 +493,8 @@ export default function SongScreen() {
   useWakeLock(immersive && preferences.keepAwake)
 
   const enterImmersive = (): void => {
+    // Funnel (#73): entering stage mode is the reader's deepest engagement.
+    logFunnelEvent(FUNNEL_EVENTS.stageModeEnabled, { song_id: songId ?? "" })
     writeImmersiveMode(true)
     setImmersive(true)
   }
@@ -810,7 +820,11 @@ export default function SongScreen() {
         columns={readerColumns}
         markers={currentAnnotations?.markers ?? []}
         onMarkerPress={openAnnotations}
-        onChordPress={setChordHelp}
+        onChordPress={(chord) => {
+          setChordHelp(chord)
+          // Funnel (#73): the "how to play" sheet is active-practice intent.
+          logFunnelEvent(FUNNEL_EVENTS.chordSheetOpened, { chord })
+        }}
         onSectionPress={tourActive ? undefined : openSectionLoop}
         loopSectionId={metronome.loop?.sectionId ?? null}
       />

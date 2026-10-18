@@ -19,12 +19,14 @@ import { useOrgData } from "@/hooks/useOrgData"
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges"
 import { createSetlist, setlistSongKeys, setlistSongNotes, updateSetlist } from "@/services/setlists"
 import { toFriendlyError } from "@/services/errors"
+import { logFunnelEvent } from "@/services/telemetry"
 import { parseIsoDate, validateRequired } from "@/libs/validation"
 import {
   MAX_BREAK_MINUTES,
   MAX_GOAL_MINUTES,
   parseGoalMinutes,
 } from "@/libs/setlistDuration"
+import { firstFunnelEvent, FUNNEL_EVENTS } from "@/libs/telemetry"
 import type { Setlist, SetlistInput } from "@/interfaces"
 
 interface SetlistFormProps {
@@ -69,7 +71,7 @@ export function SetlistForm({ setlist, onSaved, draftName, draftSongIds }: Setli
   const toast = useToast()
   const { profile } = useAuth()
   const { organizationId } = useOrganization()
-  const { songLibrary } = useOrgData()
+  const { songLibrary, setlists } = useOrgData()
 
   // Read once: the same snapshot seeds both the goal fields and the baseline
   // the leave guard compares against. `draftName` seeds a collection draft
@@ -135,6 +137,12 @@ export function SetlistForm({ setlist, onSaved, draftName, draftSongIds }: Setli
         onSaved?.(setlist.id)
       } else {
         const id = await createSetlist(organizationId ?? "", input, songLibrary, author)
+        // The band's first *running order* is the funnel's step (#73): saved
+        // templates (#41) sit in the same collection but never count — the
+        // subscribed list also refreshes only after this write lands.
+        const existing = setlists.filter((entry) => !entry.template).length
+        const first = firstFunnelEvent(existing, FUNNEL_EVENTS.firstSetlist)
+        if (first) logFunnelEvent(first, { organization_id: organizationId ?? "" })
         toast.showSuccess(t("setlists.setlistCreated", { name: input.name }))
         setBaseline(serializeForm(currentState))
         onSaved?.(id)
