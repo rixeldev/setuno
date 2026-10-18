@@ -196,6 +196,13 @@ npx expo-doctor         # diagnose dependency and config issues
   **hard-delete cascade** grew the same day: `purgeSong` and `functions/src/purge.ts` sweep
   `presence` beside `versions` (`PurgeResult.presence` rides the log) → **needs `pnpm deploy:rules`**
   (seventeenth push) **and `pnpm deploy:functions`** (seventh) — both run by the agent.
+  **Stale-save guard** (owner ask on the heels of #28): `SongForm` remembers the `updatedAt` its
+  draft seeded from and, at save time, a subscription that has since moved past it opens a `Dialog`
+  — **Reload the song** (null the id so the existing render-adjust pass re-seeds every field from
+  the live document) / **Save anyway** / keep editing. The maths is pure in `libs/songConflict.ts`
+  (`songStamp`, `editIsStale`, +6 tests): a pending `serverTimestamp` reads `null` on the writing
+  client, so your own save never cries conflict — while another save, even yours from a second
+  device, always does. No rules, no functions: pure UI over the subscription already there.
 - **The activity feed knows what you have read** (roadmap #53): one personal marker per band at
   `users/{uid}/activityRead/{orgId}` — `services/activity.ts#subscribeActivityRead` +
   `#markActivityRead` (**client** time, exactly like a trashed song or a version's `savedAt`: a

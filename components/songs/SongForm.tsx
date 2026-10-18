@@ -44,6 +44,7 @@ import { parseDurationInput } from "@/libs/format"
 import { parseChordPro } from "@/libs/chordpro"
 import { findDuplicateSongs, type SongDuplicate } from "@/libs/songSearch"
 import { SONG_STATUSES, SONG_STATUS_LABEL_KEYS } from "@/libs/songStatus"
+import { editIsStale, songStamp } from "@/libs/songConflict"
 import { EMPTY_SONG_LINKS } from "@/interfaces/song"
 import type { SongInput, SongLinks, SongSection, Song, SongStatus } from "@/interfaces"
 
@@ -154,6 +155,8 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, 
   const [importText, setImportText] = useState("")
   // Chords the editor cannot read, surfaced before saving (roadmap #21).
   const [chordWarning, setChordWarning] = useState<string[] | null>(null)
+  // The song was saved from another device after this draft loaded (#28 guard).
+  const [saveConflict, setSaveConflict] = useState(false)
   // Songs the band already has under this title (roadmap #39).
   const [duplicates, setDuplicates] = useState<SongDuplicate[] | null>(null)
   // Song the user chose to open instead of creating a duplicate; the navigation
@@ -169,8 +172,12 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, 
   // React's documented "adjust state while rendering" pattern: the fields never
   // show a frame of the previous song and no extra render pass is needed.
   const [loadedSongId, setLoadedSongId] = useState(song?.id ?? null)
+  // `updatedAt` this draft was seeded from: once the subscription moves past
+  // it, somebody saved the song while it was open (stale-save guard).
+  const [loadedStamp, setLoadedStamp] = useState<number | null>(() => songStamp(song))
   if (song && song.id !== loadedSongId) {
     setLoadedSongId(song.id)
+    setLoadedStamp(songStamp(song))
     setSongTitle(song.title)
     setArtist(song.artist)
     setKey(song.key || "C")
@@ -299,6 +306,12 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, 
         return
       }
     }
+    // Somebody saved this song after this draft loaded (another device, maybe
+    // this user's own): saving now would silently replace their work.
+    if (song && editIsStale(song, loadedStamp)) {
+      setSaveConflict(true)
+      return
+    }
     await continueSave()
   }
 
@@ -310,6 +323,16 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, 
       return
     }
     await persist()
+  }
+
+  /**
+   * The conflict dialog's safe choice: drop this draft and re-seed every field
+   * from the live document. Nulling the id re-runs the render-adjust pass
+   * above, exactly like opening the song again.
+   */
+  const reloadFromLive = (): void => {
+    setSaveConflict(false)
+    setLoadedSongId(null)
   }
 
   const persist = async (): Promise<void> => {
@@ -727,6 +750,21 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, 
             <Badge key={chord} label={chord} tone="warning" />
           ))}
         </View>
+      </Dialog>
+
+      <Dialog
+        visible={saveConflict}
+        onClose={() => setSaveConflict(false)}
+        title={t("songs.saveConflictTitle")}
+        description={t("songs.saveConflictBody")}
+        confirmLabel={t("songs.saveAnyway")}
+        cancelLabel={t("common.keepEditing")}
+        onConfirm={() => {
+          setSaveConflict(false)
+          void continueSave()
+        }}
+      >
+        <Button variant="secondary" label={t("songs.saveConflictReload")} onPress={reloadFromLive} />
       </Dialog>
 
       <DiscardChangesDialog
