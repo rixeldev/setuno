@@ -29,7 +29,7 @@ import type {
 import { logActivity } from "@/services/activity"
 import { ValidationError } from "@/services/errors"
 import { ISO_DATE_PATTERN, TIME_PATTERN, toIsoDate } from "@/libs/validation"
-import { performanceLastDay } from "@/libs/performances"
+import { orderPerformancesAsc, performanceLastDay } from "@/libs/performances"
 import { sanitizeShowLog } from "@/libs/showLog"
 import { mapAttendance } from "@/libs/eventLogistics"
 import { deleteEventTasks } from "@/services/eventLogistics"
@@ -117,10 +117,13 @@ export const subscribePerformances = (
   return onSnapshot(
     query(
       collection(firestore, paths.performances(organizationId)),
-      orderBy("date", "asc"),
+      // Desc, then `orderPerformancesAsc` (P0.9 / #82): the *window* must sit
+      // on the newest events — an ascending query + limit would fill it with
+      // the band's oldest 300 and every new show would silently stop arriving.
+      orderBy("date", "desc"),
       limitTo(300),
     ),
-    (snapshot) => onChange(mapDocs(snapshot, mapPerformance)),
+    (snapshot) => onChange(orderPerformancesAsc(mapDocs(snapshot, mapPerformance))),
     (error) => onError?.(error),
   )
 }
@@ -129,11 +132,12 @@ export const fetchPerformances = async (organizationId: string): Promise<Perform
   const snapshot = await getDocs(
     query(
       collection(firestore, paths.performances(organizationId)),
-      orderBy("date", "asc"),
+      // Same window rule as the subscription above (P0.9 / #82).
+      orderBy("date", "desc"),
       limitTo(300),
     ),
   )
-  return mapDocs(snapshot, mapPerformance)
+  return orderPerformancesAsc(mapDocs(snapshot, mapPerformance))
 }
 
 export const fetchPerformance = async (

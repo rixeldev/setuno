@@ -35,6 +35,25 @@ export const filterByEventType = (
 }
 
 /**
+ * Restores the ascending-by-date order every consumer was built on, after the
+ * listener windows on the **newest** events (P0.9 / #82): querying
+ * `orderBy("date", "asc")` + `limitTo(N)` fills the window with the band's
+ * *oldest* N events — past ~300 events every new show, the dashboard's next
+ * show included, would silently drop out of the subscription. So the query
+ * asks for desc to pick the window, and this sorts what comes back so
+ * `partitionPerformances`, the dashboard's soonest-first slice and the
+ * calendar agenda keep receiving the order they were written against. Ties
+ * break by start time then id, so two devices always render the same order.
+ */
+export const orderPerformancesAsc = (performances: readonly Performance[]): Performance[] =>
+  [...performances].sort(
+    (a, b) =>
+      a.date.localeCompare(b.date) ||
+      a.startTime.localeCompare(b.startTime) ||
+      a.id.localeCompare(b.id),
+  )
+
+/**
  * A rehearsal is not a show (roadmap #46): the stats' "shows played", music
  * minutes and the year recap count **gigs**, while #34's usage history counts
  * every completed event — a rehearsal where the band ran a setlist *was* a
