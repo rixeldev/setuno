@@ -199,6 +199,7 @@ export const createSetlist = async (
   input: SetlistInput,
   library: Map<string, Song>,
   author: { id: string; name: string },
+  options: { announce?: boolean } = {},
 ): Promise<string> => {
   const uid = requireUserId()
   const normalized = normalizeInput(input)
@@ -228,15 +229,18 @@ export const createSetlist = async (
     updatedAt: now,
   })
 
-  void logActivity({
-    organizationId,
-    type: "setlist_created",
-    message: `${author.name} created "${normalized.name}"`,
-    actorId: uid,
-    actorName: author.name,
-    targetType: "setlist",
-    targetId: reference.id,
-  })
+  // Bulk import (#38) folds every row of a run into one `bulk_imported` event.
+  if (options.announce !== false) {
+    void logActivity({
+      organizationId,
+      type: "setlist_created",
+      message: `${author.name} created "${normalized.name}"`,
+      actorId: uid,
+      actorName: author.name,
+      targetType: "setlist",
+      targetId: reference.id,
+    })
+  }
 
   return reference.id
 }

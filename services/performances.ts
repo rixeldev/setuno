@@ -203,6 +203,7 @@ export const createPerformance = async (
   organizationId: string,
   input: PerformanceInput,
   author: { id: string; name: string },
+  options: { announce?: boolean } = {},
 ): Promise<string> => {
   const uid = requireUserId()
   const normalized = normalizeInput(input)
@@ -217,15 +218,18 @@ export const createPerformance = async (
     updatedAt: now,
   })
 
-  void logActivity({
-    organizationId,
-    type: "performance_created",
-    message: `${author.name} scheduled "${normalized.name}"`,
-    actorId: uid,
-    actorName: author.name,
-    targetType: "performance",
-    targetId: reference.id,
-  })
+  // Bulk import (#38) folds every row of a run into one `bulk_imported` event.
+  if (options.announce !== false) {
+    void logActivity({
+      organizationId,
+      type: "performance_created",
+      message: `${author.name} scheduled "${normalized.name}"`,
+      actorId: uid,
+      actorName: author.name,
+      targetType: "performance",
+      targetId: reference.id,
+    })
+  }
 
   return reference.id
 }

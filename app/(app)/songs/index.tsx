@@ -12,7 +12,7 @@ import { Input, SearchInput } from "@/components/ui/Input"
 import { Dialog } from "@/components/ui/Dialog"
 import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
 import { EmptyState, ErrorState, SkeletonList } from "@/components/ui/States"
-import { FilterIcon, PlusIcon, SaveIcon, SearchIcon, SortIcon, TrashIcon } from "@/components/ui/Icons"
+import { FilterIcon, ImportIcon, PlusIcon, SaveIcon, SearchIcon, SortIcon, TrashIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { SongRow } from "@/components/app/SongRow"
 import { useToast } from "@/components/ui/Toast"
@@ -183,12 +183,20 @@ export default function SongsScreen() {
               icon={<SortIcon size={16} color={Theme.colors.text} />}
             />
             {isAdmin ? (
-              <IconButton
-                label={t("songs.trash")}
-                variant="secondary"
-                onPress={() => router.push("/songs/trash")}
-                icon={<TrashIcon size={16} color={Theme.colors.text} />}
-              />
+              <>
+                <IconButton
+                  label={t("backup.importTitle")}
+                  variant="secondary"
+                  onPress={() => router.push("/songs/import")}
+                  icon={<ImportIcon size={16} color={Theme.colors.text} />}
+                />
+                <IconButton
+                  label={t("songs.trash")}
+                  variant="secondary"
+                  onPress={() => router.push("/songs/trash")}
+                  icon={<TrashIcon size={16} color={Theme.colors.text} />}
+                />
+              </>
             ) : null}
           </View>
 

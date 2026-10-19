@@ -19,7 +19,7 @@ import {
   type SubscribeErrorHandler,
   type Unsubscribe,
 } from "@/db/Fire"
-import type { LyricLine, Song, SongInput, SongSection } from "@/interfaces"
+import type { Song, SongInput } from "@/interfaces"
 import { logActivity } from "@/services/activity"
 import { deleteSongPresence } from "@/services/songPresence"
 import { deleteVersions, writeVersion } from "@/services/songVersions"
@@ -29,63 +29,12 @@ import { songVersionData } from "@/libs/songHistory"
 import { normalizeSongStatus } from "@/libs/songStatus"
 import { normalizeSongLinks } from "@/libs/songLinks"
 import { duplicateSongTitle } from "@/libs/songMerge"
+import { mapSongInput } from "@/libs/songMapper"
 
-const mapChords = (raw: unknown): LyricLine["chords"] => {
-  if (!Array.isArray(raw)) return []
-  return raw
-    .map((entry) => {
-      if (!entry || typeof entry !== "object") return null
-      const chord = entry as { chord?: unknown; position?: unknown }
-      const chordName = typeof chord.chord === "string" ? chord.chord.trim() : ""
-      const position = typeof chord.position === "number" ? chord.position : Number.NaN
-      if (chordName.length === 0 || Number.isNaN(position)) return null
-      return { chord: chordName, position }
-    })
-    .filter((entry): entry is LyricLine["chords"][number] => entry !== null)
-}
-
-const mapSections = (raw: unknown): SongSection[] => {
-  if (!Array.isArray(raw)) return []
-  return raw.map((entry, index) => {
-    const section = (entry ?? {}) as Partial<SongSection>
-    const lines = Array.isArray(section.lines) ? section.lines : []
-    const bars = typeof section.bars === "number" ? clampSectionBars(section.bars) : 0
-    return {
-      id: typeof section.id === "string" && section.id.length > 0 ? section.id : `sec_${index}`,
-      type: (section.type ?? "verse") as SongSection["type"],
-      label: typeof section.label === "string" && section.label.length > 0 ? section.label : "Section",
-      ...(bars > 0 ? { bars } : {}),
-      lines: lines.map((line) => {
-        const value = (line ?? {}) as Partial<LyricLine>
-        return {
-          text: typeof value.text === "string" ? value.text : "",
-          chords: mapChords(value.chords),
-        }
-      }),
-    }
-  })
-}
-
-/**
- * The editable content of a song as stored — shared by the song reader and,
- * since roadmap #26, by version documents, so both normalise identically.
- */
-export const mapSongInput = (data: Record<string, unknown>): SongInput => ({
-  title: String(data.title ?? ""),
-  artist: String(data.artist ?? ""),
-  key: String(data.key ?? ""),
-  originalKey: String(data.originalKey ?? data.key ?? ""),
-  capo: typeof data.capo === "number" ? data.capo : 0,
-  bpm: typeof data.bpm === "number" ? data.bpm : null,
-  durationSec: typeof data.durationSec === "number" ? data.durationSec : null,
-  genre: String(data.genre ?? ""),
-  notes: String(data.notes ?? ""),
-  tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
-  sections: mapSections(data.sections),
-  links: normalizeSongLinks(data.links),
-  // Absence (a document written before #30) reads back as active — no migration.
-  status: normalizeSongStatus(data.status),
-})
+// The pure mapper moved to `libs/songMapper.ts` (#38) so the backup parser can
+// reuse it without dragging Firebase in; re-exported here because every
+// existing importer reads it from this module.
+export { mapSongInput } from "@/libs/songMapper"
 
 const mapSong = (data: Record<string, unknown>, id: string): Song =>
   ({
@@ -198,6 +147,7 @@ export const createSong = async (
   organizationId: string,
   input: SongInput,
   author: { id: string; name: string },
+  options: { announce?: boolean } = {},
 ): Promise<string> => {
   const uid = requireUserId()
   const normalized = normalizeSongInput(input)
@@ -213,15 +163,19 @@ export const createSong = async (
     updatedAt: now,
   })
 
-  void logActivity({
-    organizationId,
-    type: "song_created",
-    message: `${author.name} added "${normalized.title}"`,
-    actorId: uid,
-    actorName: author.name,
-    targetType: "song",
-    targetId: reference.id,
-  })
+  // A bulk import (#38) passes `announce: false`: hundreds of per-song rows
+  // would flood the feed, and the run logs one `bulk_imported` event instead.
+  if (options.announce !== false) {
+    void logActivity({
+      organizationId,
+      type: "song_created",
+      message: `${author.name} added "${normalized.title}"`,
+      actorId: uid,
+      actorName: author.name,
+      targetType: "song",
+      targetId: reference.id,
+    })
+  }
 
   return reference.id
 }

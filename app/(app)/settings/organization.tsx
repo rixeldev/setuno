@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { deleteOrganization, setOrganizationDiscoverable, updateOrganization } from "@/services/organizations"
+import { downloadBandBackup } from "@/services/bandBackup"
 import { toFriendlyError } from "@/services/errors"
 import { uploadImage } from "@/services/uploads"
 import { pickImageBase64 } from "@/libs/imagePicker"
@@ -41,6 +42,7 @@ export default function OrganizationSettings() {
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [togglingDiscoverable, setTogglingDiscoverable] = useState(false)
+  const [downloading, setDownloading] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [typedName, setTypedName] = useState("")
 
@@ -67,6 +69,30 @@ export default function OrganizationSettings() {
       toast.showError(toFriendlyError(error, t("settings.couldNotUploadLogo")))
     } finally {
       setUploading(false)
+    }
+  }
+
+  /**
+   * Whole-band backup as one JSON file (roadmap #38): songs, setlists and
+   * events ride the same share-sheet / browser-download seam the ChordPro
+   * export and the account export use.
+   */
+  const download = async (): Promise<void> => {
+    setDownloading(true)
+    try {
+      const shared = await downloadBandBackup({
+        organizationName: organization?.name ?? "",
+        members,
+        songs,
+        setlists,
+        performances,
+      })
+      if (shared) toast.showSuccess(t("backup.downloaded"))
+      else toast.showError(t("backup.shareUnavailable"))
+    } catch (error) {
+      toast.showError(toFriendlyError(error, t("backup.downloadFailed")))
+    } finally {
+      setDownloading(false)
     }
   }
 
@@ -219,6 +245,32 @@ export default function OrganizationSettings() {
 
       {isAdmin ? (
         <Card style={styles.card}>
+          <View style={styles.switchText}>
+            <AppText variant="label" tone="faint">
+              {t("backup.title")}
+            </AppText>
+            <AppText variant="caption" tone="muted">
+              {t("backup.cardHint")}
+            </AppText>
+          </View>
+          <View style={styles.block}>
+            <Button
+              label={downloading ? t("backup.downloading") : t("backup.download")}
+              variant="secondary"
+              loading={downloading}
+              onPress={() => void download()}
+            />
+            <Button
+              label={t("backup.importTitle")}
+              variant="secondary"
+              onPress={() => router.push("/songs/import")}
+            />
+          </View>
+        </Card>
+      ) : null}
+
+      {isAdmin ? (
+        <Card style={styles.card}>
           <View style={styles.switchRow}>
             <View style={styles.switchText}>
               <AppText variant="label" tone="faint">
@@ -301,5 +353,6 @@ const createStyles = () =>
       gap: Theme.spacing.m,
     },
     switchText: { flex: 1, gap: 2 },
+    block: { gap: Theme.spacing.s },
     dangerCard: { borderColor: Theme.colors.danger },
   })

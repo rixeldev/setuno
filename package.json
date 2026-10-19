@@ -71,6 +71,7 @@
     "expo-status-bar": "~57.0.1",
     "firebase": "^12.19.0",
     "i18next": "^26.4.2",
+    "jszip": "^3.10.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-hook-form": "~7.89.0",

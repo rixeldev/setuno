@@ -48,6 +48,8 @@ export default function AppLayout() {
         <Stack.Screen name="songs/[id]/history" options={modalOptions} />
         {/* Trash and recovery (roadmap #31): admin list of soft-deleted songs. */}
         <Stack.Screen name="songs/trash" options={modalOptions} />
+
+        <Stack.Screen name="songs/import" options={modalOptions} />
         {/* Personal notes of one song (roadmap #3). */}
         <Stack.Screen name="annotations/[id]" options={modalOptions} />
         <Stack.Screen name="setlists/index" options={{ animation: "none" }} />
