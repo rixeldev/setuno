@@ -181,6 +181,10 @@ export function ReaderDock({
           <AppText
             variant="bodyStrong"
             numberOfLines={1}
+            // Chrome, not content: the shut tray is a fixed 46pt row, so the
+            // summary is capped while its accessibility label still spells the
+            // whole tuning out (AppText's rest props override the variant cap).
+            maxFontSizeMultiplier={1.6}
             style={styles.summaryText}
           >
             {summary}

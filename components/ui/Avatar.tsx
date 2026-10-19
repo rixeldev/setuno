@@ -53,6 +53,8 @@ export function Avatar({
           onError={() => setFailedURL(photoURL ?? "")}
           style={{ width: diameter, height: diameter, borderRadius: diameter / 2 }}
           accessibilityIgnoresInvertColors
+          // Decorative: the row always prints the person's name beside it.
+          alt=""
         />
       ) : (
         <AppText variant="caption" style={{ fontSize, fontFamily: Theme.fonts.onestBold }}>

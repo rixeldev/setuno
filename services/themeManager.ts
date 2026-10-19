@@ -70,40 +70,55 @@ const setGradient = (key: keyof typeof Theme.gradients, value: readonly string[]
 const buildPalette = (accent: AccentPalette, mode: "dark" | "light"): void => {
   const dark = mode === "dark"
 
-  const primary = dark ? mix(accent.primary, "#FFFFFF", 0.08) : darken(accent.primary, 0.5)
+  // Dark mode lifts `primary` a touch more than the accent ships it: low-luminance
+  // primaries (ember orange, indigo) must carry ghost-button labels and badge text
+  // over the raised surfaces too, and AA pins the pair (themeContrast test).
+  const primary = dark ? mix(accent.primary, "#FFFFFF", 0.13) : darken(accent.primary, 0.5)
   const primaryStrong = dark ? accent.primaryStrong : darken(accent.primaryStrong, 0.5)
-  const highlight = dark ? accent.accent : darken(accent.accent, 0.52)
+  // Light mode darkens the accent further (0.52 left amber/pink marginal on the
+  // soft chips and the raised surfaces): chord labels and badge text are caption
+  // size, so they are held to the 4.5:1 body-text threshold, not the large-text one.
+  const highlight = dark ? accent.accent : darken(accent.accent, 0.6)
   const onPrimary = dark ? accent.onPrimary : "#FFFFFF"
 
-  const background = dark ? mix(DARK_BASE, primary, 0.05) : mix(LIGHT_BASE, primary, 0.035)
-  const surface = dark ? mix("#141420", primary, 0.05) : "#FFFFFF"
-  const surfaceHigh = dark ? mix("#1D1D2B", primary, 0.07) : mix("#FFFFFF", primary, 0.04)
-  const surfaceMuted = dark ? mix("#262636", primary, 0.07) : mix("#EDEDF6", primary, 0.08)
+  // Surfaces tint towards `primaryStrong` in dark mode, never `primary`: bright
+  // accents (sky, indigo) otherwise lift the raised surfaces until dim text can
+  // no longer clear AA against them (textFaint on surfaceMuted was the canary).
+  const tint = dark ? primaryStrong : primary
+  const background = dark ? mix(DARK_BASE, tint, 0.05) : mix(LIGHT_BASE, tint, 0.035)
+  const surface = dark ? mix("#141420", tint, 0.05) : "#FFFFFF"
+  const surfaceHigh = dark ? mix("#1D1D2B", tint, 0.07) : mix("#FFFFFF", tint, 0.04)
+  const surfaceMuted = dark ? mix("#262636", tint, 0.07) : mix("#EDEDF6", tint, 0.08)
   const border = dark ? mix("#2C2C3F", primary, 0.2) : mix("#DFDFEC", primary, 0.18)
-  const chrome = dark ? mix("#0D0D17", primary, 0.04) : "#FFFFFF"
-  const modal = dark ? mix("#191926", primary, 0.05) : "#FFFFFF"
+  const chrome = dark ? mix("#0D0D17", tint, 0.04) : "#FFFFFF"
+  const modal = dark ? mix("#191926", tint, 0.05) : "#FFFFFF"
 
-  const success = dark ? "#34D399" : "#047857"
-  const warning = dark ? "#FBBF24" : "#B45309"
+  const success = dark ? "#34D399" : "#065F46"
+  const warning = dark ? "#FBBF24" : "#92400E"
   const danger = dark ? "#FF6B7A" : "#B91C1C"
 
   setColor("background", background)
   setColor("background2", dark ? mix(background, surface, 0.6) : mix(background, surface, 0.7))
   setColor("text", dark ? "#F8F8FC" : "#14141E")
   setColor("textMuted", dark ? "#ADAEC6" : "#54566E")
-  setColor("textFaint", dark ? "#8A8CA3" : "#63657D")
+  setColor("textFaint", dark ? "#9698B0" : "#5A5C74")
   setColor("primary", primary)
   setColor("primaryStrong", primaryStrong)
-  setColor("primarySoft", colorWithOpacity(primary, dark ? 0.2 : 0.14))
+  // Dark soft fills are deliberately faint (AA pins the alpha, see below): they
+  // are redundant backing behind tone-coloured caption text, and a stronger chip
+  // would lift its own background until that text can no longer pass 4.5:1.
+  // 0.08 is the narrow window that satisfies both AA and perceptibility for the
+  // lowest-luminance accent (ember orange).
+  setColor("primarySoft", colorWithOpacity(primary, dark ? 0.08 : 0.11))
   setColor("onPrimary", onPrimary)
   setColor("accent", highlight)
-  setColor("accentSoft", colorWithOpacity(highlight, dark ? 0.18 : 0.14))
+  setColor("accentSoft", colorWithOpacity(highlight, dark ? 0.08 : 0.14))
   setColor("success", success)
-  setColor("successSoft", colorWithOpacity(success, dark ? 0.16 : 0.12))
+  setColor("successSoft", colorWithOpacity(success, dark ? 0.08 : 0.12))
   setColor("warning", warning)
-  setColor("warningSoft", colorWithOpacity(warning, dark ? 0.16 : 0.12))
+  setColor("warningSoft", colorWithOpacity(warning, dark ? 0.08 : 0.12))
   setColor("danger", danger)
-  setColor("dangerSoft", colorWithOpacity(danger, dark ? 0.16 : 0.12))
+  setColor("dangerSoft", colorWithOpacity(danger, dark ? 0.08 : 0.12))
   setColor("surface", surface)
   setColor("surfaceHigh", surfaceHigh)
   setColor("surfaceMuted", surfaceMuted)

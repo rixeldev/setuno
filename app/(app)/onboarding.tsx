@@ -82,6 +82,7 @@ export default function Onboarding() {
             source={require("../../assets/icon.png")}
             style={styles.logo}
             accessibilityIgnoresInvertColors
+            alt=""
           />
           <AppText variant="subheading">Setuno</AppText>
         </View>

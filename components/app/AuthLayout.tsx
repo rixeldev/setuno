@@ -70,6 +70,7 @@ export function AuthLayout({ title, subtitle, children, footer, back = false }: 
               source={require("../../assets/icon.png")}
               style={styles.logo}
               accessibilityIgnoresInvertColors
+              alt=""
             />
             <AppText variant="title">Setuno</AppText>
             <AppText variant="caption" tone="muted" style={styles.centered}>

@@ -178,6 +178,7 @@ export function SidebarNav() {
             source={require("../../assets/icon.png")}
             style={styles.brandLogo}
             accessibilityIgnoresInvertColors
+            alt=""
           />
           <AppText variant="title">Setuno</AppText>
         </View>
