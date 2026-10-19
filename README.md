@@ -277,7 +277,11 @@ theme follows dark, light or the device scheme (`"system"`). The palette is deri
 (`libs/appearance.ts`): dark surfaces get a subtle tint of the accent, and light mode darkens the
 accent itself so text and icons keep AA contrast. Reusable primitives live in
 `components/ui/` (`Button`, `Input`, `Card`, `Dialog`, `BottomSheet`, `Toast`, `States`,
-`PageHeader`, `Icons`…). The chord/lyric grids are drawn in a bundled **JetBrains Mono** (imported
+`PageHeader`, `Icons`…). Contrast is **CI-pinned, never tuned by eye**:
+`tests/unit/themeContrast.test.ts` asserts WCAG AA for every semantic pair across all six accents
+× light/dark against the real palette derivation, and decorative images, focus order, dynamic
+type and screen-reader labels follow the spec's §53 accessibility checklist. The chord/lyric
+grids are drawn in a bundled **JetBrains Mono** (imported
 per weight, so only the faces in use ship), which keeps every padded chord column aligned on every
 platform. Every screen carries an accessible go-back button in its header
 (`PageHeader` shows it automatically when the router can go back).
