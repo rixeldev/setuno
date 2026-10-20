@@ -1,4 +1,5 @@
 import React, { useState } from "react"
+import { Linking, Platform, StyleSheet, View } from "react-native"
 import { useTranslation } from "react-i18next"
 
 import { AppText } from "@/components/ui/AppText"
@@ -6,11 +7,22 @@ import { Button } from "@/components/ui/Button"
 import { Card } from "@/components/ui/Card"
 import { ModalScreen } from "@/components/app/ModalScreen"
 import { useToast } from "@/components/ui/Toast"
+import { Theme } from "@/constants/Theme"
+import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { useEntitlement } from "@/hooks/useEntitlement"
 import { usePlanPurchase } from "@/hooks/usePlanPurchase"
 import { PRO_PRODUCTS } from "@/functions/src/entitlements"
 import { fetchEntitlement, syncPurchase } from "@/services/entitlements"
 import { toFriendlyError } from "@/services/errors"
+
+/**
+ * Where the Android build is downloaded from.
+ *
+ * The web build cannot sell the plan yet (the store's company details are
+ * still being set up), so it points at the app instead — and the plan follows
+ * the **account**, so buying it on Android turns the web into Pro too.
+ */
+const ANDROID_DOWNLOAD_URL = "https://play.google.com/store/apps/details?id=com.rixeldev.setuno"
 
 /**
  * The member's plan (roadmap #61, with the restore flow of #62).
@@ -21,9 +33,12 @@ import { toFriendlyError } from "@/services/errors"
  */
 export default function PlanScreen() {
   const { t } = useTranslation()
+  const styles = useThemedStyles(createStyles)
   const toast = useToast()
   const plan = useEntitlement()
   const [busy, setBusy] = useState(false)
+  // The web cannot take the payment yet, so it says where to.
+  const isWeb = Platform.OS === "web"
 
   const store = usePlanPurchase({
     onPurchased: () => {
@@ -100,24 +115,41 @@ export default function PlanScreen() {
 
       {monthly || annual ? (
         <Card>
-          <AppText variant="label" tone="faint">
+          <AppText variant="label" tone="faint" style={styles.buyTitle}>
             {t("plan.buyTitle")}
           </AppText>
-          {monthly ? (
-            <Button
-              label={t("plan.buyMonthly", { price: monthly.price })}
-              full
-              loading={busy}
-              onPress={() => void onBuy(PRO_PRODUCTS.monthly)}
-            />
+          {isWeb ? (
+            <AppText variant="body" tone="muted">
+              {t("plan.subscriptionsOnMobile")}
+            </AppText>
           ) : null}
-          {annual ? (
+          <View style={styles.buyButtons}>
+            {monthly ? (
+              <Button
+                label={t("plan.buyMonthly", { price: monthly.price })}
+                full
+                disabled={isWeb}
+                loading={busy}
+                onPress={() => void onBuy(PRO_PRODUCTS.monthly)}
+              />
+            ) : null}
+            {annual ? (
+              <Button
+                label={t("plan.buyAnnual", { price: annual.price })}
+                full
+                variant="secondary"
+                disabled={isWeb}
+                loading={busy}
+                onPress={() => void onBuy(PRO_PRODUCTS.annual)}
+              />
+            ) : null}
+          </View>
+          {isWeb ? (
             <Button
-              label={t("plan.buyAnnual", { price: annual.price })}
-              full
+              label={t("plan.downloadAndroid")}
               variant="secondary"
-              loading={busy}
-              onPress={() => void onBuy(PRO_PRODUCTS.annual)}
+              full
+              onPress={() => void Linking.openURL(ANDROID_DOWNLOAD_URL)}
             />
           ) : null}
         </Card>
@@ -147,3 +179,9 @@ export default function PlanScreen() {
     </ModalScreen>
   )
 }
+
+const createStyles = () =>
+  StyleSheet.create({
+    buyTitle: { marginBottom: Theme.spacing.xs },
+    buyButtons: { gap: Theme.spacing.s },
+  })

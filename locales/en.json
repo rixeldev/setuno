@@ -1319,6 +1319,8 @@
     "buyMonthly": "Monthly — {{price}}",
     "buyAnnual": "Yearly — {{price}}",
     "notOffered": "The Pro plan is not offered in this build yet.",
+    "subscriptionsOnMobile": "Subscriptions are handled in the mobile app. Download Setuno for Android and subscribe there — your plan follows your account to every device.",
+    "downloadAndroid": "Get it on Google Play",
     "restore": "Restore purchases",
     "manage": "Manage subscription",
     "restored": "Your purchase is back.",

@@ -612,6 +612,10 @@ right amount ✓). The Play prices, meanwhile, still read **$30.99/$340.99** thr
 Developer API even though the console shows $3.99 — a pending price change on Play's side, most
 likely. A purchase with a **license tester** account settles which number Play really charges ✓.
 
+**The web cannot take the payment yet** (the store's company details are still being set up), so
+the plan screen there **disables the buy buttons** and points at the Android app instead — the plan
+follows the **account**, so buying it on Android turns the web into Pro too ✓.
+
 Without the service account the callable refuses every purchase: a missing credential must never
 fall back to "probably fine". Until the products exist, the plan screen says the plan is not
 offered in this build yet rather than offering a button that cannot work.

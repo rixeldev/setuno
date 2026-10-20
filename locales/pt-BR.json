@@ -1319,6 +1319,8 @@
     "buyMonthly": "Mensal — {{price}}",
     "buyAnnual": "Anual — {{price}}",
     "notOffered": "O plano Pro ainda não está disponível nesta versão.",
+    "subscriptionsOnMobile": "As assinaturas são gerenciadas no app mobile. Baixe o Setuno para Android e assine lá: seu plano acompanha sua conta em todos os dispositivos.",
+    "downloadAndroid": "Baixe no Google Play",
     "restore": "Restaurar compras",
     "manage": "Gerenciar assinatura",
     "restored": "Sua compra voltou.",
