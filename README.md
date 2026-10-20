@@ -579,8 +579,13 @@ The plan cannot be bought until the products exist and the server can ask Google
    the app shows whatever the store answers.
 2. **The service account** — in the Google Cloud console, create a service account for the project,
    then in the Play Console (*Users and permissions*) invite it and grant it the **"App orders"** and
-   **"Financial data"** permissions. Put its JSON in the functions' environment as
-   `PLAY_SERVICE_ACCOUNT_JSON` (a secret — never in the repo).
+   **"Financial data"** permissions. Put its key in the functions' environment, in **either** of these
+   shapes (both are accepted, so pick whichever your setup handles better):
+   - `PLAY_SERVICE_ACCOUNT_JSON` — the whole key file as a single line, or
+   - `PLAY_SERVICE_ACCOUNT_CLIENT_EMAIL` + `PLAY_SERVICE_ACCOUNT_PRIVATE_KEY` — the address and the
+     PEM (with the newlines written as `\n`).
+
+   It is a credential, so it never goes into the repo.
 3. **Deploy** — the callables ship with the functions (`pnpm deploy:functions`).
 
 Without the service account the callable refuses every purchase: a missing credential must never
