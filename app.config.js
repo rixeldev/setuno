@@ -6,6 +6,22 @@
 // the production ones.
 const stagingEnv = process.env.APP_ENV === "staging"
 
+// Firebase Hosting serves the email-link sign-in handler (#67) on the
+// project's own hosts — `<project>.firebaseapp.com`, mirrored on `<project>
+// .web.app`. A phone with the app installed opens those URLs straight from the
+// email as **Android App Links**, which is what routes them into
+// `app/email-link.tsx`; everywhere else the same URL is an ordinary page that
+// hands the one-time code to the continue URL in the browser. The hosts track
+// the selected environment, exactly like the config files below do.
+const projectId = stagingEnv ? "setuno-be01d-staging" : "setuno-be01d"
+const authHosts = [`${projectId}.firebaseapp.com`, `${projectId}.web.app`]
+const authLinkData = authHosts.flatMap((host) => [
+  { scheme: "https", host, pathPrefix: "/__/auth/links" },
+  // The older handler path, still minted by some regions — claiming both costs
+  // nothing and keeps the flow alive if Firebase switches one off.
+  { scheme: "https", host, pathPrefix: "/__/auth/action" },
+])
+
 export default {
   expo: {
     owner: "rikirilis",
@@ -26,6 +42,11 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.rixeldev.setuno",
+      // Inert while iOS is not in `platforms` below, and the exact twin of the
+      // Android intent filter: Universal Links are what make an emailed
+      // sign-in link open the app on an iPhone (#67). Declared now so iOS ships
+      // with the deep-link plumbing instead of without it.
+      associatedDomains: authHosts.map((host) => `applinks:${host}`),
       googleServicesFile: stagingEnv
         ? (process.env.GOOGLE_SERVICES_PLIST_STAGING ?? "./GoogleService-Info-staging.plist")
         : "./GoogleService-Info.plist",
@@ -41,6 +62,21 @@ export default {
       googleServicesFile: stagingEnv
         ? (process.env.GOOGLE_SERVICES_JSON_STAGING ?? "./google-services-staging.json")
         : "./google-services.json",
+      // Email-link sign-in (#67): claim the Firebase Hosting auth handler as an
+      // Android App Link, so a tap in the inbox opens the app instead of a
+      // browser tab. `autoVerify` asks Android to check `assetlinks.json` on
+      // those hosts; until the project's **SHA-256** is registered the check
+      // fails and Android falls back to the link chooser, where the app is
+      // still listed — the flow works either way, it just loses the silent
+      // hand-off until the fingerprint is added (see README §Email link).
+      intentFilters: [
+        {
+          action: "VIEW",
+          autoVerify: true,
+          category: ["BROWSABLE", "DEFAULT"],
+          data: authLinkData,
+        },
+      ],
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#0B0B14",

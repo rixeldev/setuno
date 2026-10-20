@@ -17,12 +17,20 @@ const APP_DIR = join(process.cwd(), "app")
 const APP_GROUP = join(APP_DIR, "(app)")
 const NAV_SOURCE = join(process.cwd(), "libs", "navigation.ts")
 
+/**
+ * Expo Router's own convention files, excluded from the route tree by
+ * `getRoutesCore` (`+html`, `+native-intent`). They are not screens, so the
+ * default-export rule — which exists because Expo Router rejects a *route*
+ * without one — does not apply to them.
+ */
+const CONVENTION_FILES = /[/\\]\+(html|native-intent)\.[tj]sx?$/
+
 const walk = (dir: string): string[] => {
   const entries: string[] = []
   for (const name of readdirSync(dir)) {
     const full = join(dir, name)
     if (statSync(full).isDirectory()) entries.push(...walk(full))
-    else if (/\.(t|j)sx?$/.test(name)) entries.push(full)
+    else if (/\.(t|j)sx?$/.test(name) && !CONVENTION_FILES.test(full)) entries.push(full)
   }
   return entries
 }
@@ -73,4 +81,11 @@ describe("route modules", () => {
       expect(source).toMatch(/export\s+default\b/)
     },
   )
+})
+
+describe("native intent (roadmap #67)", () => {
+  it("declares the system-path hook Expo Router looks for", () => {
+    const source = readFileSync(join(APP_DIR, "+native-intent.tsx"), "utf8")
+    expect(source).toMatch(/export\s+function\s+redirectSystemPath\b/)
+  })
 })

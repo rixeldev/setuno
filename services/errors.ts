@@ -23,6 +23,16 @@ const AUTH_MESSAGES: Record<string, string> = {
   "auth/popup-closed-by-user": "The sign-in window was closed before finishing.",
   "auth/account-exists-with-different-credential":
     "That email is linked to a different sign-in method.",
+  // Email-link sign-in (#67): the one-time code's own failure modes.
+  "auth/invalid-action-code":
+    "That sign-in link has already been used or isn't valid. Ask for a new one.",
+  "auth/expired-action-code": "That sign-in link expired. Ask for a new one.",
+  "auth/missing-action-code": "That sign-in link is incomplete. Ask for a new one.",
+  "auth/user-mismatch":
+    "That link belongs to a different email address than the one signed in here.",
+  "auth/invalid-continue-url": "Sign-in links aren't set up for this build.",
+  "auth/unauthorized-continue-url":
+    "This build's address can't finish a sign-in link. Sign in with your password instead.",
 }
 
 const FIRESTORE_MESSAGES: Record<string, string> = {

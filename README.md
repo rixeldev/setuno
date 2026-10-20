@@ -38,6 +38,7 @@ a sidebar layout on the web.
 - [Architecture](#architecture)
 - [Security rules](#security-rules)
 - [App Check](#app-check)
+- [Email link sign-in](#email-link-sign-in)
 - [Backups](#backups)
 - [Staging](#staging)
 - [Internationalization](#internationalization)
@@ -52,7 +53,7 @@ a sidebar layout on the web.
 
 | Area | What you can do |
 | --- | --- |
-| **Authentication** | Register, sign in (email or Google), sign out, password reset, persistent sessions |
+| **Authentication** | Register, sign in (email, **a one-time email link**, or Google), sign out, password reset, persistent sessions |
 | **Usernames** | Unique, case-insensitive username per account; one rename every 3 months |
 | **Your data, your call** | Take everything Setuno stores about you with you: one JSON export (profile, bands, songs, your personal data) handed to the share sheet or downloaded. Or delete the account for good behind a password or Google re-confirmation — you walk out of every band (a band left with nobody in it goes too; one left without an admin promotes its most senior member), your username is freed and your private data is erased, while the band keeps what it made together |
 | **Bands (organizations)** | Create a band, rename it, set a logo, delete it, switch between bands |
@@ -158,7 +159,8 @@ For Android Google Sign-In, copy `.env.example` to `.env` and set `EXPO_PUBLIC_G
 For **native builds**, also set `EXPO_PUBLIC_WEB_BASE_URL` to the deployed web address (for example
 `https://setuno.vercel.app`): share links point at the public `/share/<token>` page, the browser
 knows its own origin but a phone build does not. Without it the share sheet still opens and
-explains that this build cannot mint a link.
+explains that this build cannot mint a link. The same address is where an emailed sign-in link
+comes back to — see [Email link sign-in](#email-link-sign-in).
 
 Web additionally resolves `@react-native-firebase/*` through Metro shims (see
 [Architecture](#architecture)), so the same code runs unmodified in the browser.
@@ -391,6 +393,45 @@ console (Project settings → App Check → *Manage debug tokens*):
 A device that already passed App Check keeps passing whether the token is rebuilt in or not —
 uninstall the app to reset it. Until the console enrolls anything, `initializeAppCheck` failing is
 harmless by design: the band keeps playing, because monitor mode tolerates unattested traffic.
+
+---
+
+## Email link sign-in
+
+Setuno can sign a member in **without a password**: the app asks Firebase for a one-time link, the
+member opens it, and the code is redeemed on the spot. The flow is one route — `app/email-link.tsx`
+— serving both the request form and the completion.
+
+How the link travels:
+
+- **On a phone** (Android): the mail points at Firebase's own Hosting handler
+  (`<project>.firebaseapp.com/__/auth/links?…`). The app claims that URL as an **Android App Link**
+  (`app.config.js` → `android.intentFilters`, with `autoVerify` and the project's two hosts), and
+  `app/+native-intent.tsx` rewrites it onto the completion route. iOS gets the same declaration
+  through `ios.associatedDomains` (Universal Links) and ships with it.
+- **Everywhere else** (a desktop browser, a phone without the app): the same URL is an ordinary
+  page that hands the one-time code to the **continue URL**, which is the app's own `/email-link`
+  route. The web build finishes the sign-in there.
+
+The continue URL is the live browser origin on web, `EXPO_PUBLIC_WEB_BASE_URL` on a phone build,
+and the project's `authDomain` as a last resort — always an authorized domain, so a build with no
+web address configured can still *send* the link. Set `EXPO_PUBLIC_WEB_BASE_URL` to the deployed
+address anyway: it is also what the share links use.
+
+### Owner step: register the SHA-256
+
+Android only opens a link straight into the app (no chooser) once Firebase can verify the app owns
+the host, and that needs the build's **SHA-256** fingerprint:
+
+1. Firebase Console → **Project settings** → *Your apps* → the Android app → *App integrity*.
+2. Add the SHA-256 of the signing key the build uses (the EAS keystore's, for a release build).
+3. Firebase serves `assetlinks.json` on `<project>.firebaseapp.com` from then on.
+
+Until that is done the link still works — Android shows the link chooser, which still lists the app
+— but it no longer opens silently. Verifying the hand-off on a device needs a **development build**
+(Expo Go cannot open an App Link) and a physical phone.
+
+**No rules, no functions, no deploy.** The feature is entirely client-side.
 
 ---
 

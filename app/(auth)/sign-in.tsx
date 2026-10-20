@@ -44,6 +44,7 @@ export default function SignIn() {
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ defaultValues: { email: "", password: "" } })
 
@@ -139,6 +140,20 @@ export default function SignIn() {
         variant="secondary"
         loading={googleLoading}
         onPress={() => void onGoogle()}
+      />
+
+      {/* Passwordless: opens the send form, carrying whatever address is
+          already typed so the member does not have to type it twice. */}
+      <Button
+        label={t("auth.continueWithEmailLink")}
+        full
+        variant="ghost"
+        onPress={() =>
+          router.push({
+            pathname: "/email-link",
+            params: { email: getValues("email") },
+          })
+        }
       />
     </AuthLayout>
   )

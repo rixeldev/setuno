@@ -16,6 +16,8 @@ import {
   reauthenticateWithPassword,
   requestAccountExport,
   saveAccountExport,
+  sendEmailLinkReauth,
+  takeEmailLinkReauth,
 } from "@/services/accountData"
 import { signOut } from "@/services/auth"
 import { toFriendlyError } from "@/services/errors"
@@ -29,6 +31,13 @@ import { reauthenticateWithGoogle } from "@/services/googleAuth"
  * `deleteMyAccount` callable: the server walks the user out of every band,
  * wipes `users/{uid}` and removes the Auth user, so this card only owns the
  * confirmation flow and the local sign-out that follows it.
+ *
+ * The challenge offers **two** doors for a `password` account (roadmap #67):
+ * the password itself, and an emailed one-time link. The second is not a
+ * nicety — an email-link account carries the `password` provider without ever
+ * having had a password, and would otherwise reach this dialog with no way
+ * out. The link re-proves identity on the device, and the answer is consumed
+ * once (`takeEmailLinkReauth`), so it can never be replayed later.
  */
 export function AccountDataCard() {
   const { t } = useTranslation()
@@ -41,6 +50,10 @@ export function AccountDataCard() {
   const [deleting, setDeleting] = useState(false)
   const [password, setPassword] = useState("")
   const [formError, setFormError] = useState<string | null>(null)
+  const [sendingLink, setSendingLink] = useState(false)
+  const [linkSent, setLinkSent] = useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
+  const [verified, setVerified] = useState(false)
 
   const exportData = async (): Promise<void> => {
     setExporting(true)
@@ -56,18 +69,48 @@ export function AccountDataCard() {
     }
   }
 
+  /**
+   * Opens the dialog and claims the pending emailed challenge, if there is
+   * one. The claim happens here — in the handler, never while rendering — so
+   * the flag is read exactly once and a stale confirmation cannot linger.
+   */
+  const openConfirm = (): void => {
+    setFormError(null)
+    setLinkError(null)
+    setPassword("")
+    setLinkSent(false)
+    setVerified(takeEmailLinkReauth())
+    setConfirming(true)
+  }
+
   const closeConfirm = (): void => {
     if (deleting) return
     setConfirming(false)
     setFormError(null)
+    setLinkError(null)
     setPassword("")
+    setLinkSent(false)
+    setVerified(false)
+  }
+
+  const sendLink = async (): Promise<void> => {
+    setLinkError(null)
+    setSendingLink(true)
+    try {
+      await sendEmailLinkReauth()
+      setLinkSent(true)
+    } catch (error) {
+      setLinkError(toFriendlyError(error, t("settings.deleteAccountEmailLinkFailed")))
+    } finally {
+      setSendingLink(false)
+    }
   }
 
   const confirmDelete = async (): Promise<void> => {
     setFormError(null)
     setDeleting(true)
     try {
-      if (method === "password") {
+      if (method === "password" && !verified) {
         await reauthenticateWithPassword(password)
       } else if (method === "google") {
         const proved = await reauthenticateWithGoogle()
@@ -105,7 +148,7 @@ export function AccountDataCard() {
         label={t("settings.deleteAccount")}
         variant="danger"
         disabled={exporting}
-        onPress={() => setConfirming(true)}
+        onPress={openConfirm}
       />
 
       <Dialog
@@ -119,16 +162,41 @@ export function AccountDataCard() {
         dismissible={!deleting}
         onConfirm={() => void confirmDelete()}
       >
-        {method === "password" ? (
-          <Input
-            label={t("settings.deleteAccountPassword")}
-            secure
-            value={password}
-            onChangeText={setPassword}
-            error={formError}
-            autoComplete="password"
-            textContentType="password"
-          />
+        {verified ? (
+          <View style={styles.dialogBody}>
+            <AppText variant="body" tone="primary">
+              {t("settings.deleteAccountEmailVerified")}
+            </AppText>
+          </View>
+        ) : method === "password" ? (
+          <View style={styles.dialogBody}>
+            <Input
+              label={t("settings.deleteAccountPassword")}
+              secure
+              value={password}
+              onChangeText={setPassword}
+              error={formError}
+              autoComplete="password"
+              textContentType="password"
+            />
+            {linkSent ? (
+              <AppText variant="caption" tone="muted">
+                {t("settings.deleteAccountEmailLinkSent")}
+              </AppText>
+            ) : (
+              <Button
+                label={t("settings.deleteAccountEmailLink")}
+                variant="ghost"
+                loading={sendingLink}
+                onPress={() => void sendLink()}
+              />
+            )}
+            {linkError ? (
+              <AppText variant="caption" tone="danger" accessibilityRole="alert">
+                {linkError}
+              </AppText>
+            ) : null}
+          </View>
         ) : (
           <View style={styles.dialogBody}>
             {method === "google" ? (
