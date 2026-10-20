@@ -4,10 +4,18 @@ rules_version = '2';
  * Setuno — Cloud Storage security rules.
  *
  * Images live under `avatars/{uid}/…` and `organizations/{uid}/…`, where
- * `{uid}` is the uploader (see services/uploads.ts). Files are displayed
- * through their download URL, which carries its own token, so reads only need
- * to stay open to signed-in users. Writes are limited to the uploader's own
- * folder and to real images with a sane size cap.
+ * `{uid}` is the uploader (see services/uploads.ts). Song attachments
+ * (roadmap #40) live under
+ * `organizations/{orgId}/songs/{songId}/attachments/{uid}/…` — PDFs only,
+ * under 10 MB, with the uploader's own uid as the folder (Storage rules
+ * cannot see the band roster, so membership is enforced where it lives: on
+ * the song document's Firestore rules, which gate the list an attachment is
+ * written into). Files are displayed through their download URL, which
+ * carries its own token, so reads only need to stay open to signed-in users.
+ * Writes are limited to the uploader's own folder and to the type/size the
+ * match pins. Objects are never deleted by the app when an entry detaches —
+ * a duplicated song may share one and Storage has no cascade — only a failed
+ * attach rolls back its own fresh object.
  */
 service firebase.storage {
   match /b/{bucket}/o {
@@ -28,6 +36,20 @@ service firebase.storage {
     match /organizations/{uid}/{fileName} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && request.auth.uid == uid && isImage();
+    }
+
+    // Song attachments (roadmap #40): PDFs under the song, foldered by the
+    // uploader's uid so ownership is checkable without Firestore. Create and
+    // update validate the object being written; delete only checks ownership
+    // (a delete has no new object to describe — `request.resource` is what a
+    // write *would* store, and metadata rules belong to the write half).
+    match /organizations/{orgId}/songs/{songId}/attachments/{uid}/{fileName} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.contentType.matches('application/pdf.*')
+        && request.resource.size < 10 * 1024 * 1024;
+      allow delete: if isSignedIn() && request.auth.uid == uid;
     }
 
     // Everything else is closed.

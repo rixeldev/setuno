@@ -79,6 +79,9 @@ const importedSong = (
   tags: draft.tags,
   sections: draft.sections,
   links: draft.links,
+  // The backup deliberately carries no attachments (like attendance/liveShare):
+  // the PDFs live in Storage behind this band, so a restored song starts clean.
+  attachments: [],
   status: draft.status,
   deletedAt: null,
   deletedBy: null,

@@ -13,8 +13,9 @@
  * music and logistics while every collaboration surface stays denied
  * (roadmap #59), the one-field suggestion assignments any member writes
  * (roadmap #58), the song edit-presence dots only their own owner may stamp
- * (roadmap #28) and the opt-in directory plus the join requests that can only
- * ever mint an invitation (roadmap #60).
+ * (roadmap #28), the opt-in directory plus the join requests that can only
+ * ever mint an invitation (roadmap #60) and the attachment list an admin
+ * appends one field at a time (roadmap #40).
  *
  * Run through `firebase emulators:exec --only firestore,storage "pnpm
  * test:integration"`, which starts the emulators, exports their host variables
@@ -172,6 +173,50 @@ describe("songs are written by admins only", () => {
     await assertSucceeds(
       alice().firestore().doc(songPath()).update({ deletedAt: null, deletedBy: null }),
     )
+  })
+
+  // --- attachments (#40): the write-through touches one field and the cap is
+  // pinned where the client cannot reach (rules cannot iterate the list, so
+  // entries themselves are sanitized in libs/songAttachments.ts).
+  const attachment = (id: string) => ({
+    id,
+    kind: "link",
+    name: "Chart",
+    url: "https://example.com/chart.pdf",
+    path: "",
+    size: 0,
+    note: "",
+    uploadedBy: "alice",
+    uploadedByName: "alice",
+    uploadedAt: new Date(),
+  })
+
+  it("lets an admin attach files and links", async () => {
+    await assertSucceeds(
+      alice().firestore().doc(songPath()).update({ attachments: [attachment("att_1")] }),
+    )
+  })
+
+  it("denies a member attaching anything", async () => {
+    await assertFails(
+      bob().firestore().doc(songPath()).update({ attachments: [attachment("att_1")] }),
+    )
+  })
+
+  it("rejects an attachment list past the 20-entry cap", async () => {
+    const oversized = Array.from({ length: 21 }, (_, index) => attachment(`att_${index}`))
+    await assertFails(alice().firestore().doc(songPath()).update({ attachments: oversized }))
+  })
+
+  it("rejects an attachments value that is not a list", async () => {
+    await assertFails(alice().firestore().doc(songPath()).update({ attachments: "chart.pdf" }))
+  })
+
+  it("keeps accepting an unrelated update on a song that carries attachments", async () => {
+    await assertSucceeds(
+      alice().firestore().doc(songPath()).update({ attachments: [attachment("att_1")] }),
+    )
+    await assertSucceeds(alice().firestore().doc(songPath()).update({ status: "retired" }))
   })
 })
 

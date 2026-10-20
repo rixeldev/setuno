@@ -55,6 +55,15 @@ export interface Song {
   sections: SongSection[]
   /** Optional external references (roadmap #16). */
   links: SongLinks
+  /**
+   * Per-song files and links (roadmap #40): a PDF uploaded to Storage or an
+   * arbitrary URL (chart, rehearsal recording), each with its own note.
+   * Absent on older documents, so reads self-heal to `[]` — no migration.
+   * Deliberately **not** on `SongInput`: attachments are written through
+   * `services/songAttachments.ts` (one field at a time), so a lyrics save can
+   * never clobber them and a version restore never touches them.
+   */
+  attachments: SongAttachment[]
   /** Repertoire status (roadmap #30): absent documents read as `active`. */
   status: SongStatus
   /**
@@ -80,6 +89,37 @@ export type SongLinkProvider = "youtube" | "spotify" | "appleMusic"
 export type SongLinks = Record<SongLinkProvider, string>
 
 export const EMPTY_SONG_LINKS: SongLinks = { youtube: "", spotify: "", appleMusic: "" }
+
+/** What an attachment is: a PDF uploaded to Storage, or a plain URL. */
+export type SongAttachmentKind = "file" | "link"
+
+/**
+ * One attachment on a song (roadmap #40). A `file` carries its Storage `path`
+ * (what put it there) plus the tokenized download `url`; a `link` is the URL
+ * the user typed and has no `path`. `note` is the entry's own metadata
+ * ("chart in Bb", "rehearsal take 2"); `uploadedBy`/`uploadedByName`/
+ * `uploadedAt` say who put it on the song (client time — an offline attach
+ * shows immediately, like every other stamp in the app).
+ */
+export interface SongAttachment {
+  /** Stable id, unique within the song's list (removal keys off it). */
+  id: string
+  kind: SongAttachmentKind
+  /** Display label; never empty after sanitizing. */
+  name: string
+  /** https URL: the download URL of a file, or the link itself. */
+  url: string
+  /** Storage path for `file` entries (`""` for links). */
+  path: string
+  /** Size in bytes (0 for links). */
+  size: number
+  /** Optional per-entry note (#40's "notes metadata"). */
+  note: string
+  uploadedBy: string
+  uploadedByName: string
+  /** Null when an older/hand-edited entry never carried a stamp. */
+  uploadedAt: TimestampLike | null
+}
 
 /**
  * Where a song sits in the band's repertoire (roadmap #30). Absence in a

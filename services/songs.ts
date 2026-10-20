@@ -28,6 +28,7 @@ import { countSongChords, countSongLines, clampSectionBars, normalizeSectionLabe
 import { songVersionData } from "@/libs/songHistory"
 import { normalizeSongStatus } from "@/libs/songStatus"
 import { normalizeSongLinks } from "@/libs/songLinks"
+import { sanitizeSongAttachments } from "@/libs/songAttachments"
 import { duplicateSongTitle } from "@/libs/songMerge"
 import { mapSongInput } from "@/libs/songMapper"
 
@@ -41,6 +42,9 @@ const mapSong = (data: Record<string, unknown>, id: string): Song =>
     id,
     organizationId: String(data.organizationId ?? ""),
     ...mapSongInput(data),
+    // Attachments (roadmap #40): absent on older documents, self-healed here —
+    // deliberately outside `SongInput`, so no whole-input save ever writes it.
+    attachments: sanitizeSongAttachments(data.attachments),
     // Trash (roadmap #31): absent or null = live.
     deletedAt: (data.deletedAt as Song["deletedAt"]) ?? null,
     deletedBy: data.deletedBy ? String(data.deletedBy) : null,
@@ -250,6 +254,10 @@ export const duplicateSong = async (
     tags: source.tags,
     sections: source.sections,
     links: source.links,
+    // The copy carries the attachments too (same music → same chart); both
+    // songs reference the same Storage object, which is why detaching never
+    // deletes it (#40).
+    attachments: source.attachments,
     status: source.status,
     createdBy: uid,
     createdByName: author.name,

@@ -446,6 +446,16 @@ export const KeepAwakeIcon = ({ size = 24, color = Theme.colors.text, ...rest }:
   <MaterialCommunityIcons name="sleep-off" size={size} color={color} {...rest} />
 )
 
+/* Attachments (roadmap #40): both glyphs verified against the installed
+   MaterialCommunityIcons glyphmap. */
+export const PaperclipIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="paperclip" size={size} color={color} {...rest} />
+)
+
+export const FilePdfIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="file-pdf-box" size={size} color={color} {...rest} />
+)
+
 export const MusicIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
   <Ionicons name="musical-notes" size={size} color={color} {...rest} />
 )

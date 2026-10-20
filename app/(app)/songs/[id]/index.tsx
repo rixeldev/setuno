@@ -48,6 +48,7 @@ import { PageHeader } from "@/components/ui/PageHeader"
 import { TourHint } from "@/components/onboarding/TourHint"
 import { SongContent } from "@/components/songs/SongContent"
 import { SongLinks } from "@/components/songs/SongLinks"
+import { SongAttachments } from "@/components/songs/SongAttachments"
 import { ChordShapeSheet } from "@/components/songs/ChordShapeSheet"
 import { SongControls } from "@/components/songs/SongControls"
 import { AutoscrollBar } from "@/components/songs/AutoscrollBar"
@@ -1128,6 +1129,8 @@ export default function SongScreen() {
           ) : null}
 
           <SongLinks links={song.links} />
+
+          <SongAttachments attachments={song.attachments} />
 
           {lyrics}
 

@@ -651,14 +651,24 @@ service cloud.firestore {
           && request.resource.data.title is string
           && request.resource.data.title.size() > 0
           && request.resource.data.title.size() <= 140
-          && request.resource.data.sections is list;
+          && request.resource.data.sections is list
+          // #40: attachments ride the same cap everywhere; `get()` keeps the
+          // pin silent on documents written before the feature (absent → []).
+          && request.resource.data.get('attachments', []) is list
+          && request.resource.data.get('attachments', []).size() <= 20;
         allow update: if isAdmin(organizationId)
           && request.resource.data.organizationId == organizationId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'title', 'artist', 'key', 'originalKey', 'capo', 'bpm', 'durationSec',
-            'genre', 'notes', 'tags', 'sections', 'links', 'status',
+            'genre', 'notes', 'tags', 'sections', 'links', 'status', 'attachments',
             'deletedAt', 'deletedBy', 'authorId', 'authorName', 'updatedAt'
-          ]);
+          ])
+          // #40: the list is capped (rules cannot iterate it — its entries are
+          // sanitized client-side in `libs/songAttachments.ts`, the `markers`
+          // precedent). A partial update that never touches the field reads
+          // the stored value (or the [] default) and sails through.
+          && request.resource.data.get('attachments', []) is list
+          && request.resource.data.get('attachments', []).size() <= 20;
         allow delete: if isAdmin(organizationId);
 
         // The song's version history (roadmap #26): one immutable document

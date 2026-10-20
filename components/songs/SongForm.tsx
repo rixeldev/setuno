@@ -18,6 +18,7 @@ import { AppBackground } from "@/components/app/AppBackground"
 import { DiscardChangesDialog } from "@/components/app/DiscardChangesDialog"
 import { SongRow } from "@/components/app/SongRow"
 import { SongEditor } from "@/components/songs/editor/SongEditor"
+import { AttachmentsEditor } from "@/components/songs/AttachmentsEditor"
 import {
   AppleMusicIcon,
   ChevronDownIcon,
@@ -148,7 +149,8 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, 
           song.notes ||
           song.links.youtube ||
           song.links.spotify ||
-          song.links.appleMusic),
+          song.links.appleMusic ||
+          song.attachments.length > 0),
     ),
   )
 
@@ -635,6 +637,9 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, 
                   icon={<AppleMusicIcon size={16} color={Theme.colors.textFaint} />}
                 />
               </View>
+              {/* Roadmap #40: files/links attach on their own clock — they are
+                  not part of the lyrics draft this form saves. */}
+              {song ? <AttachmentsEditor song={song} /> : null}
             </View>
           ) : null}
         </Card>

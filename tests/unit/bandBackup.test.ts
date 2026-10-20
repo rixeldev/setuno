@@ -46,6 +46,7 @@ const song = (id: string, title: string, artist = ""): Song => ({
   sections: [],
   links: EMPTY_SONG_LINKS,
   status: "active",
+  attachments: [],
   deletedAt: null,
   deletedBy: null,
   createdBy: "uid-1",

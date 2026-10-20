@@ -39,6 +39,7 @@ const song = (id: string, patch: Partial<Song> = {}): Song => ({
   sections: [],
   links: EMPTY_SONG_LINKS,
   status: "active",
+  attachments: [],
   deletedAt: null,
   deletedBy: null,
   createdBy: "uid",
