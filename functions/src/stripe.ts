@@ -111,7 +111,9 @@ export interface StripeOffer {
  * What the two plans cost, read from Stripe.
  *
  * The web build shows the same prices the mobile one does, and the two never
- * drift because both come from the store itself.
+ * drift because both come from the store itself. The amount is returned both
+ * as the store's smallest unit and as a formatted string, so the app can show
+ * the price with its own currency formatting.
  */
 export const stripeOffers = async (config: StripeConfig): Promise<StripeOffer[]> => {
   const offers: StripeOffer[] = []
@@ -122,17 +124,40 @@ export const stripeOffers = async (config: StripeConfig): Promise<StripeOffer[]>
       currency?: string
       unit_amount_decimal?: string
     }
+    const currency = (price.currency ?? "usd").toUpperCase()
+    const amount = price.unit_amount ?? 0
     offers.push({
       plan,
       priceId,
-      amount: price.unit_amount ?? 0,
-      currency: price.currency ?? "eur",
-      display:
-        price.unit_amount_decimal ??
-        ((price.unit_amount ?? 0) / 100).toFixed(2),
+      amount,
+      currency,
+      display: formatPrice(amount, currency, price.unit_amount_decimal),
     })
   }
   return offers
+}
+
+/**
+ * A price as money: "$3.99".
+ *
+ * The store's decimal form wins when it has one (a currency with no decimals
+ * would come out as "300" otherwise), and the currency is always shown — a
+ * bare number in a price the member is about to pay for is a bug waiting to
+ * happen.
+ */
+export const formatPrice = (
+  amount: number,
+  currency: string,
+  decimal?: string,
+): string => {
+  const value = decimal !== undefined && decimal !== "" ? Number(decimal) : amount / 100
+  if (!Number.isFinite(value)) return `${amount} ${currency}`
+  try {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(value)
+  } catch {
+    // An unknown currency code must not break the price.
+    return `${value.toFixed(2)} ${currency}`
+  }
 }
 
 /** A Checkout session the member can pay in. */
