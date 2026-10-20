@@ -1,35 +1,92 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 import type { PlanPurchaseApi, PlanProduct } from "@/hooks/usePlanPurchase"
+import {
+  fetchEntitlement,
+  fetchPlanOffers,
+  openBillingPortal,
+  startCheckout,
+} from "@/services/entitlements"
 
 /**
  * The store's side of the Pro plan — **web** (roadmap #61).
  *
- * There is no store to talk to in a browser, so the whole API is a no-op: the
- * catalogue is empty (the screen says the plan is not offered here) and the
- * purchase does nothing. The twin file is what keeps `expo-iap` — a native
- * only module — out of the web bundle.
+ * The web buys from **Stripe Checkout**: Play Billing has no web
+ * implementation, so the native file talks to `expo-iap` and this one talks to
+ * the same callables the webhook settles the entitlement with. Either way the
+ * plan ends up in the **same** document, so it belongs to the account and not
+ * to the device.
+ *
+ * The twin file is what keeps `expo-iap` — a native only module — out of the
+ * web bundle.
  */
 export const usePlanPurchase = (options: {
+  /** Called once the server has confirmed the purchase. */
   onPurchased: (productId: string) => void
+  /** Called when the store or the server refuses. */
   onError: (message: string) => void
 }): PlanPurchaseApi => {
-  const [products] = useState<PlanProduct[]>([])
+  const [products, setProducts] = useState<PlanProduct[]>([])
 
-  const buy = useCallback(async (): Promise<void> => {
-    options.onError("store-unavailable")
-  }, [options])
+  // The catalogue decides whether the plan can be bought here at all: until
+  // the prices exist, the screen says so instead of offering a button that
+  // cannot work.
+  useEffect(() => {
+    let cancelled = false
+    void fetchPlanOffers()
+      .then((offers) => {
+        if (cancelled) return
+        setProducts(
+          offers.map((offer) => ({ id: offer.plan, price: offer.display })),
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setProducts([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
-  const restore = useCallback(
-    async (): Promise<{ productId: string; purchaseToken: string }[]> => [],
-    [],
+  const buy = useCallback(
+    async (productId: string): Promise<void> => {
+      try {
+        const url = await startCheckout(productId as "monthly" | "annual")
+        // Stripe's Checkout is a hosted page: the browser goes there, pays and
+        // comes back. The entitlement is written by the webhook meanwhile.
+        if (typeof window !== "undefined") window.location.href = url
+      } catch {
+        options.onError("purchase-failed")
+      }
+    },
+    [options],
   )
 
+  const restore = useCallback(async (): Promise<{ productId: string; purchaseToken: string }[]> => {
+    // Stripe is the source of truth and the webhook has already settled the
+    // entitlement; asking the server again is all a "restore" has to do.
+    try {
+      await fetchEntitlement()
+    } catch {
+      // Nothing to restore (or the store is unreachable) — the screen says so.
+    }
+    return []
+  }, [])
+
+  const manage = useCallback(async (): Promise<void> => {
+    try {
+      const url = await openBillingPortal()
+      if (typeof window !== "undefined") window.location.href = url
+    } catch {
+      options.onError("store-unavailable")
+    }
+  }, [options])
+
   return {
-    connected: false,
+    connected: products.length > 0,
     products,
     buy,
     restore,
-    manage: async () => undefined,
+    manage,
   }
 }

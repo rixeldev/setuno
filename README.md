@@ -569,20 +569,40 @@ entitlement written. The client has no way to write it — the security rules al
 | The document | `users/{uid}/entitlements/pro`, server-written only |
 | The app | `hooks/useEntitlement.ts`, `hooks/usePlanPurchase.ts` (+ its `.web.ts` twin) and the plan screen in Settings |
 
-### What is in place, and what is left
+### The web buys the plan from Stripe
 
-The plan is **live in the store**: the subscription `setuno_pro` with the base plans **`monthly`**
-(`P1M`, 7 days of grace) and **`annual`** (`P1Y`, 14 days of grace), both auto-renewing and
-re-subscribable, priced in 174 regions, with the listing in English, Spanish, Brazilian Portuguese
-and French. The server side is done too: the credential lives in **Secret Manager**
-(`PLAY_SERVICE_ACCOUNT_JSON`), the callable is bound to it, and the *Google Play Android Developer
-API* is enabled on the project — without that one Google answers `403` and no purchase can ever be
-confirmed.
+The mobile build buys the plan from **Google Play**; the web build buys the same plan from **Stripe
+Checkout**, because Play Billing has no web implementation. Both paths write the **same** entitlement
+document, so the plan belongs to the account and not to the device: buy it on Android and the web is
+Pro too.
 
-**What is left** is a real purchase with a **license tester** account (Play Console → *Testing* →
-*License testers*): the app asks the store for the sku, Google returns the token, the callable
-confirms it with Google and writes the entitlement. A tip would be a separate one-time product
-(`setuno_tip`) — the backend already knows how to confirm and consume one.
+How it works:
+
+- `hooks/usePlanPurchase.ts` (native) talks to `expo-iap`; `hooks/usePlanPurchase.web.ts` (web) talks
+  to the same callables the webhook settles the entitlement with. The seam keeps `expo-iap` — a
+  native-only module — out of the web bundle.
+- The server's half is `functions/src/stripe.ts`: Stripe's REST API is called with a plain `fetch` (no
+  SDK), the **webhook signature is verified against the raw body** (with a replay guard), and the
+  member's uid comes from the **metadata Stripe stored with the subscription**, never from the
+  browser.
+- The configuration — the API key, the webhook signing secret, the two price ids and the web origin
+  — is one JSON blob in **Secret Manager** (`STRIPE_CONFIG`).
+
+**Owner steps** (in the Stripe dashboard):
+
+1. **The prices** — two recurring prices with the same amounts as the Play plans, and note their
+   price ids (`price_…`).
+2. **The API key** — a secret key (`sk_test_…` for the test mode, `sk_live_…` for the real one).
+3. **The webhook endpoint** — point it at
+   `https://us-central1-setuno-be01d.cloudfunctions.net/stripeWebhook` and subscribe it to
+   `checkout.session.completed`, `customer.subscription.created`,
+   `customer.subscription.updated` and `customer.subscription.deleted`; the endpoint's **signing
+   secret** (`whsec_…`) is the fourth value.
+4. **The billing portal** — enable it in Stripe's *Settings → Billing → Portal* (a member cancels
+   and changes their card there).
+
+All four values go into the secret, and the agent publishes it:
+`firebase functions:secrets:set STRIPE_CONFIG` (one JSON blob) and `pnpm deploy:functions`.
 
 Without the service account the callable refuses every purchase: a missing credential must never
 fall back to "probably fine". Until the products exist, the plan screen says the plan is not

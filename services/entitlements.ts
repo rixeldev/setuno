@@ -107,3 +107,47 @@ export const fetchEntitlement = async (): Promise<PlanState> => {
   const now = new Date().toISOString().slice(0, 10)
   return toPlanState(mapEntitlement(response.data, now))
 }
+
+/** One of the two plans, with what the store charges for it. */
+export interface PlanOffer {
+  plan: "monthly" | "annual"
+  priceId: string
+  /** The amount, in the currency's smallest unit. */
+  amount: number
+  currency: string
+  /** The formatted price, as the store writes it ("€40.29"). */
+  display: string
+}
+
+/**
+ * The two plans and their prices — the **web** half of the plan (roadmap #61).
+ *
+ * The web buys from Stripe (Play Billing has no web implementation), so the
+ * prices come from Stripe's own catalogue: the number the member sees is the
+ * number Stripe charges.
+ */
+export const fetchPlanOffers = async (): Promise<PlanOffer[]> => {
+  const call = httpsCallable<Record<string, never>, { offers: PlanOffer[] }>(
+    getFunctions(),
+    "getPlanOffers",
+  )
+  const response = await call({})
+  return response.data.offers ?? []
+}
+
+/** Opens Stripe's Checkout for a plan and returns the URL to send the member to. */
+export const startCheckout = async (plan: "monthly" | "annual"): Promise<string> => {
+  const call = httpsCallable<{ plan: string }, { url: string }>(getFunctions(), "startCheckout")
+  const response = await call({ plan })
+  return response.data.url
+}
+
+/** Opens Stripe's billing portal (cancel, change the card). */
+export const openBillingPortal = async (): Promise<string> => {
+  const call = httpsCallable<Record<string, never>, { url: string }>(
+    getFunctions(),
+    "openBillingPortal",
+  )
+  const response = await call({})
+  return response.data.url
+}

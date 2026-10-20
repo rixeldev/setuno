@@ -9,7 +9,7 @@ import {
   onDocumentUpdated,
   onDocumentUpdatedWithAuthContext,
 } from "firebase-functions/v2/firestore"
-import { HttpsError, onCall } from "firebase-functions/v2/https"
+import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https"
 import { defineSecret } from "firebase-functions/params"
 import { onSchedule } from "firebase-functions/v2/scheduler"
 
@@ -54,6 +54,16 @@ import {
   verifyPlayPurchase,
   type ServiceAccount,
 } from "./playBilling"
+import {
+  createBillingPortalSession,
+  createCheckoutSession,
+  stripeApi,
+  stripeConfigFromEnv,
+  stripeOffers,
+  subscriptionFromStripe,
+  verifyStripeSignature,
+  type StripeConfig,
+} from "./stripe"
 
 initializeApp()
 
@@ -66,6 +76,16 @@ initializeApp()
  * the fallback (the emulator reads it from the local `.env`).
  */
 const playServiceAccount = defineSecret("PLAY_SERVICE_ACCOUNT_JSON")
+
+/**
+ * Stripe's configuration (the **web** half of the plan, roadmap #61).
+ *
+ * The mobile build buys from Google Play; the web build buys from Stripe
+ * Checkout, because Play Billing has no web implementation. Both write the
+ * **same** entitlement document, so the plan belongs to the account and not to
+ * the device.
+ */
+const stripeSecret = defineSecret("STRIPE_CONFIG")
 
 /** The credential, from the secret first and the environment after. */
 const resolveServiceAccount = async (): Promise<ServiceAccount | null> => {
@@ -80,6 +100,20 @@ const resolveServiceAccount = async (): Promise<ServiceAccount | null> => {
     // still carry it.
   }
   return serviceAccountFromEnv()
+}
+
+/** Stripe's configuration, from the secret first and the environment after. */
+const resolveStripeConfig = async (): Promise<StripeConfig | null> => {
+  try {
+    const value = await stripeSecret.value()
+    if (value) {
+      const fromSecret = stripeConfigFromEnv(value)
+      if (fromSecret) return fromSecret
+    }
+  } catch {
+    // Not bound here — the environment may still carry it.
+  }
+  return stripeConfigFromEnv(process.env.STRIPE_CONFIG)
 }
 
 /**
@@ -777,3 +811,174 @@ export const syncProPurchase = onCall({ secrets: [playServiceAccount] }, async (
   })
   return entitlement
 })
+
+/**
+ * The two plans and what they cost (the **web** half of the plan, roadmap #61).
+ *
+ * The prices come from Stripe itself, so the web build never shows a number
+ * the store does not charge.
+ */
+export const getPlanOffers = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to see the plans")
+  const config = await resolveStripeConfig()
+  if (!config) throw new HttpsError("failed-precondition", "The store is not configured yet")
+  try {
+    return { offers: await stripeOffers(config) }
+  } catch (error) {
+    logger.error("getPlanOffers could not read the catalogue", { error: String(error) })
+    throw new HttpsError("internal", "The store could not be reached")
+  }
+})
+
+/**
+ * Opens Stripe's Checkout for a plan.
+ *
+ * The member's uid travels inside the session's metadata, so the webhook can
+ * tell whose purchase it is **without trusting the browser** ✓. The client
+ * never says who it is.
+ */
+export const startCheckout = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to buy the plan")
+  const uid = request.auth.uid
+  const data = readCallInput(request.data)
+  const plan = data.plan === "annual" ? "annual" : data.plan === "monthly" ? "monthly" : null
+  if (!plan) throw new HttpsError("invalid-argument", "Unknown plan")
+
+  const config = await resolveStripeConfig()
+  if (!config) throw new HttpsError("failed-precondition", "The store is not configured yet")
+  const origin = config.webOrigin ?? "https://setuno.vercel.app"
+  try {
+    const session = await createCheckoutSession({
+      config,
+      uid,
+      email: request.auth.token.email ?? "",
+      plan,
+      successUrl: `${origin}/settings/plan?checkout=success`,
+      cancelUrl: `${origin}/settings/plan?checkout=cancelled`,
+    })
+    return { url: session.url }
+  } catch (error) {
+    logger.error("startCheckout could not open the session", { uid, plan, error: String(error) })
+    throw new HttpsError("internal", "The store could not be reached")
+  }
+})
+
+/**
+ * Opens Stripe's billing portal, where a member cancels or changes their
+ * card — the same contract as the native "Manage subscription" ✓.
+ */
+export const openBillingPortal = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to manage your plan")
+  const uid = request.auth.uid
+  const config = await resolveStripeConfig()
+  if (!config) throw new HttpsError("failed-precondition", "The store is not configured yet")
+
+  const snapshot = await getFirestore().doc(`users/${uid}/entitlements/pro`).get()
+  const customerId = String(snapshot.data()?.customerId ?? "")
+  if (customerId.length === 0) {
+    throw new HttpsError("failed-precondition", "There is no subscription to manage")
+  }
+  const origin = config.webOrigin ?? "https://setuno.vercel.app"
+  try {
+    const session = await createBillingPortalSession({
+      config,
+      customerId,
+      returnUrl: `${origin}/settings/plan`,
+    })
+    return { url: session.url }
+  } catch (error) {
+    logger.error("openBillingPortal could not open the portal", { uid, error: String(error) })
+    throw new HttpsError("internal", "The store could not be reached")
+  }
+})
+
+/**
+ * Stripe's webhook (the **web** half of the plan, roadmap #61).
+ *
+ * Stripe tells the server what happened; the server decides what that means
+ * for the entitlement. The signature is checked against the **raw body**
+ * (Stripe's HMAC covers the exact bytes it sent) and a stale timestamp is
+ * refused, so a captured webhook cannot be replayed months later.
+ *
+ * The member's uid comes from the metadata Stripe stored with the
+ * subscription — never from the browser — and a purchase without it grants
+ * nothing at all.
+ */
+export const stripeWebhook = onRequest({ secrets: [stripeSecret] }, async (req, res) => {
+  const config = await resolveStripeConfig()
+  if (!config) {
+    res.status(500).send("The store is not configured")
+    return
+  }
+  const payload = req.rawBody ? req.rawBody.toString("utf8") : ""
+  const header = req.headers["stripe-signature"]
+  const signature = Array.isArray(header) ? header[0] : (header ?? null)
+  if (!verifyStripeSignature({ payload, header: signature, secret: config.webhookSecret })) {
+    res.status(400).send("Bad signature")
+    return
+  }
+
+  const event = req.body as { type?: string; data?: { object?: Record<string, unknown> } }
+  const object = event.data?.object ?? {}
+  const type = event.type ?? ""
+
+  try {
+    if (type === "checkout.session.completed") {
+      // The session carries the subscription; the subscription carries the
+      // metadata that says whose it is.
+      const subscriptionId = String(object.subscription ?? "")
+      if (subscriptionId.length > 0) {
+        const subscription = (await stripeApi(config, `subscriptions/${subscriptionId}`, {})) as Record<
+          string,
+          unknown
+        >
+        await settleStripeSubscription(config, subscription)
+      }
+    } else if (
+      type === "customer.subscription.created" ||
+      type === "customer.subscription.updated" ||
+      type === "customer.subscription.deleted"
+    ) {
+      await settleStripeSubscription(config, object)
+    }
+  } catch (error) {
+    logger.error("stripeWebhook could not settle the subscription", { type, error: String(error) })
+    res.status(500).send("Could not settle the subscription")
+    return
+  }
+
+  res.status(200).send("ok")
+})
+
+/** Turns a Stripe subscription into the entitlement it means. */
+const settleStripeSubscription = async (
+  config: StripeConfig,
+  subscription: Record<string, unknown>,
+): Promise<void> => {
+  const parsed = subscriptionFromStripe(subscription)
+  if (!parsed) {
+    // A subscription without our metadata is not ours: it grants nothing.
+    logger.warn("stripeWebhook ignored a subscription without our metadata", {
+      id: String(subscription.id ?? ""),
+    })
+    return
+  }
+  const now = new Date().toISOString().slice(0, 10)
+  const entitlement: Entitlement = {
+    plan: parsed.active ? "pro" : "free",
+    productId: String(subscription.id ?? ""),
+    source: "stripe",
+    expiresAt: parsed.expiresAt,
+    updatedAt: now,
+    customerId: parsed.customerId,
+    subscriptionId: parsed.subscriptionId,
+  }
+  await getFirestore()
+    .doc(`users/${parsed.uid}/entitlements/pro`)
+    .set(entitlement, { merge: true })
+  logger.info("stripeWebhook settled an entitlement", {
+    uid: parsed.uid,
+    plan: entitlement.plan,
+    active: parsed.active,
+  })
+}

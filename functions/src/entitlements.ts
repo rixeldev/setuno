@@ -14,7 +14,7 @@
 export type PlanId = "free" | "pro"
 
 /** Where the purchase came from. */
-export type EntitlementSource = "play" | "appstore" | "tip"
+export type EntitlementSource = "play" | "appstore" | "tip" | "stripe"
 
 /**
  * The product ids the stores use. They are the contract between the app, the
@@ -75,6 +75,10 @@ export interface Entitlement {
   expiresAt: string | null
   /** When the entitlement was last refreshed (ISO date). */
   updatedAt: string
+  /** The store's customer id, when the store has one (Stripe). */
+  customerId?: string
+  /** The store's subscription id, when the store has one (Stripe). */
+  subscriptionId?: string
 }
 
 /** The entitlement every account has before it buys anything. */
@@ -116,5 +120,15 @@ export const mapEntitlement = (data: unknown, now: string): Entitlement => {
     typeof raw.updatedAt === "string" && /^\d{4}-\d{2}-\d{2}/.test(raw.updatedAt)
       ? raw.updatedAt.slice(0, 10)
       : now
-  return { plan, productId, source, expiresAt, updatedAt }
+  const customerId = typeof raw.customerId === "string" ? raw.customerId : undefined
+  const subscriptionId = typeof raw.subscriptionId === "string" ? raw.subscriptionId : undefined
+  return {
+    plan,
+    productId,
+    source,
+    expiresAt,
+    updatedAt,
+    ...(customerId ? { customerId } : {}),
+    ...(subscriptionId ? { subscriptionId } : {}),
+  }
 }
