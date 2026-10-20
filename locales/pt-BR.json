@@ -125,6 +125,8 @@
     "welcomeSubtitle": "O repertório, as listas e os eventos da sua banda em um só lugar.",
     "signIn": "Entrar",
     "continueWithGoogle": "Continuar com Google",
+    "continueWithApple": "Continuar com a Apple",
+    "couldNotSignInApple": "Não conseguimos entrar com a Apple. Tente de novo.",
     "continueWithEmailLink": "Continuar com link por e-mail",
     "signUp": "Criar conta",
     "email": "E-mail",

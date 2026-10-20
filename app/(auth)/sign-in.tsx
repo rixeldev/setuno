@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import { Link, useRouter } from "expo-router"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -12,6 +12,7 @@ import { MailIcon, LockIcon } from "@/components/ui/Icons"
 import { Theme } from "@/constants/Theme"
 import { useAuth } from "@/hooks/useAuth"
 import { toFriendlyError } from "@/services/errors"
+import { isAppleSignInAvailable } from "@/services/appleAuth"
 import { validateEmail, validatePassword } from "@/libs/validation"
 
 interface FormValues {
@@ -23,9 +24,38 @@ interface FormValues {
 export default function SignIn() {
   const router = useRouter()
   const { t } = useTranslation()
-  const { signIn, signInWithGoogle } = useAuth()
+  const { signIn, signInWithGoogle, signInWithApple } = useAuth()
   const [formError, setFormError] = useState<string | null>(null)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [appleLoading, setAppleLoading] = useState(false)
+  // Apple's button only exists where the platform can show it (iOS). The web
+  // keeps its own flows, and Android has no native Apple sheet (roadmap #66).
+  const [appleAvailable, setAppleAvailable] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    void isAppleSignInAvailable()
+      .then((available) => {
+        if (active) setAppleAvailable(available)
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const onApple = async () => {
+    setFormError(null)
+    setAppleLoading(true)
+    try {
+      const completed = await signInWithApple()
+      if (completed) router.replace("/")
+    } catch (error) {
+      setFormError(toFriendlyError(error, t("auth.couldNotSignInApple")))
+    } finally {
+      setAppleLoading(false)
+    }
+  }
 
   const onGoogle = async () => {
     setFormError(null)
@@ -141,6 +171,16 @@ export default function SignIn() {
         loading={googleLoading}
         onPress={() => void onGoogle()}
       />
+
+      {appleAvailable ? (
+        <Button
+          label={t("auth.continueWithApple")}
+          full
+          variant="secondary"
+          loading={appleLoading}
+          onPress={() => void onApple()}
+        />
+      ) : null}
 
       {/* Passwordless: opens the send form, carrying whatever address is
           already typed so the member does not have to type it twice. */}

@@ -627,6 +627,21 @@ that it happened. A tip never touches the plan, so a member who already has Pro 
 **Owner step**: create the one-time product `setuno_tip` in the Play Console with a fixed price (a
 store never takes a custom amount) and pick the amount.
 
+### Sign in with Apple
+
+The sign-in screen offers **"Continue with Apple"** wherever the platform can show Apple's sheet
+(iOS; the web keeps its email and Google flows). The flow is the same shape as Google's: Apple's
+identity token is exchanged for a Firebase credential and the session is identical to any other.
+
+Two details only Apple has, and both are handled: the member's **name** travels only with the
+*first* authorization, so it goes straight into the credential and the profile is written with it
+(never to be asked for again), and the **email** may be a *private relay* address — a real one
+(Apple forwards it), used as the account's address.
+
+**Owner steps**: enable the **Apple** provider in the Firebase console and turn the "Sign in with
+Apple" capability on in the EAS project; the flow can only be exercised on a real iPhone, and iOS
+does not build yet.
+
 Without the service account the callable refuses every purchase: a missing credential must never
 fall back to "probably fine". Until the products exist, the plan screen says the plan is not
 offered in this build yet rather than offering a button that cannot work.

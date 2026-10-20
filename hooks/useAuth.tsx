@@ -11,6 +11,7 @@ import {
   subscribeAuthState,
 } from "@/services/auth"
 import { ensureUserProfile, subscribeUserProfile, updateUserProfile } from "@/services/users"
+import { signInWithApple as appleSignIn } from "@/services/appleAuth"
 import type { UserProfile, UserProfileUpdate } from "@/interfaces"
 
 export type AuthStatus = "initializing" | "signed-out" | "signed-in"
@@ -22,6 +23,8 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>
   /** Google sign-in. Resolves `false` when the user dismissed the picker. */
   signInWithGoogle: () => Promise<boolean>
+  /** Sign in with Apple (roadmap #66). Resolves `false` when the platform has no Apple button. */
+  signInWithApple: () => Promise<boolean>
   signUp: (input: { email: string; password: string; displayName: string }) => Promise<void>
   signOut: () => Promise<void>
   sendPasswordReset: (email: string) => Promise<void>
@@ -77,6 +80,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = useCallback(async (): Promise<boolean> => googleSignIn(), [])
 
+  const signInWithApple = useCallback(async (): Promise<boolean> => appleSignIn(), [])
+
   const signUp = useCallback(
     async (input: { email: string; password: string; displayName: string }) => {
       await registerWithEmail(input)
@@ -117,13 +122,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile,
       signIn,
       signInWithGoogle,
+      signInWithApple,
       signUp,
       signOut,
       sendPasswordReset: sendReset,
       updateProfile,
       refreshProfile,
     }),
-    [status, user, profile, signIn, signInWithGoogle, signUp, signOut, sendReset, updateProfile, refreshProfile],
+    [status, user, profile, signIn, signInWithGoogle, signInWithApple, signUp, signOut, sendReset, updateProfile, refreshProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

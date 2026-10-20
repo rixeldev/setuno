@@ -125,6 +125,8 @@
     "welcomeSubtitle": "Your band's songbook, setlists and events in one place.",
     "signIn": "Sign in",
     "continueWithGoogle": "Continue with Google",
+    "continueWithApple": "Continue with Apple",
+    "couldNotSignInApple": "We couldn't sign you in with Apple. Please try again.",
     "continueWithEmailLink": "Continue with email link",
     "signUp": "Create account",
     "email": "Email",

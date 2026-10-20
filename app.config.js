@@ -59,6 +59,13 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: appLinks.bundleId,
+      // "Sign in with Apple" (roadmap #66): the entitlement Apple's button
+      // needs. The EAS project also needs the capability turned on, and iOS
+      // does not build yet — this is here so the day it does, the entitlement
+      // is already there.
+      entitlements: {
+        "com.apple.developer.applesignin": ["Default"],
+      },
       // Inert while iOS is not in `platforms` below, and the exact twin of the
       // Android intent filter: Universal Links are what make an emailed
       // sign-in link open the app on an iPhone (#67) and a link to a song

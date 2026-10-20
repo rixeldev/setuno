@@ -125,6 +125,8 @@
     "welcomeSubtitle": "Le répertoire, les listes et les événements de votre groupe au même endroit.",
     "signIn": "Se connecter",
     "continueWithGoogle": "Continuer avec Google",
+    "continueWithApple": "Continuer avec Apple",
+    "couldNotSignInApple": "Nous n'avons pas pu vous connecter avec Apple. Réessayez.",
     "continueWithEmailLink": "Continuer avec un lien par e-mail",
     "signUp": "Créer un compte",
     "email": "E-mail",
