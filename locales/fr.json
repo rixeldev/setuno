@@ -1284,6 +1284,13 @@
     "liveEndedBadge": "DERNIER MORCEAU",
     "liveEndedCaption": "Le concert semble terminé — voici comment la soirée s'est passée."
   },
+  "deepLinks": {
+    "copyLink": "Copier le lien",
+    "copyHint": "Ouvre l'app si elle est installée",
+    "copied": "Lien vers {{title}} copié.",
+    "notConfigured": "Cette build n'a pas d'adresse web pour construire le lien.",
+    "copyA11y": "Copier le lien vers {{title}}"
+  },
   "liveShow": {
     "title": "Concert en cours",
     "start": "Lancer le concert",

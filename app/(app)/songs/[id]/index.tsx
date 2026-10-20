@@ -30,6 +30,7 @@ import {
   FullscreenExitIcon,
   KeepAwakeIcon,
   LibraryIcon,
+  LinkIcon,
   MusicIcon,
   NoteIcon,
   PauseIcon,
@@ -87,6 +88,7 @@ import { useReaderKeys } from "@/hooks/useReaderKeys"
 import { useAnnotations } from "@/hooks/useAnnotations"
 import { useFavorites } from "@/hooks/useFavorites"
 import { usePaletteCommands } from "@/hooks/usePaletteCommands"
+import { useCopyDeepLink } from "@/hooks/useCopyDeepLink"
 import { duplicateSong, subscribeSong, trashSong } from "@/services/songs"
 import { mergeSongs } from "@/services/songMerge"
 import { setShareLive } from "@/services/shares"
@@ -143,6 +145,7 @@ export default function SongScreen() {
   const { t } = useTranslation()
   const router = useRouter()
   const toast = useToast()
+  const copyDeepLink = useCopyDeepLink()
   const { gutter, isMobile } = useResponsive()
   const params = useLocalSearchParams<{ id?: string; setlist?: string; tour?: string }>()
   const songId = params.id ?? null
@@ -1266,6 +1269,20 @@ export default function SongScreen() {
                 <ShareIcon size={15} color={Theme.colors.textMuted} />
                 <AppText variant="caption" tone="muted">
                   {t("shares.title")}
+                </AppText>
+              </Pressable>
+
+              {/* The band's own link to this song (#76): opens the app when it
+                  is installed, the web app when it is not. */}
+              <Pressable
+                onPress={() => void copyDeepLink("song", song.id, song.title)}
+                accessibilityRole="button"
+                accessibilityLabel={t("deepLinks.copyA11y", { title: song.title })}
+                style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
+              >
+                <LinkIcon size={15} color={Theme.colors.textMuted} />
+                <AppText variant="caption" tone="muted">
+                  {t("deepLinks.copyLink")}
                 </AppText>
               </Pressable>
 

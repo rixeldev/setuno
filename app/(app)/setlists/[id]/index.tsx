@@ -23,6 +23,7 @@ import { ShareSheet } from "@/components/shares/ShareSheet"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
+import { useCopyDeepLink } from "@/hooks/useCopyDeepLink"
 import {
   deleteSetlist,
   duplicateSetlist,
@@ -80,6 +81,7 @@ export default function SetlistDetail() {
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
   const toast = useToast()
+  const copyDeepLink = useCopyDeepLink()
   const params = useLocalSearchParams<{ id?: string }>()
   const setlistId = params.id ?? null
 
@@ -849,6 +851,16 @@ export default function SetlistDetail() {
           onPress={() => {
             setMenuOpen(false)
             setShareOpen(true)
+          }}
+        />
+        {/* The band's own link to this setlist (#76): opens the app when it is
+            installed, the web app when it is not. */}
+        <SheetOptionRow
+          label={t("deepLinks.copyLink")}
+          hint={t("deepLinks.copyHint")}
+          onPress={() => {
+            setMenuOpen(false)
+            void copyDeepLink("setlist", setlist.id, setlist.name)
           }}
         />
         <SheetOptionRow

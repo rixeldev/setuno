@@ -1147,6 +1147,13 @@
     "liveEndedBadge": "ÚLTIMA CANCIÓN",
     "liveEndedCaption": "El show parece haber terminado — así fue la noche."
   },
+  "deepLinks": {
+    "copyLink": "Copiar enlace",
+    "copyHint": "Abre la app si está instalada",
+    "copied": "Enlace a {{title}} copiado.",
+    "notConfigured": "Esta build no tiene una dirección web con la que crear el enlace.",
+    "copyA11y": "Copiar el enlace a {{title}}"
+  },
   "liveShow": {
     "title": "En directo",
     "start": "Empezar",

@@ -4,6 +4,15 @@
 // both halves must flip together). On EAS the staging files ride as file-type
 // environment variables; locally the gitignored *-staging files sit beside
 // the production ones.
+// App Links and the app's identity (roadmap #76) live in `app-links.json`:
+// the hosts the app claims, the paths it answers on, and the SHA-256
+// fingerprints of the signing keys. `scripts/generate-app-links.mjs` reads the
+// same file to write the verification files the web deploy serves, so a host
+// claimed by the app and a host served by the deploy can never drift.
+import { readFileSync } from "node:fs"
+
+const appLinks = JSON.parse(readFileSync(new URL("./app-links.json", import.meta.url), "utf8"))
+
 const stagingEnv = process.env.APP_ENV === "staging"
 
 // Firebase Hosting serves the email-link sign-in handler (#67) on the
@@ -21,6 +30,14 @@ const authLinkData = authHosts.flatMap((host) => [
   // nothing and keeps the flow alive if Firebase switches one off.
   { scheme: "https", host, pathPrefix: "/__/auth/action" },
 ])
+
+// The app's own hosts (#76): a link to a song, a setlist or a share on one of
+// them opens the app when it is installed, and the web app when it is not.
+// `autoVerify` asks Android to check `assetlinks.json` on those hosts; the
+// file is written by `scripts/generate-app-links.mjs` into the web export.
+const appLinkData = appLinks.hosts.flatMap((host) =>
+  appLinks.paths.map((path) => ({ scheme: "https", host, pathPrefix: path })),
+)
 
 export default {
   expo: {
@@ -41,19 +58,20 @@ export default {
     },
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.rixeldev.setuno",
+      bundleIdentifier: appLinks.bundleId,
       // Inert while iOS is not in `platforms` below, and the exact twin of the
       // Android intent filter: Universal Links are what make an emailed
-      // sign-in link open the app on an iPhone (#67). Declared now so iOS ships
-      // with the deep-link plumbing instead of without it.
-      associatedDomains: authHosts.map((host) => `applinks:${host}`),
+      // sign-in link open the app on an iPhone (#67) and a link to a song
+      // open the song (#76). Declared now so iOS ships with the deep-link
+      // plumbing instead of without it.
+      associatedDomains: [...authHosts, ...appLinks.hosts].map((host) => `applinks:${host}`),
       googleServicesFile: stagingEnv
         ? (process.env.GOOGLE_SERVICES_PLIST_STAGING ?? "./GoogleService-Info-staging.plist")
         : "./GoogleService-Info.plist",
       buildNumber: "1",
     },
     android: {
-      package: "com.rixeldev.setuno",
+      package: appLinks.packageName,
       versionCode: 1,
       version: "1.0.0",
       minSdkVersion: 24,
@@ -62,19 +80,25 @@ export default {
       googleServicesFile: stagingEnv
         ? (process.env.GOOGLE_SERVICES_JSON_STAGING ?? "./google-services-staging.json")
         : "./google-services.json",
-      // Email-link sign-in (#67): claim the Firebase Hosting auth handler as an
-      // Android App Link, so a tap in the inbox opens the app instead of a
-      // browser tab. `autoVerify` asks Android to check `assetlinks.json` on
-      // those hosts; until the project's **SHA-256** is registered the check
-      // fails and Android falls back to the link chooser, where the app is
-      // still listed — the flow works either way, it just loses the silent
-      // hand-off until the fingerprint is added (see README §Email link).
+      // Deep links (#67 and #76): claim two families of URL as **Android App
+      // Links**, so a tap opens the app instead of a browser tab —
+      //
+      //   • the Firebase Hosting auth handler, which is where an emailed
+      //     sign-in link points;
+      //   • the app's own hosts, where a song, a setlist or a share lives.
+      //
+      // `autoVerify` asks Android to check `assetlinks.json` on those hosts
+      // (written into the web export by `scripts/generate-app-links.mjs`);
+      // until the project's **SHA-256** is registered the check fails and
+      // Android falls back to the link chooser, where the app is still listed
+      // — the flow works either way, it just loses the silent hand-off until
+      // the fingerprint is added (see README §Deep links).
       intentFilters: [
         {
           action: "VIEW",
           autoVerify: true,
           category: ["BROWSABLE", "DEFAULT"],
-          data: authLinkData,
+          data: [...authLinkData, ...appLinkData],
         },
       ],
       adaptiveIcon: {

@@ -39,6 +39,7 @@ a sidebar layout on the web.
 - [Security rules](#security-rules)
 - [App Check](#app-check)
 - [Email link sign-in](#email-link-sign-in)
+- [Deep links](#deep-links)
 - [Backups](#backups)
 - [Staging](#staging)
 - [Internationalization](#internationalization)
@@ -432,6 +433,55 @@ Until that is done the link still works — Android shows the link chooser, whic
 (Expo Go cannot open an App Link) and a physical phone.
 
 **No rules, no functions, no deploy.** The feature is entirely client-side.
+
+---
+
+## Deep links
+
+A link to the app's own web address opens **Setuno itself** when the app is installed, and the web
+app when it is not. Three public shapes answer:
+
+| Link | What it opens |
+| --- | --- |
+| `/song/<id>` | that song in the band |
+| `/setlist/<id>` | that setlist in the band |
+| `/share/<token>` | the public snapshot (read-only, no account needed) |
+
+The first two are the app's own screens under **stable, public names** — they never move with the
+app's internal routing — and they only ever point at something inside your band. The third is the
+public share link, which anybody can open.
+
+Inside the app, the reader's footer and the setlist's overflow menu have a **Copy link** action
+that puts the band's own link on the clipboard; that is the link to send to a bandmate. The public
+snapshot is a different thing and is minted by the **Share** action.
+
+### How it is wired
+
+- `app-links.json` (repo root) is the **single source of truth**: the app's identity, the hosts it
+  claims and the paths it answers on. `app.config.js` reads it for the Android intent filter (and
+  the iOS `associatedDomains` twin) and `scripts/generate-app-links.mjs` reads it to write the
+  verification files — so a host the app claims can never stop being a host the deploy serves.
+- The verification files are written at **build time** (`pnpm export:web` ends with the generator):
+  - `dist/.well-known/assetlinks.json` — Android. The local **debug** keystore's SHA-256 is picked
+    up automatically, so a development build verifies without any setup; the **release** (EAS)
+    fingerprint goes in `app-links.json` (see below).
+  - `dist/.well-known/apple-app-site-association` — iOS, written **only** when `APPLE_TEAM_ID` is
+    set. The app does not build for iOS yet, and a placeholder would be worse than none: iOS
+    rejects the file and says nothing about why.
+- The web deploy serves them from its own origin; `vercel.json` pins the content type and the SPA
+  rewrite never touches them (Vercel serves real files before it rewrites).
+
+### Owner step: add the release fingerprint
+
+The shipped build is signed with the **EAS keystore**, whose SHA-256 nobody has written down yet:
+
+1. Get the fingerprint of the keystore EAS uses (EAS → *Credentials* → Android keystore, or
+   `keytool -list -v -keystore <keystore>`).
+2. Put it in `app-links.json` → `sha256Fingerprints`.
+3. Rebuild the web deploy — the file is generated, not committed.
+
+Until then a release build opens the link in the browser (or in the chooser); the *development*
+build on this machine already verifies.
 
 ---
 
