@@ -46,7 +46,7 @@ import {
   mapEntitlement,
   type Entitlement,
 } from "./entitlements"
-import { consumePlayPurchase, verifyPlayPurchase } from "./playBilling"
+import { consumePlayPurchase, serviceAccountFromEnv, verifyPlayPurchase } from "./playBilling"
 
 initializeApp()
 
@@ -688,7 +688,7 @@ export const syncProPurchase = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "A purchase token is required")
   }
 
-  const serviceAccount = process.env.PLAY_SERVICE_ACCOUNT_JSON
+  const serviceAccount = serviceAccountFromEnv()
   if (!serviceAccount) {
     // A missing credential must never fall back to "probably fine": the plan
     // stays free until the store can actually be asked.
@@ -701,7 +701,7 @@ export const syncProPurchase = onCall(async (request) => {
   let expiresAt: string | null = null
   try {
     const purchase = await verifyPlayPurchase({
-      serviceAccountJson: serviceAccount,
+      serviceAccount,
       packageName,
       productId,
       purchaseToken,
@@ -713,7 +713,7 @@ export const syncProPurchase = onCall(async (request) => {
       // A tip is a consumable: confirm it and let it go, so it can be tipped
       // again. It never grants the plan.
       await consumePlayPurchase({
-        serviceAccountJson: serviceAccount,
+        serviceAccount,
         packageName,
         productId,
         purchaseToken,

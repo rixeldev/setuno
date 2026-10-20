@@ -25,6 +25,42 @@ interface ServiceAccount {
   private_key: string
 }
 
+/**
+ * The credential, from the environment.
+ *
+ * Two shapes are accepted, because both are awkward in different ways:
+ *
+ *   • `PLAY_SERVICE_ACCOUNT_JSON` — the whole key file in one line (the file
+ *     Google downloads is a single line once minified, and its `private_key`
+ *     already carries the newlines escaped as `\n`).
+ *   • `PLAY_SERVICE_ACCOUNT_CLIENT_EMAIL` + `PLAY_SERVICE_ACCOUNT_PRIVATE_KEY` —
+ *     the same key in two variables, which is what a secret manager or a
+ *     `.env` file handles most comfortably.
+ *
+ * Returns `null` when neither is there: the caller then **refuses** the
+ * purchase, because a missing credential must never fall back to "probably
+ * fine".
+ */
+export const serviceAccountFromEnv = (): ServiceAccount | null => {
+  const json = process.env.PLAY_SERVICE_ACCOUNT_JSON
+  if (json && json.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(json) as ServiceAccount
+      if (parsed?.client_email && parsed?.private_key) return parsed
+    } catch {
+      // A malformed JSON falls through to the pair below.
+    }
+  }
+  const email = process.env.PLAY_SERVICE_ACCOUNT_CLIENT_EMAIL
+  const key = process.env.PLAY_SERVICE_ACCOUNT_PRIVATE_KEY
+  if (email && key && key.length > 0) {
+    // A PEM pasted with literal "\n" (an unquoted env value) becomes a real
+    // key; one written with real newlines is left alone.
+    return { client_email: email, private_key: key.replace(/\\n/g, "\n") }
+  }
+  return null
+}
+
 const PLAY_API = "https://androidpublisher.googleapis.com/androidpublisher/v3"
 const TOKEN_URL = "https://oauth2.googleapis.com/token"
 const SCOPE = "https://www.googleapis.com/auth/androidpublisher"
@@ -84,7 +120,7 @@ interface ProductPurchase {
  * active while it has been bought and not refunded (state 0, not consumed).
  */
 export const verifyPlayPurchase = async (input: {
-  serviceAccountJson: string
+  serviceAccount: ServiceAccount
   packageName: string
   productId: string
   purchaseToken: string
@@ -92,12 +128,7 @@ export const verifyPlayPurchase = async (input: {
    * product through the products API. */
   kind: "subscription" | "tip"
 }): Promise<PlayPurchase> => {
-  let account: ServiceAccount
-  try {
-    account = JSON.parse(input.serviceAccountJson) as ServiceAccount
-  } catch {
-    throw new Error("play-account:invalid")
-  }
+  const account = input.serviceAccount
   if (!account.client_email || !account.private_key) throw new Error("play-account:incomplete")
 
   const token = await accessToken(account)
@@ -135,17 +166,12 @@ export const verifyPlayPurchase = async (input: {
  * again. A consumable that is never consumed can only ever be bought once.
  */
 export const consumePlayPurchase = async (input: {
-  serviceAccountJson: string
+  serviceAccount: ServiceAccount
   packageName: string
   productId: string
   purchaseToken: string
 }): Promise<void> => {
-  let account: ServiceAccount
-  try {
-    account = JSON.parse(input.serviceAccountJson) as ServiceAccount
-  } catch {
-    throw new Error("play-account:invalid")
-  }
+  const account = input.serviceAccount
   if (!account.client_email || !account.private_key) throw new Error("play-account:incomplete")
 
   const token = await accessToken(account)
