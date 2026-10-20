@@ -42,6 +42,7 @@ a sidebar layout on the web.
 - [Deep links](#deep-links)
 - [Installable web app](#installable-web-app)
 - [Android home-screen widget](#android-home-screen-widget)
+- [The Pro plan](#the-pro-plan)
 - [Backups](#backups)
 - [Staging](#staging)
 - [Internationalization](#internationalization)
@@ -547,6 +548,44 @@ How the content gets there:
 Building it locally needs the native project (`npx expo prebuild --platform android`) and a JDK
 (17 or 21). The iOS half of the roadmap's item — WidgetKit and the Live Activity — is a separate
 piece of work: it needs an EAS build and a config plugin, and iOS does not ship yet.
+
+---
+
+## The Pro plan
+
+Setuno has a **free plan** and a **Pro plan**. Pro removes the ads, opens the band's statistics
+and lifts the free limits (one band and a base songbook). **Reading and playing are never gated.**
+
+The plan is decided **on the server**. The phone tells the callable which token the store gave it,
+the callable asks Google whether that token is a real paid purchase, and only then is the
+entitlement written. The client has no way to write it — the security rules allow the owner to
+*read* their entitlement and nothing else — so a phone can never grant itself the plan.
+
+| Piece | Where |
+| --- | --- |
+| The shapes, the free limits and the product ids | `functions/src/entitlements.ts` (pure — the app reads it through the `@/functions` alias) |
+| The store check | `functions/src/playBilling.ts` (the Google Play Developer API) |
+| The callables | `getMyEntitlement` and `syncProPurchase` in `functions/src/index.ts` |
+| The document | `users/{uid}/entitlements/pro`, server-written only |
+| The app | `hooks/useEntitlement.ts`, `hooks/usePlanPurchase.ts` (+ its `.web.ts` twin) and the plan screen in Settings |
+
+### Owner steps: the products and the store credentials
+
+The plan cannot be bought until the products exist and the server can ask Google about them.
+
+1. **The products** — in the Play Console, create the two subscriptions with these exact ids:
+   `setuno_pro_monthly` and `setuno_pro_annual` (the ids are a contract between the app, the store
+   and the callable; a purchase of an unknown id is never granted). The prices are yours to choose —
+   the app shows whatever the store answers.
+2. **The service account** — in the Google Cloud console, create a service account for the project,
+   then in the Play Console (*Users and permissions*) invite it and grant it the **"App orders"** and
+   **"Financial data"** permissions. Put its JSON in the functions' environment as
+   `PLAY_SERVICE_ACCOUNT_JSON` (a secret — never in the repo).
+3. **Deploy** — the callables ship with the functions (`pnpm deploy:functions`).
+
+Without the service account the callable refuses every purchase: a missing credential must never
+fall back to "probably fine". Until the products exist, the plan screen says the plan is not
+offered in this build yet rather than offering a button that cannot work.
 
 ---
 

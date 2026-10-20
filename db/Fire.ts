@@ -96,6 +96,14 @@ export const paths = {
   /** Personal read marker of a band's activity feed (roadmap #53). */
   userActivityRead: (uid: string, orgId: string) => `users/${uid}/activityRead/${orgId}`,
   /**
+   * The Pro plan (roadmap #61): one document per account, written by the
+   * `syncProPurchase` callable and read-only from the client — the rules have
+   * no `allow write` for it, so a phone can never grant itself the plan.
+   */
+  userEntitlements: (uid: string) => `users/${uid}/entitlements`,
+  userEntitlement: (uid: string, entitlementId: string) =>
+    `users/${uid}/entitlements/${entitlementId}`,
+  /**
    * Push registrations (roadmap #52): one doc per install, the document id is
    * the Expo push token itself. Owner-only; Cloud Functions read it with the
    * Admin SDK, which bypasses the rules.

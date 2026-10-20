@@ -408,6 +408,18 @@ service cloud.firestore {
           && request.resource.data.lang in ['en', 'es']
           && request.resource.data.lastSeenAt is timestamp;
       }
+
+      /**
+       * The Pro plan (roadmap #61): the entitlement document is written by
+       * the `syncProPurchase` callable and **only read here**. The client
+       * never writes it — there is no `allow write` at all — so a phone can
+       * never grant itself the plan; the store has to confirm the purchase
+       * first. The free plan needs no document: a missing one simply reads
+       * as the free plan (`libs` side: `mapEntitlement`).
+       */
+      match /entitlements/{entitlementId} {
+        allow read: if isSelf(uid);
+      }
     }
 
     // ------------------------------------------------------------- usernames

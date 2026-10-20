@@ -13,6 +13,7 @@ import { Dialog } from "@/components/ui/Dialog"
 import { useToast } from "@/components/ui/Toast"
 import {
   ChevronRightIcon,
+  CrownIcon,
   DevicesIcon,
   EyeIcon,
   GroupIcon,
@@ -30,6 +31,7 @@ import { ThemeSheet } from "@/components/settings/ThemeSheet"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
+import { useEntitlement } from "@/hooks/useEntitlement"
 import { getAppearance } from "@/services/themeManager"
 import { useLanguagePreference } from "@/services/i18next"
 import { disablePushForThisDevice } from "@/services/notifications"
@@ -62,6 +64,7 @@ export default function SettingsScreen() {
   const { profile, user, signOut } = useAuth()
   const { organization, role, organizations } = useOrganization()
   const { songs, setlists, performances, members } = useOrgData()
+  const plan = useEntitlement()
   const [confirmSignOut, setConfirmSignOut] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [sheet, setSheet] = useState<"theme" | "language" | null>(null)
@@ -193,6 +196,13 @@ export default function SettingsScreen() {
           icon={DevicesIcon}
           title={t("settings.devices")}
           onPress={() => router.push("/settings/devices")}
+        />
+        <Divider />
+        <Row
+          icon={CrownIcon}
+          title={t("plan.title")}
+          subtitle={plan.isPro ? t("plan.pro") : t("plan.free")}
+          onPress={() => router.push("/settings/plan")}
         />
         <Divider />
         <Row

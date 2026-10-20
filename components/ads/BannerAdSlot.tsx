@@ -4,6 +4,7 @@ import { BannerAd, BannerAdSize } from "react-native-google-mobile-ads"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
+import { useEntitlement } from "@/hooks/useEntitlement"
 import { BANNER_SIZE, BANNER_UNIT_ID } from "@/services/ads"
 
 /**
@@ -13,10 +14,16 @@ import { BANNER_SIZE, BANNER_UNIT_ID } from "@/services/ads"
  *
  * `fullWidth` uses the anchored adaptive unit, which fills the screen width and
  * is meant for bottom-of-screen placements (the dashboard slot).
+ *
+ * **Pro members see no ads at all** (roadmap #61): the slot is not even
+ * mounted, so nothing is requested and nothing is shown.
  */
 export function BannerAdSlot({ fullWidth = false }: { fullWidth?: boolean }) {
   const styles = useThemedStyles(createStyles)
   const [loaded, setLoaded] = useState(false)
+  const plan = useEntitlement()
+
+  if (plan.isPro) return null
 
   return (
     <View style={loaded ? styles.host : styles.collapsed}>

@@ -27,6 +27,7 @@ import { YearRecapCard } from "@/components/stats/YearRecapCard"
 import { captureAndShareImage } from "@/libs/shareImage"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
+import { useEntitlement } from "@/hooks/useEntitlement"
 import {
   buildBandStats,
   buildYearRecap,
@@ -52,6 +53,7 @@ export default function BandStatsScreen() {
   const toast = useToast()
   const { organization } = useOrganization()
   const { performances, setlists, songs, members, loading, error } = useOrgData()
+  const plan = useEntitlement()
 
   const [year, setYear] = useState<number | null>(null)
   const [yearSheetOpen, setYearSheetOpen] = useState(false)
@@ -109,6 +111,24 @@ export default function BandStatsScreen() {
 
   const bandName = organization?.name || t("stats.yourBand")
   const topSongs = stats.topSongs.slice(0, MAX_TOP_SONGS)
+
+  // The band's statistics are a Pro perk (roadmap #61): a free member sees the
+  // upsell instead of the numbers, and the reading itself is never gated.
+  if (!plan.isPro) {
+    return (
+      <ModalScreen title={t("stats.title")} subtitle={t("stats.subtitle")}>
+        <Card>
+          <AppText variant="body" tone="muted">
+            {t("plan.statsLocked")}
+          </AppText>
+          <Button
+            label={t("plan.seePlan")}
+            onPress={() => router.push("/settings/plan")}
+          />
+        </Card>
+      </ModalScreen>
+    )
+  }
 
   return (
     <ModalScreen title={t("stats.title")} subtitle={t("stats.subtitle")}>

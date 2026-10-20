@@ -84,6 +84,8 @@ export default function AppLayout() {
         <Stack.Screen name="settings/organization" options={modalOptions} />
         <Stack.Screen name="settings/notifications" />
         <Stack.Screen name="settings/devices" />
+        {/* The Pro plan (roadmap #61): the plan, the limits and the store. */}
+        <Stack.Screen name="settings/plan" options={modalOptions} />
         <Stack.Screen name="more" options={{ animation: "none" }} />
         <Stack.Screen name="organizations/index" options={modalOptions} />
         <Stack.Screen name="organizations/new" options={modalOptions} />

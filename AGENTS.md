@@ -125,6 +125,16 @@ npx expo-doctor         # diagnose dependency and config issues
 - Google Mobile Ads is native-only and platform-split like `googleAuth`: `services/ads.ts` + `components/ads/BannerAdSlot.tsx` for native, with `.web.ts` shims that no-op so web never imports the SDK.
 - The mobile banner is **one persistent slot under the navigation** (`AppShell` renders it below `BottomBar`), full width via the anchored-adaptive unit; the old end-of-list banners are gone. It collapses to zero height until an ad loads, so it is invisible when there is no fill (offline, blocker, web), and it hides with the navigation on focus routes. `hooks/useBottomChrome.ts` reports the measured bar + banner height so the toast anchors above it.
 - Dev builds use the SDK's official test unit; release builds use `adBannerId` from `db/firebaseConfig.ts` (override with `EXPO_PUBLIC_ADMOB_BANNER_ID`). Ads require a development build (not Expo Go).
+- **Pro members see no ads at all** (roadmap #61): `BannerAdSlot` reads the entitlement and is not even mounted for a Pro member, so nothing is requested and nothing is shown.
+
+## The Pro plan (roadmap #61)
+
+- The plan is **server-written only**: the entitlement lives at `users/{uid}/entitlements/pro`, the `syncProPurchase` callable writes it with the Admin SDK after the **store** confirms the purchase, and the rules have **no `allow write`** for it — a phone can never grant itself the plan (the emulator test pins that). The client only ever reads it, so a phone that has been offline for a month still knows what it is entitled to.
+- The pure core is `functions/src/entitlements.ts` (**zero firebase imports**, the `notify.ts` precedent): the app reads the shapes, the free limits and the product ids through the `@/functions` alias. `mapEntitlement` **heals** anything it does not like — a missing document is the free plan and a broken one grants nothing, because a document nobody can read must never *grant* anything.
+- The store side is `functions/src/playBilling.ts`: the phone hands over the token the store gave it and the callable asks **Google** whether that token is a real, paid purchase. The service account comes from `PLAY_SERVICE_ACCOUNT_JSON`; without it the callable refuses the purchase — a missing credential must never fall back to "probably fine".
+- The app's side is platform-split, because `expo-iap` is **native only**: `hooks/usePlanPurchase.ts` (the real store) and `hooks/usePlanPurchase.web.ts` (a no-op twin) — the same seam as `googleAuth`. The plan screen is `app/(app)/settings/plan.tsx` (a modal) and the entitlement is read through `hooks/useEntitlement.ts`.
+- **The reading is never gated**: the Pro perks are the ads, the band's statistics and the limits. A free member always reads and plays everything.
+- The product ids are a **contract** between the app, the Play Console and the callable (`PRO_PRODUCTS`): a purchase of an unknown product is never granted, whatever the store says.
 
 ## In-app review (roadmap #71)
 

@@ -1559,6 +1559,29 @@ describe("favorites and collections are private to their owner", () => {
   })
 })
 
+describe("the Pro plan is server-written (#61)", () => {
+  it("lets the owner read their own entitlement", async () => {
+    await assertSucceeds(alice().firestore().doc(`users/alice/entitlements/pro`).get())
+  })
+
+  it("refuses a client write, in any shape", async () => {
+    await assertFails(
+      alice().firestore().doc(`users/alice/entitlements/pro`).set({ plan: "pro" }),
+    )
+    await assertFails(
+      alice().firestore().doc(`users/alice/entitlements/pro`).update({ plan: "pro" }),
+    )
+  })
+
+  it("hides one member's entitlement from another", async () => {
+    await assertFails(bob().firestore().doc(`users/alice/entitlements/pro`).get())
+  })
+
+  it("is invisible to a signed-out visitor", async () => {
+    await assertFails(guest().firestore().doc(`users/alice/entitlements/pro`).get())
+  })
+})
+
 describe("song versions are an admin-written, member-readable history", () => {
   /** The shape `services/songVersions.ts` writes — one immutable snapshot. */
   const version = (savedBy: string, overrides: Record<string, unknown> = {}) => ({

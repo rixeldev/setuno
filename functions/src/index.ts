@@ -40,6 +40,13 @@ import {
 } from "./notify"
 import { extractMentionUids, type MentionMember } from "./mentions"
 import { sendExpoPush, type ExpoPushMessage } from "./expoPush"
+import {
+  PRO_PRODUCTS,
+  isKnownProduct,
+  mapEntitlement,
+  type Entitlement,
+} from "./entitlements"
+import { consumePlayPurchase, verifyPlayPurchase } from "./playBilling"
 
 initializeApp()
 
@@ -638,4 +645,102 @@ export const signOutEverywhere = onCall(async (request) => {
     devices: devices.length,
   })
   return { revoked: true, devices: devices.length }
+})
+
+/**
+ * The member's plan (roadmap #61).
+ *
+ * The entitlement is written by `syncProPurchase` and read here; a **missing**
+ * document simply reads as the free plan, so a brand-new account never has to
+ * ask twice. The call is scoped to the caller's own uid: no argument is read,
+ * so nobody can read anybody else's plan.
+ */
+export const getMyEntitlement = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to see your plan")
+  const uid = request.auth.uid
+
+  const snapshot = await getFirestore().doc(`users/${uid}/entitlements/pro`).get()
+  const now = new Date().toISOString().slice(0, 10)
+  return mapEntitlement(snapshot.exists ? snapshot.data() : null, now)
+})
+
+/**
+ * Confirms a purchase with the store and settles the plan (roadmap #61, and
+ * the tip of #64).
+ *
+ * The phone hands over the token the store gave it; the callable asks Google
+ * whether that token is a real, paid purchase, and **only then** is the plan
+ * written. The entitlement document is written with the Admin SDK, so the
+ * client cannot write it at all — the rules have no `allow write` for it.
+ *
+ * A tip (a consumable, roadmap #64) is confirmed and consumed, so the member
+ * can tip again, but it never grants the plan.
+ */
+export const syncProPurchase = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to manage your plan")
+  const uid = request.auth.uid
+  const data = readCallInput(request.data)
+
+  const productId = typeof data.productId === "string" ? data.productId : ""
+  const purchaseToken = typeof data.purchaseToken === "string" ? data.purchaseToken : ""
+  if (!isKnownProduct(productId)) throw new HttpsError("invalid-argument", "Unknown product")
+  if (purchaseToken.length === 0 || purchaseToken.length > 512) {
+    throw new HttpsError("invalid-argument", "A purchase token is required")
+  }
+
+  const serviceAccount = process.env.PLAY_SERVICE_ACCOUNT_JSON
+  if (!serviceAccount) {
+    // A missing credential must never fall back to "probably fine": the plan
+    // stays free until the store can actually be asked.
+    throw new HttpsError("failed-precondition", "The store is not configured on this server yet")
+  }
+  const packageName = process.env.ANDROID_PACKAGE_NAME ?? "com.rixeldev.setuno"
+
+  let active = false
+  let expiresAt: string | null = null
+  try {
+    const purchase = await verifyPlayPurchase({
+      serviceAccountJson: serviceAccount,
+      packageName,
+      productId,
+      purchaseToken,
+    })
+    active = purchase.active
+    expiresAt = purchase.expiresAt
+    if (productId === PRO_PRODUCTS.tip) {
+      // A tip is a consumable: confirm it and let it go, so it can be tipped
+      // again. It never grants the plan.
+      await consumePlayPurchase({
+        serviceAccountJson: serviceAccount,
+        packageName,
+        productId,
+        purchaseToken,
+      })
+    }
+  } catch (error) {
+    logger.error("syncProPurchase could not confirm the purchase", {
+      uid,
+      productId,
+      error: String(error),
+    })
+    throw new HttpsError("internal", "The store could not be reached")
+  }
+
+  const isTip = productId === PRO_PRODUCTS.tip
+  const now = new Date().toISOString().slice(0, 10)
+  const entitlement: Entitlement = {
+    plan: !isTip && active ? "pro" : "free",
+    productId,
+    source: isTip ? "tip" : "play",
+    expiresAt,
+    updatedAt: now,
+  }
+  await getFirestore().doc(`users/${uid}/entitlements/pro`).set(entitlement, { merge: true })
+  logger.info("syncProPurchase settled an entitlement", {
+    uid,
+    productId,
+    active,
+    plan: entitlement.plan,
+  })
+  return entitlement
 })
