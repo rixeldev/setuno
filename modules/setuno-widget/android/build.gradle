@@ -1,0 +1,17 @@
+apply plugin: 'com.android.library'
+apply plugin: 'expo-module-gradle-plugin'
+
+group = 'com.rixeldev.setuno'
+version = '1.0.0'
+
+android {
+  namespace "com.rixeldev.setuno.widget"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  implementation 'androidx.core:core:1.17.0'
+}

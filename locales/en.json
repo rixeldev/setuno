@@ -1299,6 +1299,9 @@
     "notConfigured": "This build has no web address to build the link from.",
     "copyA11y": "Copy the link to {{title}}"
   },
+  "widget": {
+    "nothingScheduled": "No gigs scheduled."
+  },
   "liveShow": {
     "title": "Live show",
     "start": "Start show",

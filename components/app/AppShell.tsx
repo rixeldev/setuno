@@ -11,6 +11,7 @@ import { SyncBanner } from "@/components/app/SyncBanner"
 import { BannerAdSlot } from "@/components/ads/BannerAdSlot"
 import { useResponsive } from "@/hooks/useResponsive"
 import { usePushRegistration } from "@/hooks/usePushRegistration"
+import { useHomeWidget } from "@/hooks/useHomeWidget"
 import { isFocusRoute } from "@/libs/navigation"
 
 /**
@@ -32,6 +33,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Push registrations refresh silently here (roadmap #52): never prompts,
   // never resurrects a device the user switched off in the settings screen.
   usePushRegistration()
+
+  // The Android home-screen widget follows the band's next gig (roadmap #78).
+  // The push happens here, where the band data is already subscribed.
+  useHomeWidget()
 
   // Floating UI (the toast) anchors above the measured bottom chrome; release
   // it while the bar is hidden and when the shell goes away.

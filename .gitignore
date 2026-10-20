@@ -47,6 +47,12 @@ functions/package-lock.json
 /ios
 /android
 
+# Local Expo modules (roadmap #78): their Gradle output is build noise, the
+# sources are not — `modules/setuno-widget/android/build` is the AAR.
+/modules/*/android/build/
+/modules/*/android/.cxx/
+/modules/*/android/.gradle/
+
 # Agent
 .agents
 

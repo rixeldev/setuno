@@ -1,0 +1,7 @@
+{
+  "name": "setuno-widget",
+  "version": "1.0.0",
+  "description": "Setuno's Android home-screen widget (roadmap #78).",
+  "main": "index.ts",
+  "private": true
+}

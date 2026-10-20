@@ -1299,6 +1299,9 @@
     "notConfigured": "Este build não tem um endereço web para montar o link.",
     "copyA11y": "Copiar o link para {{title}}"
   },
+  "widget": {
+    "nothingScheduled": "Nenhum show marcado."
+  },
   "liveShow": {
     "title": "Show ao vivo",
     "start": "Iniciar show",

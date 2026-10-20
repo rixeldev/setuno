@@ -1162,6 +1162,9 @@
     "notConfigured": "Esta build no tiene una dirección web con la que crear el enlace.",
     "copyA11y": "Copiar el enlace a {{title}}"
   },
+  "widget": {
+    "nothingScheduled": "No hay bolos programados."
+  },
   "liveShow": {
     "title": "En directo",
     "start": "Empezar",

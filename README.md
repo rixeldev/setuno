@@ -41,6 +41,7 @@ a sidebar layout on the web.
 - [Email link sign-in](#email-link-sign-in)
 - [Deep links](#deep-links)
 - [Installable web app](#installable-web-app)
+- [Android home-screen widget](#android-home-screen-widget)
 - [Backups](#backups)
 - [Staging](#staging)
 - [Internationalization](#internationalization)
@@ -515,6 +516,37 @@ already offline-first, and the worker's job is to keep its hands off it.
 The rules are **run**, not read, in `tests/unit/pwa.test.ts`: the worker is executed against
 stubbed `caches`/`fetch`, and the suite proves that a navigation is answered while the API and
 every write are not.
+
+---
+
+## Android home-screen widget
+
+Android users can put the band's **next gig** on their home screen: when it is, where, and which
+setlist they will play. Tapping it opens Setuno on that gig.
+
+The widget is a **local Expo module** (`modules/setuno-widget`) — the `modules/` directory the
+roadmap pointed at. It is autolinked through `package.json`:
+
+```json
+"expo": { "autolinking": { "nativeModulesDir": "./modules" } }
+```
+
+How the content gets there:
+
+- The widget cannot read the band's data, and it should not: the **app pushes** what it already
+  knows (`hooks/useHomeWidget.ts` → the module → the shared preferences → the launcher draws it).
+- The payload is **already localized** by the app, so the launcher never needs the app's
+  translations. The widget's own name and description are Android resources, translated per
+  language.
+- The content is as fresh as the last time the app was open — a widget that woke the app on every
+  draw would cost more than it is worth.
+
+`libs/homeWidget.ts` holds the pure part (which gig the widget shows, and what it says about it);
+`tests/unit/homeWidget.test.ts` checks it.
+
+Building it locally needs the native project (`npx expo prebuild --platform android`) and a JDK
+(17 or 21). The iOS half of the roadmap's item — WidgetKit and the Live Activity — is a separate
+piece of work: it needs an EAS build and a config plugin, and iOS does not ship yet.
 
 ---
 

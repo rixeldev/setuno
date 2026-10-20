@@ -1,0 +1,17 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!-- The home-screen widget. It is a plain receiver: the app pushes the
+         content and the launcher asks the provider to draw it. -->
+    <receiver
+      android:name="com.rixeldev.setuno.widget.SetunoWidgetProvider"
+      android:exported="true"
+      android:label="@string/widget_label">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/widget_setuno_info" />
+    </receiver>
+  </application>
+</manifest>

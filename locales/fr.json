@@ -1299,6 +1299,9 @@
     "notConfigured": "Cette build n'a pas d'adresse web pour construire le lien.",
     "copyA11y": "Copier le lien vers {{title}}"
   },
+  "widget": {
+    "nothingScheduled": "Aucun concert prévu."
+  },
   "liveShow": {
     "title": "Concert en cours",
     "start": "Lancer le concert",
