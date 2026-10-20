@@ -13,6 +13,7 @@ import { Dialog } from "@/components/ui/Dialog"
 import { useToast } from "@/components/ui/Toast"
 import {
   ChevronRightIcon,
+  DevicesIcon,
   EyeIcon,
   GroupIcon,
   LanguageIcon,
@@ -186,6 +187,12 @@ export default function SettingsScreen() {
           icon={NotificationsIcon}
           title={t("settings.notifications")}
           onPress={() => router.push("/settings/notifications")}
+        />
+        <Divider />
+        <Row
+          icon={DevicesIcon}
+          title={t("settings.devices")}
+          onPress={() => router.push("/settings/devices")}
         />
         <Divider />
         <Row

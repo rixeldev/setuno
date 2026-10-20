@@ -725,3 +725,8 @@ export const RedoIcon = ({ size = 24, color = Theme.colors.text, ...rest }: Icon
 export const AtIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
   <MaterialCommunityIcons name="at" size={size} color={color} {...rest} />
 )
+
+/** The account's device list (roadmap #69). */
+export const DevicesIcon = ({ size = 24, color = Theme.colors.text, ...rest }: IconProps & Record<string, unknown>) => (
+  <MaterialCommunityIcons name="devices" size={size} color={color} {...rest} />
+)

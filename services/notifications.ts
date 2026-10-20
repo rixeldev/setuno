@@ -146,6 +146,14 @@ export const disablePushForThisDevice = async (uid: string): Promise<void> => {
 }
 
 /**
+ * The document id this install would own (roadmap #69): the cached push
+ * token, read without the network, so the devices screen can mark its own row
+ * — `null` while this install has never registered (never asked, switched
+ * off, or web).
+ */
+export const getThisDeviceToken = async (): Promise<string | null> => readCachedToken()
+
+/**
  * Silent re-registration from `AppShell`: refreshes `lang` and `lastSeenAt`
  * on a document that already exists. It never creates one (a permission
  * granted at the OS level must not resurrect a device the user switched off

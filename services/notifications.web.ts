@@ -28,3 +28,6 @@ export const enablePushForThisDevice = async (): Promise<PushDeviceState> => ({
 export const disablePushForThisDevice = async (): Promise<void> => undefined
 
 export const refreshPushRegistration = async (): Promise<void> => undefined
+
+/** No push token exists in a browser — there is no row to mark as "this device". */
+export const getThisDeviceToken = async (): Promise<string | null> => null

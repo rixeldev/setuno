@@ -610,3 +610,32 @@ export const deleteMyAccount = onCall(async (request) => {
   }
   return { deleted: true, ...summary }
 })
+
+/**
+ * End every session on this account (roadmap #69). Revoke the refresh tokens
+ * — every device and browser signs itself out at the next refresh — and sweep
+ * the push registrations in the same call, so the account's device list
+ * empties instead of advertising sessions that are gone. Each phone keeps its
+ * cached token, and #52's contract reads a missing document as the durable
+ * *off* state, so a revoked device never resurrects its own registration.
+ *
+ * Caller-scoped by construction: the uid comes from the verified token and no
+ * argument is read, so nobody can revoke anybody else.
+ */
+export const signOutEverywhere = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to manage your sessions")
+  const uid = request.auth.uid
+
+  await getAuth().revokeRefreshTokens(uid)
+  const devices = await getFirestore()
+    .collection(`users/${uid}/devices`)
+    .listDocuments()
+  // Tens of documents at most (one per phone/tablet install); Firestore caps
+  // a batch at 500, so a plain fan-out is honest and simpler.
+  await Promise.all(devices.map((device) => device.delete()))
+  logger.info("signOutEverywhere revoked a session and swept its devices", {
+    uid,
+    devices: devices.length,
+  })
+  return { revoked: true, devices: devices.length }
+})
