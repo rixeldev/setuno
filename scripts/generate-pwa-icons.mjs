@@ -52,6 +52,18 @@ const main = async () => {
   drawCentered(ctx, foreground, 512, MASKABLE_GLYPH)
   writeFileSync(join(outDir, "icon-maskable-512.png"), maskable.toBuffer("image/png"))
 
+  // The Play Console's **subscription icon**: a square (no transparent
+  // corners) with the glyph a little larger than in the maskable one. It is
+  // the same brand, drawn for a 512×512 PNG the store accepts.
+  const subscription = createCanvas(512, 512)
+  const subCtx = subscription.getContext("2d")
+  subCtx.drawImage(background, 0, 0, 512, 512)
+  drawCentered(subCtx, foreground, 512, 0.66)
+  writeFileSync(
+    join(root, "assets", "subscription-icon-512.png"),
+    subscription.toBuffer("image/png"),
+  )
+
   for (const file of ["icon-192.png", "icon-512.png", "icon-maskable-512.png"]) {
     const path = join(outDir, file)
     if (!existsSync(path)) throw new Error(`missing ${path}`)

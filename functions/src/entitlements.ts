@@ -20,19 +20,27 @@ export type EntitlementSource = "play" | "appstore" | "tip"
  * The product ids the stores use. They are the contract between the app, the
  * Play Console and the callable — a purchase of an unknown product is never
  * granted, whatever the store says.
+ *
+ * On Play, a subscription is a **container** (`setuno_pro`) that holds one
+ * **base plan** per period, and the sku the app asks the store for is the
+ * **base plan id**, not the subscription's own id. So the monthly and the
+ * yearly plans are two base plans of one subscription, and the tip is a
+ * separate one-off product with its own id.
  */
 export const PRO_PRODUCTS = {
-  /** The month-to-month subscription. */
-  monthly: "setuno_pro_monthly",
-  /** The yearly subscription. */
-  annual: "setuno_pro_annual",
+  /** The subscription that holds the base plans (Play's container). */
+  subscription: "setuno_pro",
+  /** The month-to-month base plan — the sku the app asks for. */
+  monthly: "monthly",
+  /** The yearly base plan — the sku the app asks for. */
+  annual: "annual",
   /** The optional tip (roadmap #64) — a consumable, never a plan. */
   tip: "setuno_tip",
 } as const
 
 export type ProProductId = (typeof PRO_PRODUCTS)[keyof typeof PRO_PRODUCTS]
 
-/** The products that grant the plan (the tip does not). */
+/** The skus that grant the plan (the tip does not). */
 export const SUBSCRIPTION_PRODUCTS: readonly string[] = [
   PRO_PRODUCTS.monthly,
   PRO_PRODUCTS.annual,

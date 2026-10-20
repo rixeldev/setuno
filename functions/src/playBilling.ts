@@ -88,6 +88,9 @@ export const verifyPlayPurchase = async (input: {
   packageName: string
   productId: string
   purchaseToken: string
+  /** A subscription is confirmed through the subscriptions API; a one-off
+   * product through the products API. */
+  kind: "subscription" | "tip"
 }): Promise<PlayPurchase> => {
   let account: ServiceAccount
   try {
@@ -98,7 +101,7 @@ export const verifyPlayPurchase = async (input: {
   if (!account.client_email || !account.private_key) throw new Error("play-account:incomplete")
 
   const token = await accessToken(account)
-  const isSubscription = !input.productId.includes("_tip")
+  const isSubscription = input.kind === "subscription"
   const url = isSubscription
     ? `${PLAY_API}/applications/${encodeURIComponent(input.packageName)}/purchases/subscriptionsv2/tokens/${encodeURIComponent(input.purchaseToken)}`
     : `${PLAY_API}/applications/${encodeURIComponent(input.packageName)}/purchases/products/${encodeURIComponent(input.productId)}/tokens/${encodeURIComponent(input.purchaseToken)}`

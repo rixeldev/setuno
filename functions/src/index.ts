@@ -695,6 +695,7 @@ export const syncProPurchase = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "The store is not configured on this server yet")
   }
   const packageName = process.env.ANDROID_PACKAGE_NAME ?? "com.rixeldev.setuno"
+  const isTip = productId === PRO_PRODUCTS.tip
 
   let active = false
   let expiresAt: string | null = null
@@ -704,10 +705,11 @@ export const syncProPurchase = onCall(async (request) => {
       packageName,
       productId,
       purchaseToken,
+      kind: isTip ? "tip" : "subscription",
     })
     active = purchase.active
     expiresAt = purchase.expiresAt
-    if (productId === PRO_PRODUCTS.tip) {
+    if (isTip) {
       // A tip is a consumable: confirm it and let it go, so it can be tipped
       // again. It never grants the plan.
       await consumePlayPurchase({
@@ -726,7 +728,6 @@ export const syncProPurchase = onCall(async (request) => {
     throw new HttpsError("internal", "The store could not be reached")
   }
 
-  const isTip = productId === PRO_PRODUCTS.tip
   const now = new Date().toISOString().slice(0, 10)
   const entitlement: Entitlement = {
     plan: !isTip && active ? "pro" : "free",
