@@ -1328,7 +1328,10 @@
     "purchaseFailed": "L'achat n'a pas pu aboutir.",
     "storeUnavailable": "Le magasin n'est pas disponible sur cet appareil.",
     "statsLocked": "Les statistiques du groupe font partie de l'offre Pro.",
-    "seePlan": "Voir l'offre"
+    "seePlan": "Voir l'offre",
+    "limitTitle": "Vous avez atteint la limite de l'offre gratuite",
+    "limitBands": "L'offre gratuite permet {{count}} groupe. Passez à Pro pour autant de groupes que vous voulez.",
+    "limitSongs": "L'offre gratuite permet {{count}} morceaux. Passez à Pro pour un répertoire sans limite."
   },
   "liveShow": {
     "title": "Concert en cours",

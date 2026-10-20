@@ -1328,7 +1328,10 @@
     "purchaseFailed": "Não foi possível concluir a compra.",
     "storeUnavailable": "A loja não está disponível neste dispositivo.",
     "statsLocked": "As estatísticas da banda fazem parte do plano Pro.",
-    "seePlan": "Ver o plano"
+    "seePlan": "Ver o plano",
+    "limitTitle": "Você chegou ao limite do plano grátis",
+    "limitBands": "O plano grátis comporta {{count}} banda. Vire Pro para quantas bandas quiser.",
+    "limitSongs": "O plano grátis comporta {{count}} músicas. Vire Pro para um repertório sem limite."
   },
   "liveShow": {
     "title": "Show ao vivo",

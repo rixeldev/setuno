@@ -32,6 +32,8 @@ import {
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
+import { useEntitlement } from "@/hooks/useEntitlement"
+import { LimitDialog } from "@/components/plans/LimitDialog"
 import { useResponsive } from "@/hooks/useResponsive"
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges"
 import { useUndoRedo } from "@/hooks/useUndoRedo"
@@ -119,6 +121,12 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, 
   const { profile } = useAuth()
   const { organizationId } = useOrganization()
   const { gutter, contentMaxWidth } = useResponsive()
+  const plan = useEntitlement()
+
+  /** The free plan's songbook size (roadmap #63); `0` means unlimited. */
+  const songLimit = plan.limits?.songs ?? 0
+  const atSongLimit = !song && !plan.isPro && songLimit > 0 && songs.length >= songLimit
+  const [limitReached, setLimitReached] = useState(false)
 
   const [songTitle, setSongTitle] = useState(song?.title ?? "")
   const [artist, setArtist] = useState(song?.artist ?? "")
@@ -345,6 +353,14 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, 
       const message = t("songs.noBand")
       setFormError(message)
       toast.showError(message)
+      return
+    }
+    // The free plan holds a base songbook (roadmap #63). The limit is
+    // communicated before it is hit (the plan screen always says what the free
+    // plan allows); this is the moment it is hit. Editing a song is never
+    // limited — only adding one.
+    if (atSongLimit) {
+      setLimitReached(true)
       return
     }
 
@@ -784,6 +800,12 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, 
         what={t("songs.changesToThisSong")}
         onKeepEditing={leaveGuard.keepEditing}
         onDiscard={leaveGuard.discardAndLeave}
+      />
+
+      <LimitDialog
+        visible={limitReached}
+        message={t("plan.limitSongs", { count: songLimit })}
+        onClose={() => setLimitReached(false)}
       />
     </KeyboardAvoidingView>
   )

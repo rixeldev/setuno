@@ -14,6 +14,8 @@ import { ModalScreen } from "@/components/app/ModalScreen"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { createOrganization } from "@/services/organizations"
+import { useEntitlement } from "@/hooks/useEntitlement"
+import { LimitDialog } from "@/components/plans/LimitDialog"
 import { toFriendlyError } from "@/services/errors"
 import { validateRequired } from "@/libs/validation"
 
@@ -24,12 +26,20 @@ export default function NewOrganization() {
   const router = useRouter()
   const toast = useToast()
   const { profile, user } = useAuth()
-  const { switchOrganization } = useOrganization()
+  const { organizations, switchOrganization } = useOrganization()
+  const plan = useEntitlement()
 
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [limitReached, setLimitReached] = useState(false)
+
+  // The free plan holds one band (roadmap #63). The limit is **communicated
+  // before it is hit** (the plan screen always says what the free plan
+  // allows); this is the moment it is hit.
+  const bandLimit = plan.limits?.bands ?? 0
+  const atBandLimit = !plan.isPro && bandLimit > 0 && organizations.length >= bandLimit
 
   const close = (): void => {
     if (router.canGoBack()) router.back()
@@ -40,7 +50,10 @@ export default function NewOrganization() {
     const nameError = validateRequired(name, t("auth.giveBandName"))
     setError(nameError)
     if (nameError) return
-
+    if (atBandLimit) {
+      setLimitReached(true)
+      return
+    }
     setSaving(true)
     try {
       const id = await createOrganization({
@@ -103,6 +116,12 @@ export default function NewOrganization() {
           style={styles.action}
         />
       </View>
+
+      <LimitDialog
+        visible={limitReached}
+        message={t("plan.limitBands", { count: bandLimit })}
+        onClose={() => setLimitReached(false)}
+      />
     </ModalScreen>
   )
 }

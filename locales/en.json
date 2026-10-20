@@ -1328,7 +1328,10 @@
     "purchaseFailed": "The purchase could not be completed.",
     "storeUnavailable": "The store is not available on this device.",
     "statsLocked": "The band's statistics are part of the Pro plan.",
-    "seePlan": "See the plan"
+    "seePlan": "See the plan",
+    "limitTitle": "You have reached the free plan's limit",
+    "limitBands": "The free plan holds {{count}} band. Go Pro for as many bands as you like.",
+    "limitSongs": "The free plan holds {{count}} songs. Go Pro for an unlimited songbook."
   },
   "liveShow": {
     "title": "Live show",
