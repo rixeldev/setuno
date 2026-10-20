@@ -818,7 +818,7 @@ export const syncProPurchase = onCall({ secrets: [playServiceAccount] }, async (
  * The prices come from Stripe itself, so the web build never shows a number
  * the store does not charge.
  */
-export const getPlanOffers = onCall(async (request) => {
+export const getPlanOffers = onCall({ secrets: [stripeSecret] }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to see the plans")
   const config = await resolveStripeConfig()
   if (!config) throw new HttpsError("failed-precondition", "The store is not configured yet")
@@ -837,7 +837,7 @@ export const getPlanOffers = onCall(async (request) => {
  * tell whose purchase it is **without trusting the browser** ✓. The client
  * never says who it is.
  */
-export const startCheckout = onCall(async (request) => {
+export const startCheckout = onCall({ secrets: [stripeSecret] }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to buy the plan")
   const uid = request.auth.uid
   const data = readCallInput(request.data)
@@ -867,7 +867,7 @@ export const startCheckout = onCall(async (request) => {
  * Opens Stripe's billing portal, where a member cancels or changes their
  * card — the same contract as the native "Manage subscription" ✓.
  */
-export const openBillingPortal = onCall(async (request) => {
+export const openBillingPortal = onCall({ secrets: [stripeSecret] }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to manage your plan")
   const uid = request.auth.uid
   const config = await resolveStripeConfig()

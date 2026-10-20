@@ -604,6 +604,14 @@ How it works:
 All four values go into the secret, and the agent publishes it:
 `firebase functions:secrets:set STRIPE_CONFIG` (one JSON blob) and `pnpm deploy:functions`.
 
+**The state right now**: the two Stripe prices exist and are active — **$3.99/monthly and
+$34.99/yearly** ✓ — the key, the webhook secret and the price ids are in **Secret Manager**
+(`STRIPE_CONFIG`) ✓, the four endpoints are deployed and `ACTIVE` ✓, and a Checkout session was
+opened against the real API to prove the whole path ✓ (it returns `checkout.stripe.com` with the
+right amount ✓). The Play prices, meanwhile, still read **$30.99/$340.99** through the Play
+Developer API even though the console shows $3.99 — a pending price change on Play's side, most
+likely. A purchase with a **license tester** account settles which number Play really charges ✓.
+
 Without the service account the callable refuses every purchase: a missing credential must never
 fall back to "probably fine". Until the products exist, the plan screen says the plan is not
 offered in this build yet rather than offering a button that cannot work.
