@@ -13,7 +13,7 @@ import { Dialog } from "@/components/ui/Dialog"
 import { EmptyState } from "@/components/ui/States"
 import { Input, SearchInput } from "@/components/ui/Input"
 import { useToast } from "@/components/ui/Toast"
-import { CloseIcon, DotsIcon, EditIcon, MusicIcon, NoteIcon, PlusIcon } from "@/components/ui/Icons"
+import { CloseIcon, DotsIcon, EditIcon, MusicIcon, NoteIcon, PlusIcon, SparklesIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { SetlistKeyDialog } from "@/components/setlists/SetlistKeyDialog"
 import { SetlistBlockDialog } from "@/components/setlists/SetlistBlockDialog"
@@ -35,7 +35,7 @@ import {
   updateSetlistSongKey,
 } from "@/services/setlists"
 import { toFriendlyError } from "@/services/errors"
-import { filterSongs, EMPTY_FILTERS } from "@/libs/songSearch"
+import { filterSongs, EMPTY_FILTERS, songDurationSec } from "@/libs/songSearch"
 import { isPickableForSetlist } from "@/libs/songStatus"
 import { ROTATION_MISSED_EVENTS, rotationSuggestions } from "@/libs/songUsage"
 import { setlistPrintHtml } from "@/libs/songPrint"
@@ -51,9 +51,15 @@ import { estimateDurationSec } from "@/libs/songUtils"
 import {
   durationGoalTargetLabel,
   durationGoalText,
+  MAX_GOAL_MINUTES,
+  parseGoalMinutes,
   setlistGoal,
 } from "@/libs/setlistDuration"
 import { cleanBlockName, insertBlock, listRows, removeBlock, removeEntry, renameBlock } from "@/libs/setlistBlocks"
+import {
+  ASSISTANT_DEFAULT_MINUTES,
+  buildRepertoireDraft,
+} from "@/libs/repertoireAssistant"
 import type { SetlistBlock } from "@/interfaces/setlist"
 import { displayKey } from "@/libs/chords"
 import { usePreferences } from "@/services/prefs"
@@ -105,6 +111,11 @@ export default function SetlistDetail() {
   const [busy, setBusy] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  // The repertoire assistant (roadmap #86): the minutes it aims for and
+  // whether it fills the list or replaces the running order.
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const [assistantMinutes, setAssistantMinutes] = useState("")
+  const [assistantMode, setAssistantMode] = useState<"add" | "replace">("add")
   // "Save as template" asks what to call the template, the way the songbook's
   // saved views do — the name is what the band will look for later.
   const [savingTemplate, setSavingTemplate] = useState(false)
@@ -261,6 +272,49 @@ export default function SetlistDetail() {
     setPickerOpen(false)
     setSearch("")
     toast.showSuccess(t("setlists.songsAdded", { count: ids.length }))
+  }
+
+  /**
+   * The repertoire assistant (roadmap #86): drafts a running order from the
+   * slot, the rotation and the energy. It is only a draft — the band
+   * rearranges it afterwards like any other order.
+   */
+  const openAssistant = (): void => {
+    setAssistantMinutes(
+      setlist && setlist.targetMinutes > 0 ? `${setlist.targetMinutes}` : "",
+    )
+    setAssistantMode("add")
+    setAssistantOpen(true)
+  }
+
+  const applyAssistant = (): void => {
+    if (!setlist) return
+    const pool = songs
+      .filter((song) => isPickableForSetlist(song, showRetired))
+      .filter((song) => !setlist.songs.some((entry) => entry.songId === song.id))
+    const existing = assistantMode === "replace" ? [] : setlist.songs.map((entry) => entry.songId)
+    const draft = buildRepertoireDraft({
+      songs: pool.map((song) => ({
+        id: song.id,
+        title: song.title,
+        bpm: song.bpm,
+        durationSec: songDurationSec(song),
+      })),
+      usage: songUsage,
+      existingSongIds: existing,
+      // The goal is for the whole set, so the music already there counts —
+      // unless the draft is replacing the running order.
+      existingSec: assistantMode === "replace" ? 0 : setlist.estimatedDurationSec,
+      targetMinutes: parseGoalMinutes(assistantMinutes, MAX_GOAL_MINUTES),
+      breakMinutes: setlist.breakMinutes,
+    })
+    setAssistantOpen(false)
+    if (draft.songIds.length === 0) {
+      toast.showError(t("setlists.assistantEmpty"))
+      return
+    }
+    void persistOrder({ songIds: [...existing, ...draft.songIds] })
+    toast.showSuccess(t("setlists.assistantApplied", { count: draft.songIds.length }))
   }
 
   /** Inserts a new divider, or renames the one picked — one dialog, two modes. */
@@ -743,11 +797,23 @@ export default function SetlistDetail() {
       ) : null}
 
       {isAdmin && editing ? (
-        <Button
-          label={t("setlists.addSongs")}
-          icon={<PlusIcon size={16} color={Theme.colors.onPrimary} />}
-          onPress={() => setPickerOpen(true)}
-        />
+        <View style={styles.assistantRow}>
+          <Button
+            label={t("setlists.addSongs")}
+            icon={<PlusIcon size={16} color={Theme.colors.onPrimary} />}
+            onPress={() => setPickerOpen(true)}
+            style={styles.flex}
+          />
+          {/* The repertoire assistant (roadmap #86): a draft running order
+              from the slot, the rotation and the energy. */}
+          <Button
+            label={t("setlists.assistantSuggest")}
+            variant="secondary"
+            icon={<SparklesIcon size={16} color={Theme.colors.textMuted} />}
+            onPress={openAssistant}
+            style={styles.flex}
+          />
+        </View>
       ) : null}
 
       {relatedShows.length > 0 ? (
@@ -887,6 +953,41 @@ export default function SetlistDetail() {
         sourceId={setlist.id}
         title={setlist.name}
       />
+
+      {/* The repertoire assistant (roadmap #86): how long the set should be,
+          and whether the draft joins the list or replaces it. */}
+      <Dialog
+        visible={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+        title={t("setlists.assistantTitle")}
+        description={t("setlists.assistantDescription")}
+        confirmLabel={t("setlists.assistantSuggest")}
+        onConfirm={applyAssistant}
+      >
+        <View style={styles.assistantBody}>
+          <Input
+            label={t("setlists.assistantMinutes")}
+            value={assistantMinutes}
+            onChangeText={setAssistantMinutes}
+            placeholder={`${ASSISTANT_DEFAULT_MINUTES}`}
+            keyboardType="numeric"
+          />
+          <View style={styles.assistantChips}>
+            <Chip
+              label={t("setlists.assistantAdd")}
+              selected={assistantMode === "add"}
+              onPress={() => setAssistantMode("add")}
+              accessibilityLabel={t("setlists.assistantAdd")}
+            />
+            <Chip
+              label={t("setlists.assistantReplace")}
+              selected={assistantMode === "replace"}
+              onPress={() => setAssistantMode("replace")}
+              accessibilityLabel={t("setlists.assistantReplace")}
+            />
+          </View>
+        </View>
+      </Dialog>
 
       <Dialog
         visible={pickerOpen}
@@ -1141,6 +1242,13 @@ const createStyles = () =>
       flexWrap: "wrap",
       gap: Theme.spacing.xs,
       marginVertical: Theme.spacing.xs,
+    },
+    assistantRow: { flexDirection: "row", gap: Theme.spacing.s },
+    assistantBody: { gap: Theme.spacing.m },
+    assistantChips: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: Theme.spacing.xs,
     },
     pickerList: { maxHeight: 320, width: "100%", flexShrink: 1 },
     pickerRow: {
