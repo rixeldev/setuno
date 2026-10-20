@@ -569,31 +569,20 @@ entitlement written. The client has no way to write it — the security rules al
 | The document | `users/{uid}/entitlements/pro`, server-written only |
 | The app | `hooks/useEntitlement.ts`, `hooks/usePlanPurchase.ts` (+ its `.web.ts` twin) and the plan screen in Settings |
 
-### Owner steps: the products and the store credentials
+### What is in place, and what is left
 
-The plan cannot be bought until the products exist and the server can ask Google about them.
+The plan is **live in the store**: the subscription `setuno_pro` with the base plans **`monthly`**
+(`P1M`, 7 days of grace) and **`annual`** (`P1Y`, 14 days of grace), both auto-renewing and
+re-subscribable, priced in 174 regions, with the listing in English, Spanish, Brazilian Portuguese
+and French. The server side is done too: the credential lives in **Secret Manager**
+(`PLAY_SERVICE_ACCOUNT_JSON`), the callable is bound to it, and the *Google Play Android Developer
+API* is enabled on the project — without that one Google answers `403` and no purchase can ever be
+confirmed.
 
-1. **The products** — in the Play Console, create one subscription with two base plans:
-   - the subscription's product id: `setuno_pro`;
-   - a base plan per period, with the ids **`monthly`** and **`annual`** (these are the skus the
-     app asks the store for — with other names the plan never shows up in the app);
-   - auto-renewing, with the prices you choose. The app shows whatever the store answers.
-
-2. **The service account** — in the Google Cloud console, create a service account for the project,
-   then in the Play Console (*Users and permissions*) invite it and grant it the **"App orders"** and
-   **"Financial data"** permissions. Give it **no IAM roles** in the project: the Play permission is
-   the one that matters, and a key for an account with roles on the project is a much bigger key.
-   (The project's default App Engine service account works too — that is the one currently
-   configured — but it is a full-project credential, so a dedicated account is worth the two
-   minutes.)
-3. **The key in the functions** — it lives in **Secret Manager**, never in the repo:
-   `firebase functions:secrets:set PLAY_SERVICE_ACCOUNT_JSON` (the value is the key file, minified to
-   one line). The callable reads the secret and falls back to the environment, so the emulator can
-   run with a plain `.env` too.
-4. **The API enabled** — the *Google Play Android Developer API* must be on in the Cloud project
-   (`androidpublisher.googleapis.com`); without it Google answers `403` and no purchase can ever be
-   confirmed. It is already enabled in the production project.
-5. **Deploy** — the callables ship with the functions (`pnpm deploy:functions`).
+**What is left** is a real purchase with a **license tester** account (Play Console → *Testing* →
+*License testers*): the app asks the store for the sku, Google returns the token, the callable
+confirms it with Google and writes the entitlement. A tip would be a separate one-time product
+(`setuno_tip`) — the backend already knows how to confirm and consume one.
 
 Without the service account the callable refuses every purchase: a missing credential must never
 fall back to "probably fine". Until the products exist, the plan screen says the plan is not
