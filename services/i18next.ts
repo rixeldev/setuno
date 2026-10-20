@@ -9,6 +9,8 @@ import { initReactI18next } from "react-i18next"
 
 import en from "@/locales/en.json"
 import es from "@/locales/es.json"
+import fr from "@/locales/fr.json"
+import ptBR from "@/locales/pt-BR.json"
 import { getDeviceLanguage } from "@/libs/deviceLanguage"
 import {
   isLanguagePreference,
@@ -21,6 +23,8 @@ import {
 const resources = {
   en: { translation: en },
   es: { translation: es },
+  "pt-BR": { translation: ptBR },
+  fr: { translation: fr },
 }
 
 /** Survives restarts: "device" (default) or an explicit language. */

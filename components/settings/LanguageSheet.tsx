@@ -13,8 +13,9 @@ interface LanguageSheetProps {
 }
 
 /**
- * Language picker (docs §32): Español / English. The first launch still follows
- * the device language until one of the two is chosen here.
+ * Language picker (docs §32): English / Español / Português (Brasil) /
+ * Français. The first launch still follows the device language until one of
+ * them is chosen here.
  */
 export function LanguageSheet({ visible, onClose }: LanguageSheetProps) {
   const { t } = useTranslation()

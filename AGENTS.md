@@ -40,7 +40,7 @@ pnpm deploy:indexes     # publish firestore.indexes.json
 pnpm deploy:storage     # publish storage.rules
 pnpm deploy:functions   # build + publish the Cloud Functions workspace
 pnpm serve:functions    # build + run the functions & firestore emulators
-pnpm assets:store [es|en] # Play Store graphics from docs/images captures
+pnpm assets:store [es|en|pt-BR|fr] # Play Store graphics from docs/images captures
 npx expo-doctor         # diagnose dependency and config issues
 ```
 
@@ -187,11 +187,12 @@ npx expo-doctor         # diagnose dependency and config issues
 
 ## Internationalization
 
-- i18next is configured in `services/i18next.ts`; locale bundles are `locales/en.json` and `locales/es.json`.
-- The app starts in the **device language** (`libs/deviceLanguage.ts` native / `.web.ts` browser) unless the user picked one in the language bottom sheet (`components/settings/LanguageSheet.tsx`, reachable from Settings). The sheet offers only **English / Español**; the choice lives in AsyncStorage and is restored by `hydrateLanguage()` from `app/_layout.tsx` before the first frame.
-- Supported languages are declared once in `libs/language.ts` (`SUPPORTED_LANGUAGES`, `LANGUAGE_NAMES`, `resolveLanguage`).
+- i18next is configured in `services/i18next.ts`; locale bundles are `locales/en.json`, `locales/es.json`, `locales/pt-BR.json` and `locales/fr.json` (roadmap #70).
+- The app starts in the **device language** (`libs/deviceLanguage.ts` native / `.web.ts` browser) unless the user picked one in the language bottom sheet (`components/settings/LanguageSheet.tsx`, reachable from Settings). The sheet offers **English / Español / Português (Brasil) / Français**; the choice lives in AsyncStorage and is restored by `hydrateLanguage()` from `app/_layout.tsx` before the first frame.
+- Supported languages are declared once in `libs/language.ts` (`SUPPORTED_LANGUAGES`, `LANGUAGE_NAMES`, `resolveLanguage`). `pt-BR` is the **regional** code on purpose: it is the Portuguese we translated, and `matchLanguage` sends *every* Portuguese device (`pt`, `pt-PT`) to it, while an exact tag wins first (`pt-BR` stays `pt-BR`) and a base match follows (`fr-CA` → `fr`).
 - Every user-facing string comes from `t("namespace.key")` via `useTranslation()` from `react-i18next`.
-- **Adding a string means editing both locale files.** Keep `en.json` and `es.json` structurally identical — `tests/unit/i18n.test.ts` fails otherwise, and it also asserts that every statically referenced `t("…")` key exists in English (plural `_one`/`_other` forms included).
+- **Adding a string means editing every locale file.** Keep the bundles structurally identical — `tests/unit/i18n.test.ts` fails otherwise, and it also asserts that every statically referenced `t("…")` key exists in English (plural `_one`/`_other` forms included). That test is **generalised over every shipped language**: a new bundle is one line in its `bundles` map, and it also checks the **`{{placeholders}}`** of every value (a translator who drops `{{duration}}` does not break the build, they make the value disappear at runtime).
+- **Literal identifiers stay literal**: the CSV column names in `backup.csvHint` are the ones `libs/bandBackup.ts#parseSongsCsv` matches (`title`, `artist`, `key`, `capo`, `bpm`, `genre`, `tags`, `duration`, `notes`, `lyrics`) — translate the sentence around them, never the columns.
 - Interpolation: `{{variable}}`. Plurals: `key_one` / `key_other`.
 - Domain error messages are mapped centrally in `services/errors.ts` (`toFriendlyError`) — extend that instead of hardcoding user-facing error text.
 - **Section labels are derived, not stored**: a song persists `section.type` + its ordinal position, and the UI renders the label with `sectionLabelFor(sections, index, t)` (`libs/songUtils.ts`), so every member reads “Verse 1” / “Estrofa 1” regardless of who created the song. Only `custom` sections use their stored text.

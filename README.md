@@ -601,12 +601,18 @@ t("songs.newSong")
 t("toasts.suggestionSent")
 ```
 
-The app starts in the **device language**. The Settings → Language sheet offers **English / Español**;
-choosing one stores it on the device (`services/i18next.ts`) and it is restored before the first frame.
+The app starts in the **device language**. The Settings → Language sheet offers
+**English / Español / Português (Brasil) / Français**; choosing one stores it on the device
+(`services/i18next.ts`) and it is restored before the first frame.
 
-**Keep both locale files in sync** — every new user-facing string needs a key in `en.json` *and*
-`es.json`. Interpolation uses `{{variable}}`; plurals use `_one` / `_other` suffixes.
-`tests/unit/i18n.test.ts` enforces the parity and that every statically referenced key exists.
+**Keep every locale file in sync** — every new user-facing string needs a key in `en.json` *and*
+in each of `es.json`, `pt-BR.json` and `fr.json`. Interpolation uses `{{variable}}`; plurals use
+`_one` / `_other` suffixes. `tests/unit/i18n.test.ts` enforces the parity **for every shipped
+language** and that every statically referenced key exists — including the `{{placeholders}}` of
+each value, so a translation can never silently drop one.
+
+Two things a translation must not touch: the **CSV column names** in `backup.csvHint` (they are
+the literal headers `libs/bandBackup.ts#parseSongsCsv` matches) and anything inside `{{ }}`.
 
 ---
 

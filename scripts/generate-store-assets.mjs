@@ -7,15 +7,77 @@
 // The screenshots in docs/images are the source material — keep them as real
 // app captures.
 //
-// Usage: node scripts/generate-store-assets.mjs [es|en]
+// Usage: node scripts/generate-store-assets.mjs [es|en|pt-BR|fr]
 import { createCanvas, GlobalFonts, loadImage } from "@napi-rs/canvas"
 import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..")
-const lang = process.argv[2] === "en" ? "en" : "es"
-const outDir = lang === "es" ? join(root, "docs", "images", "store") : join(root, "docs", "images", "store", "en")
+
+/**
+ * One entry per store listing language (roadmap #70). Spanish is the default
+ * listing and keeps the flat folder; the others sit in their own subfolder so
+ * the Play Console can take each locale's assets.
+ */
+const STORE = {
+  es: {
+    dir: join(root, "docs", "images", "store"),
+    tagline: "El cancionero, las listas y los bolos de tu banda.",
+    footer: "Cancionero · Listas · Bolos · Sin conexión",
+    dualTitle: "Cancionero y directo",
+    dualSubtitle: "Una app para ensayar y tocar",
+    captions: [
+      { source: "home", title: "Tu banda, al día", subtitle: "Próximo bolo, actividad y accesos rápidos" },
+      { source: "songs", title: "Todo tu cancionero", subtitle: "Busca, filtra y abre cualquier canción" },
+      { source: "song", title: "Listo para el escenario", subtitle: "Acordes, letra, cejilla y transposición" },
+      { source: "edit", title: "Cada acorde, en su sitio", subtitle: "Editor con secciones y sugerencias" },
+    ],
+  },
+  en: {
+    dir: join(root, "docs", "images", "store", "en"),
+    tagline: "The band's songbook, setlists and gigs.",
+    footer: "Songbook · Setlists · Gigs · Offline",
+    dualTitle: "Songbook and stage",
+    dualSubtitle: "One app to rehearse and perform",
+    captions: [
+      { source: "home", title: "Your band, up to date", subtitle: "Next gig, activity and quick actions" },
+      { source: "songs", title: "Your whole songbook", subtitle: "Search, filter and open any song" },
+      { source: "song", title: "Ready for the stage", subtitle: "Chords, lyrics, capo and transpose" },
+      { source: "edit", title: "Every chord in place", subtitle: "Editor with sections and suggestions" },
+    ],
+  },
+  "pt-BR": {
+    dir: join(root, "docs", "images", "store", "pt-BR"),
+    tagline: "O repertório, as listas e os shows da sua banda.",
+    footer: "Repertório · Listas · Shows · Sem conexão",
+    dualTitle: "Repertório e palco",
+    dualSubtitle: "Um app para ensaiar e tocar",
+    captions: [
+      { source: "home", title: "Sua banda, em dia", subtitle: "Próximo show, atividade e atalhos" },
+      { source: "songs", title: "Todo o seu repertório", subtitle: "Busque, filtre e abra qualquer música" },
+      { source: "song", title: "Pronto para o palco", subtitle: "Acordes, letra, capo e transposição" },
+      { source: "edit", title: "Cada acorde no lugar", subtitle: "Editor com seções e sugestões" },
+    ],
+  },
+  fr: {
+    dir: join(root, "docs", "images", "store", "fr"),
+    tagline: "Le répertoire, les listes et les concerts de votre groupe.",
+    footer: "Répertoire · Listes · Concerts · Hors ligne",
+    dualTitle: "Répertoire et scène",
+    dualSubtitle: "Une app pour répéter et jouer",
+    captions: [
+      { source: "home", title: "Votre groupe, à jour", subtitle: "Prochain concert, activité et raccourcis" },
+      { source: "songs", title: "Tout votre répertoire", subtitle: "Cherchez, filtrez et ouvrez n'importe quel morceau" },
+      { source: "song", title: "Prêt pour la scène", subtitle: "Accords, paroles, capo et transposition" },
+      { source: "edit", title: "Chaque accord à sa place", subtitle: "Éditeur avec sections et suggestions" },
+    ],
+  },
+}
+
+const lang = STORE[process.argv[2]] ? process.argv[2] : "es"
+const store = STORE[lang]
+const outDir = store.dir
 mkdirSync(outDir, { recursive: true })
 
 /* ------------------------------------------------------------------ fonts */
@@ -304,7 +366,7 @@ const feature = () => {
 
   ctx.font = `400 25px ${ONEST}`
   ctx.fillStyle = MUTED
-  ctx.fillText(lang === "en" ? "The band's songbook, setlists and gigs." : "El cancionero, las listas y los bolos de tu banda.", tileX, 238)
+  ctx.fillText(store.tagline, tileX, 238)
 
   // App-native chord chips under the tagline.
   const chips = ["Em7", "G/B", "C", "D"]
@@ -319,27 +381,12 @@ const feature = () => {
   // Footer line.
   ctx.font = `400 19px ${ONEST}`
   ctx.fillStyle = colorWithAlpha(CREAM, 0.55)
-  ctx.fillText(lang === "en" ? "Songbook · Setlists · Gigs · Offline" : "Cancionero · Listas · Bolos · Sin conexión", tileX, 452)
+  ctx.fillText(store.footer, tileX, 452)
 
   writeFileSync(join(outDir, "feature-graphic-1024x500.png"), canvas.toBuffer("image/png"))
 }
 
 /* ------------------------------------------------------------- screenshots */
-
-const CAPTIONS = {
-  es: [
-    { source: "home", title: "Tu banda, al día", subtitle: "Próximo bolo, actividad y accesos rápidos" },
-    { source: "songs", title: "Todo tu cancionero", subtitle: "Busca, filtra y abre cualquier canción" },
-    { source: "song", title: "Listo para el escenario", subtitle: "Acordes, letra, cejilla y transposición" },
-    { source: "edit", title: "Cada acorde, en su sitio", subtitle: "Editor con secciones y sugerencias" },
-  ],
-  en: [
-    { source: "home", title: "Your band, up to date", subtitle: "Next gig, activity and quick actions" },
-    { source: "songs", title: "Your whole songbook", subtitle: "Search, filter and open any song" },
-    { source: "song", title: "Ready for the stage", subtitle: "Chords, lyrics, capo and transpose" },
-    { source: "edit", title: "Every chord in place", subtitle: "Editor with sections and suggestions" },
-  ],
-}
 
 const frameBackground = (ctx, W, H, tealAccent) => {
   const bg = ctx.createLinearGradient(0, 0, 0, H)
@@ -450,8 +497,8 @@ const dualFrame = () => {
   drawChordChip(ctx, "Em7", 930, 1500, 26, 0.12, 0.5)
   drawChordChip(ctx, "D", 120, 1480, 26, -0.12, 0.45)
 
-  const title = lang === "en" ? "Songbook and stage" : "Cancionero y directo"
-  const subtitle = lang === "en" ? "One app to rehearse and perform" : "Una app para ensayar y tocar"
+  const title = store.dualTitle
+  const subtitle = store.dualSubtitle
 
   ctx.textAlign = "center"
   ctx.textBaseline = "middle"
@@ -487,10 +534,10 @@ const dualFrame = () => {
 /* -------------------------------------------------------------------- run */
 
 feature()
-CAPTIONS[lang].forEach((caption, index) => screenshot(index, caption))
+store.captions.forEach((caption, index) => screenshot(index, caption))
 dualFrame()
 
-for (const file of ["feature-graphic-1024x500.png", ...CAPTIONS[lang].map((c, i) => `screenshot-${i + 1}-${c.source}-1080x1920.png`), "screenshot-5-dual-1080x1920.png"]) {
+for (const file of ["feature-graphic-1024x500.png", ...store.captions.map((c, i) => `screenshot-${i + 1}-${c.source}-1080x1920.png`), "screenshot-5-dual-1080x1920.png"]) {
   const size = statSync(join(outDir, file)).size
   console.log(file, (size / 1024 / 1024).toFixed(2) + " MB")
 }
