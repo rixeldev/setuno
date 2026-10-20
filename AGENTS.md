@@ -378,6 +378,26 @@ npx expo-doctor         # diagnose dependency and config issues
 Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
 Docs: https://docs.expo.dev/eas/index.md
 
+## The watch app (roadmap #79) — spiked, not shipped
+
+The roadmap's watch app was **spiked on 2026-10-20 and not shipped**, because the tooling is not
+sane under Continuous Native Generation:
+
+- **Apple Watch**: a watchOS app is Swift/SwiftUI. React Native has **no watchOS target** and
+  neither has Expo — `expo/config`'s `platforms` is `('android' | 'ios' | 'web')` and `expo prebuild`
+  only ever generates `android/` and `ios/`. A watch app would be a **separate native project**,
+  i.e. a different codebase, not this app.
+- **Wear OS**: a Wear OS app *is* an Android app (a `:wear` Gradle module in the same project, with
+  its own manifest and launcher), so the packaging is possible. But the UI would have to be native
+  Kotlin/Compose (a second app) or a **Wear OS Web** app — and the only thing that reuses this
+  codebase is a small watch-sized **web** page, which is a new deliverable of its own, not the
+  Setuno app with a watch UI.
+
+The reachable version of the idea is a watch-sized PWA (the web build already installs, see
+`public/manifest.json`), and it is worth doing only if the band actually asks for it. Until then
+the item stays closed — the **setlist stepping** the watch app would offer is already in the phone's
+reader (the corner arrows, roadmap #11's setlist walk).
+
 ## Deploying the web (Vercel)
 
 `vercel.json` at the repo root is ready for the static export: it runs
