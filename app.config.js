@@ -115,6 +115,11 @@ export default {
       bundler: "metro",
       output: "single",
       favicon: "./assets/favicon.png",
+      // The installable web app (roadmap #77): the description and the theme
+      // colour the browser shows on the install prompt and in its own UI.
+      description:
+        "Songs, setlists and gigs for your band: chords, lyrics, a stage reader and a tuner, offline and on every platform.",
+      themeColor: "#0B0B14",
     },
     plugins: [
       "@react-native-firebase/app",
