@@ -795,10 +795,28 @@ export const syncProPurchase = onCall({ secrets: [playServiceAccount] }, async (
   }
 
   const now = new Date().toISOString().slice(0, 10)
+  if (isTip) {
+    // A tip grants **nothing** — and it must not take anything away either: a
+    // member who already has Pro keeps their plan. So the write carries the tip
+    // and the date, and nothing else; the merge leaves the plan alone.
+    const tip: Entitlement = {
+      plan: "free",
+      productId,
+      source: "tip",
+      expiresAt: null,
+      updatedAt: now,
+    }
+    await getFirestore()
+      .doc(`users/${uid}/entitlements/pro`)
+      .set({ productId, source: "tip", updatedAt: now }, { merge: true })
+    logger.info("syncProPurchase recorded a tip", { uid, productId })
+    return tip
+  }
+
   const entitlement: Entitlement = {
-    plan: !isTip && active ? "pro" : "free",
+    plan: active ? "pro" : "free",
     productId,
-    source: isTip ? "tip" : "play",
+    source: "play",
     expiresAt,
     updatedAt: now,
   }

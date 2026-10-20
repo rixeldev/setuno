@@ -85,7 +85,14 @@ export const usePlanPurchase = (options: {
   return {
     connected: products.length > 0,
     products,
+    // No tip on the web yet: the store's company details are still being set
+    // up, and the tip is a one-time product that would need its own Stripe
+    // price.
+    tip: null,
     buy,
+    tipNow: async () => {
+      options.onError("store-unavailable")
+    },
     restore,
     manage,
   }

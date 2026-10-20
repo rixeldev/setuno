@@ -13,6 +13,7 @@ import { Dialog } from "@/components/ui/Dialog"
 import { useToast } from "@/components/ui/Toast"
 import {
   ChevronRightIcon,
+  CoinsIcon,
   CrownIcon,
   DevicesIcon,
   EyeIcon,
@@ -203,6 +204,12 @@ export default function SettingsScreen() {
           title={t("plan.title")}
           subtitle={plan.isPro ? t("plan.pro") : t("plan.free")}
           onPress={() => router.push("/settings/plan")}
+        />
+        <Divider />
+        <Row
+          icon={CoinsIcon}
+          title={t("plan.supportTitle")}
+          onPress={() => router.push("/settings/support")}
         />
         <Divider />
         <Row

@@ -28,8 +28,12 @@ export interface PlanPurchaseApi {
   connected: boolean
   /** The plan products the store offers right now. */
   products: PlanProduct[]
+  /** The optional tip (roadmap #64), with what it costs. */
+  tip: PlanProduct | null
   /** Starts the purchase of a product. */
   buy: (productId: string) => Promise<void>
+  /** Buys the tip — a consumable that grants nothing. */
+  tipNow: () => Promise<void>
   /** The purchases the store still knows about (the restore flow, #62). */
   restore: () => Promise<{ productId: string; purchaseToken: string }[]>
   /** Opens the store's own subscription screen. */
@@ -43,6 +47,7 @@ export const usePlanPurchase = (options: {
   onError: (message: string) => void
 }): PlanPurchaseApi => {
   const [products, setProducts] = useState<PlanProduct[]>([])
+  const [tip, setTip] = useState<PlanProduct | null>(null)
 
   const { connected, requestPurchase: request, finishTransaction, restorePurchases } = useIAP({
     onPurchaseSuccess: (purchase) => {
@@ -86,6 +91,29 @@ export const usePlanPurchase = (options: {
     }
   }, [])
 
+  // The tip is a **one-time product**, a different kind of thing than the
+  // subscriptions, so the store is asked for it separately.
+  useEffect(() => {
+    let cancelled = false
+    void fetchProducts({ skus: [PRO_PRODUCTS.tip], type: "in-app" })
+      .then((result) => {
+        if (cancelled) return
+        const list = Array.isArray(result) ? result : []
+        const product = list[0]
+        if (!product) return
+        setTip({
+          id: "id" in product ? product.id : PRO_PRODUCTS.tip,
+          price: "displayPrice" in product ? product.displayPrice : "",
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setTip(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const buy = useCallback(
     async (productId: string): Promise<void> => {
       try {
@@ -99,6 +127,17 @@ export const usePlanPurchase = (options: {
     },
     [request, options],
   )
+
+  const tipNow = useCallback(async (): Promise<void> => {
+    try {
+      await request({
+        request: { google: { skus: [PRO_PRODUCTS.tip] } },
+        type: "in-app",
+      })
+    } catch {
+      options.onError("purchase-failed")
+    }
+  }, [request, options])
 
   const restore = useCallback(async (): Promise<{ productId: string; purchaseToken: string }[]> => {
     try {
@@ -118,7 +157,9 @@ export const usePlanPurchase = (options: {
   return {
     connected,
     products,
+    tip,
     buy,
+    tipNow,
     restore,
     manage: async () => {
       const { deepLinkToSubscriptions } = await import("expo-iap")

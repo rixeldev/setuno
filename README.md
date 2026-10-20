@@ -616,6 +616,17 @@ likely. A purchase with a **license tester** account settles which number Play r
 the plan screen there **disables the buy buttons** and points at the Android app instead — the plan
 follows the **account**, so buying it on Android turns the web into Pro too ✓.
 
+### The tip
+
+**Settings → Support Setuno** offers a small tip for the person who made the app. It is a
+**consumable** and it **grants nothing** — no feature, no limit, no badge — and the screen says so
+in as many words. There is no external payment link anywhere: the tip goes through the store the
+app already uses, and the server confirms it, consumes it (so it can be tipped again) and records
+that it happened. A tip never touches the plan, so a member who already has Pro keeps it.
+
+**Owner step**: create the one-time product `setuno_tip` in the Play Console with a fixed price (a
+store never takes a custom amount) and pick the amount.
+
 Without the service account the callable refuses every purchase: a missing credential must never
 fall back to "probably fine". Until the products exist, the plan screen says the plan is not
 offered in this build yet rather than offering a button that cannot work.
