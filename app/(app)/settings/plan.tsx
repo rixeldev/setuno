@@ -11,6 +11,7 @@ import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { useEntitlement } from "@/hooks/useEntitlement"
 import { usePlanPurchase } from "@/hooks/usePlanPurchase"
+import { useOrganization } from "@/hooks/useOrganization"
 import { PRO_PRODUCTS } from "@/functions/src/entitlements"
 import { fetchEntitlement, syncPurchase } from "@/services/entitlements"
 import { toFriendlyError } from "@/services/errors"
@@ -36,11 +37,15 @@ export default function PlanScreen() {
   const styles = useThemedStyles(createStyles)
   const toast = useToast()
   const plan = useEntitlement()
+  const { organizationId, isAdmin } = useOrganization()
   const [busy, setBusy] = useState(false)
   // The web cannot take the payment yet, so it says where to.
   const isWeb = Platform.OS === "web"
+  // The plan belongs to the band, so only one of its admins can buy it.
+  const canBuy = isAdmin && Boolean(organizationId)
 
   const store = usePlanPurchase({
+    organizationId: organizationId ?? "",
     onPurchased: () => {
       toast.showSuccess(t("plan.proActivated"))
     },
@@ -65,9 +70,13 @@ export default function PlanScreen() {
     try {
       const purchases = await store.restore()
       for (const purchase of purchases) {
-        await syncPurchase(purchase.productId, purchase.purchaseToken)
+        await syncPurchase(
+          organizationId ?? "",
+          purchase.productId,
+          purchase.purchaseToken,
+        )
       }
-      await fetchEntitlement()
+      await fetchEntitlement(organizationId ?? "")
       toast.showSuccess(purchases.length > 0 ? t("plan.restored") : t("plan.nothingToRestore"))
     } catch (error) {
       toast.showError(toFriendlyError(error, t("plan.restoreFailed")))
@@ -128,7 +137,7 @@ export default function PlanScreen() {
               <Button
                 label={t("plan.buyMonthly", { price: monthly.price })}
                 full
-                disabled={isWeb}
+                disabled={isWeb || !canBuy}
                 loading={busy}
                 onPress={() => void onBuy(PRO_PRODUCTS.monthly)}
               />
@@ -138,7 +147,7 @@ export default function PlanScreen() {
                 label={t("plan.buyAnnual", { price: annual.price })}
                 full
                 variant="secondary"
-                disabled={isWeb}
+                disabled={isWeb || !canBuy}
                 loading={busy}
                 onPress={() => void onBuy(PRO_PRODUCTS.annual)}
               />

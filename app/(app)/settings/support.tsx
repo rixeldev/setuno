@@ -27,6 +27,8 @@ export default function SupportScreen() {
   const [busy, setBusy] = useState(false)
 
   const store = usePlanPurchase({
+    // A tip belongs to the person, not to the band.
+    organizationId: "",
     onPurchased: () => {
       toast.showSuccess(t("plan.tipThanks"))
       router.back()

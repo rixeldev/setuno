@@ -96,12 +96,13 @@ describe("subscriptionFromStripe", () => {
     customer: "cus_123",
     status: "active",
     current_period_end: 1_800_000_000,
-    metadata: { uid: "alice", plan: "monthly" },
+    metadata: { uid: "alice", plan: "monthly", organizationId: "band-1" },
   }
 
-  it("reads the member and the period out of the metadata", () => {
+  it("reads the member, the band and the period out of the metadata", () => {
     const parsed = subscriptionFromStripe(subscription)
     expect(parsed?.uid).toBe("alice")
+    expect(parsed?.organizationId).toBe("band-1")
     expect(parsed?.plan).toBe("monthly")
     expect(parsed?.customerId).toBe("cus_123")
     expect(parsed?.active).toBe(true)
@@ -111,6 +112,11 @@ describe("subscriptionFromStripe", () => {
   it("grants nothing to a subscription without our metadata", () => {
     expect(subscriptionFromStripe({ id: "sub_1", metadata: {} })).toBeNull()
     expect(subscriptionFromStripe({ id: "sub_1" })).toBeNull()
+    // The band is part of the contract: a subscription without one cannot say
+    // which band's plan it settles.
+    expect(
+      subscriptionFromStripe({ id: "sub_1", metadata: { uid: "alice", plan: "monthly" } }),
+    ).toBeNull()
   })
 
   it("does not grant a plan to a cancelled subscription", () => {

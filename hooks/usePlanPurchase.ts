@@ -41,6 +41,8 @@ export interface PlanPurchaseApi {
 }
 
 export const usePlanPurchase = (options: {
+  /** The band the plan belongs to — a tip does not need one. */
+  organizationId: string
   /** Called once the server has confirmed the purchase. */
   onPurchased: (productId: string) => void
   /** Called when the store or the server refuses. */
@@ -56,7 +58,7 @@ export const usePlanPurchase = (options: {
         options.onError("purchase-token")
         return
       }
-      void syncPurchase(purchase.productId, token)
+      void syncPurchase(options.organizationId, purchase.productId, token)
         .then(() => finishTransaction({ purchase }))
         .then(() => options.onPurchased(purchase.productId))
         .catch(() => options.onError("purchase-failed"))

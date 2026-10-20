@@ -716,16 +716,25 @@ export const signOutEverywhere = onCall(async (request) => {
 /**
  * The member's plan (roadmap #61).
  *
- * The entitlement is written by `syncProPurchase` and read here; a **missing**
- * document simply reads as the free plan, so a brand-new account never has to
- * ask twice. The call is scoped to the caller's own uid: no argument is read,
- * so nobody can read anybody else's plan.
+ * The entitlement lives on the **band**, not on the account: the band
+ * subscribes (an admin buys it) and every member of it gets the perks — the
+ * ads disappear on every member's device, the band's statistics open, and the
+ * songbook stops having a ceiling. A per-account entitlement would have left
+ * the band's songbook limit applying to the members who did not buy anything.
  */
 export const getMyEntitlement = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to see your plan")
   const uid = request.auth.uid
+  const data = readCallInput(request.data)
+  const organizationId = typeof data.organizationId === "string" ? data.organizationId : ""
+  if (organizationId.length === 0) throw new HttpsError("invalid-argument", "A band is required")
 
-  const snapshot = await getFirestore().doc(`users/${uid}/entitlements/pro`).get()
+  const db = getFirestore()
+  // The plan belongs to the band, so the caller has to belong to it.
+  const member = await db.doc(`organizations/${organizationId}/members/${uid}`).get()
+  if (!member.exists) throw new HttpsError("permission-denied", "You are not a member of this band")
+
+  const snapshot = await db.doc(`organizations/${organizationId}/entitlement/pro`).get()
   const now = new Date().toISOString().slice(0, 10)
   return mapEntitlement(snapshot.exists ? snapshot.data() : null, now)
 })
@@ -749,9 +758,14 @@ export const syncProPurchase = onCall({ secrets: [playServiceAccount] }, async (
 
   const productId = typeof data.productId === "string" ? data.productId : ""
   const purchaseToken = typeof data.purchaseToken === "string" ? data.purchaseToken : ""
+  const organizationId = typeof data.organizationId === "string" ? data.organizationId : ""
   if (!isKnownProduct(productId)) throw new HttpsError("invalid-argument", "Unknown product")
   if (purchaseToken.length === 0 || purchaseToken.length > 512) {
     throw new HttpsError("invalid-argument", "A purchase token is required")
+  }
+  const isTip = productId === PRO_PRODUCTS.tip
+  if (!isTip && organizationId.length === 0) {
+    throw new HttpsError("invalid-argument", "A band is required")
   }
 
   const serviceAccount = await resolveServiceAccount()
@@ -761,7 +775,6 @@ export const syncProPurchase = onCall({ secrets: [playServiceAccount] }, async (
     throw new HttpsError("failed-precondition", "The store is not configured on this server yet")
   }
   const packageName = process.env.ANDROID_PACKAGE_NAME ?? "com.rixeldev.setuno"
-  const isTip = productId === PRO_PRODUCTS.tip
 
   let active = false
   let expiresAt: string | null = null
@@ -797,8 +810,9 @@ export const syncProPurchase = onCall({ secrets: [playServiceAccount] }, async (
   const now = new Date().toISOString().slice(0, 10)
   if (isTip) {
     // A tip grants **nothing** — and it must not take anything away either: a
-    // member who already has Pro keeps their plan. So the write carries the tip
-    // and the date, and nothing else; the merge leaves the plan alone.
+    // band that already has Pro keeps its plan. The tip is recorded on the
+    // account that gave it (it is not the band's), and it carries nothing but
+    // the tip and the date.
     const tip: Entitlement = {
       plan: "free",
       productId,
@@ -807,7 +821,7 @@ export const syncProPurchase = onCall({ secrets: [playServiceAccount] }, async (
       updatedAt: now,
     }
     await getFirestore()
-      .doc(`users/${uid}/entitlements/pro`)
+      .doc(`users/${uid}/entitlements/tip`)
       .set({ productId, source: "tip", updatedAt: now }, { merge: true })
     logger.info("syncProPurchase recorded a tip", { uid, productId })
     return tip
@@ -820,9 +834,24 @@ export const syncProPurchase = onCall({ secrets: [playServiceAccount] }, async (
     expiresAt,
     updatedAt: now,
   }
-  await getFirestore().doc(`users/${uid}/entitlements/pro`).set(entitlement, { merge: true })
+  // The plan belongs to the **band**, and only an admin of it may buy it — a
+  // member cannot gift Pro to a band they do not run, and cannot buy it for
+  // somebody else's band either.
+  const member = await getFirestore()
+    .doc(`organizations/${organizationId}/members/${uid}`)
+    .get()
+  if (!member.exists) {
+    throw new HttpsError("permission-denied", "You are not a member of this band")
+  }
+  if (member.data()?.role !== "admin") {
+    throw new HttpsError("permission-denied", "Only a band admin can buy the plan")
+  }
+  await getFirestore()
+    .doc(`organizations/${organizationId}/entitlement/pro`)
+    .set(entitlement, { merge: true })
   logger.info("syncProPurchase settled an entitlement", {
     uid,
+    organizationId,
     productId,
     active,
     plan: entitlement.plan,
@@ -860,7 +889,20 @@ export const startCheckout = onCall({ secrets: [stripeSecret] }, async (request)
   const uid = request.auth.uid
   const data = readCallInput(request.data)
   const plan = data.plan === "annual" ? "annual" : data.plan === "monthly" ? "monthly" : null
+  const organizationId = typeof data.organizationId === "string" ? data.organizationId : ""
   if (!plan) throw new HttpsError("invalid-argument", "Unknown plan")
+  if (organizationId.length === 0) throw new HttpsError("invalid-argument", "A band is required")
+
+  // The plan belongs to the band, so only one of its admins can buy it.
+  const member = await getFirestore()
+    .doc(`organizations/${organizationId}/members/${uid}`)
+    .get()
+  if (!member.exists) {
+    throw new HttpsError("permission-denied", "You are not a member of this band")
+  }
+  if (member.data()?.role !== "admin") {
+    throw new HttpsError("permission-denied", "Only a band admin can buy the plan")
+  }
 
   const config = await resolveStripeConfig()
   if (!config) throw new HttpsError("failed-precondition", "The store is not configured yet")
@@ -871,6 +913,7 @@ export const startCheckout = onCall({ secrets: [stripeSecret] }, async (request)
       uid,
       email: request.auth.token.email ?? "",
       plan,
+      organizationId,
       successUrl: `${origin}/settings/plan?checkout=success`,
       cancelUrl: `${origin}/settings/plan?checkout=cancelled`,
     })
@@ -991,11 +1034,13 @@ const settleStripeSubscription = async (
     customerId: parsed.customerId,
     subscriptionId: parsed.subscriptionId,
   }
+  // The plan belongs to the **band** the subscription was bought for.
   await getFirestore()
-    .doc(`users/${parsed.uid}/entitlements/pro`)
+    .doc(`organizations/${parsed.organizationId}/entitlement/pro`)
     .set(entitlement, { merge: true })
   logger.info("stripeWebhook settled an entitlement", {
     uid: parsed.uid,
+    organizationId: parsed.organizationId,
     plan: entitlement.plan,
     active: parsed.active,
   })

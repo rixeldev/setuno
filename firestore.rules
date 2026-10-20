@@ -528,6 +528,22 @@ service cloud.firestore {
       // Only the owner can delete the band.
       allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
 
+      // ------------------------------------------------------------- entitlement
+
+      /**
+       * The Pro plan (roadmap #61): the entitlement lives on the **band**,
+       * because the band is what subscribes — an admin buys it and every
+       * member of the band gets the perks (no ads on any of their devices, the
+       * statistics, and no songbook ceiling).
+       *
+       * It is **written by the callable alone**: the store confirms the
+       * purchase and the Admin SDK writes it, so there is no `allow write`
+       * here at all and a phone can never grant a band the plan.
+       */
+      match /entitlement/{entitlementId} {
+        allow read: if isBandReader(organizationId);
+      }
+
       // ----------------------------------------------------------------- members
 
       match /members/{memberUid} {

@@ -21,6 +21,8 @@ import {
  * web bundle.
  */
 export const usePlanPurchase = (options: {
+  /** The band the plan belongs to — a tip does not need one. */
+  organizationId: string
   /** Called once the server has confirmed the purchase. */
   onPurchased: (productId: string) => void
   /** Called when the store or the server refuses. */
@@ -51,7 +53,10 @@ export const usePlanPurchase = (options: {
   const buy = useCallback(
     async (productId: string): Promise<void> => {
       try {
-        const url = await startCheckout(productId as "monthly" | "annual")
+        const url = await startCheckout(
+          options.organizationId,
+          productId as "monthly" | "annual",
+        )
         // Stripe's Checkout is a hosted page: the browser goes there, pays and
         // comes back. The entitlement is written by the webhook meanwhile.
         if (typeof window !== "undefined") window.location.href = url
@@ -66,12 +71,12 @@ export const usePlanPurchase = (options: {
     // Stripe is the source of truth and the webhook has already settled the
     // entitlement; asking the server again is all a "restore" has to do.
     try {
-      await fetchEntitlement()
+      await fetchEntitlement(options.organizationId)
     } catch {
       // Nothing to restore (or the store is unreachable) — the screen says so.
     }
     return []
-  }, [])
+  }, [options.organizationId])
 
   const manage = useCallback(async (): Promise<void> => {
     try {

@@ -35,11 +35,13 @@ export default function NewOrganization() {
   const [saving, setSaving] = useState(false)
   const [limitReached, setLimitReached] = useState(false)
 
-  // The free plan holds one band (roadmap #63). The limit is **communicated
-  // before it is hit** (the plan screen always says what the free plan
-  // allows); this is the moment it is hit.
+  // The free plan holds one band **of your own** (roadmap #63). The limit is
+  // **communicated before it is hit** (the plan screen always says what the
+  // free plan allows); this is the moment it is hit. Joining a band is free —
+  // only running one of your own costs a plan.
   const bandLimit = plan.limits?.bands ?? 0
-  const atBandLimit = !plan.isPro && bandLimit > 0 && organizations.length >= bandLimit
+  const ownedBands = organizations.filter((organization) => organization.role === "admin").length
+  const atBandLimit = !plan.isPro && bandLimit > 0 && ownedBands >= bandLimit
 
   const close = (): void => {
     if (router.canGoBack()) router.back()

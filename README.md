@@ -566,15 +566,24 @@ entitlement written. The client has no way to write it — the security rules al
 | The shapes, the free limits and the product ids | `functions/src/entitlements.ts` (pure — the app reads it through the `@/functions` alias) |
 | The store check | `functions/src/playBilling.ts` (the Google Play Developer API) |
 | The callables | `getMyEntitlement` and `syncProPurchase` in `functions/src/index.ts` |
-| The document | `users/{uid}/entitlements/pro`, server-written only |
+| The document | `organizations/{orgId}/entitlement`, server-written only |
 | The app | `hooks/useEntitlement.ts`, `hooks/usePlanPurchase.ts` (+ its `.web.ts` twin) and the plan screen in Settings |
+
+### The plan belongs to the band
+
+The **band** subscribes, not the person: an admin buys the plan for the band and **every member**
+gets the perks — no ads on any of their devices, the band's statistics, and no songbook ceiling. The
+entitlement lives on the band (`organizations/{orgId}/entitlement`) and only the server writes it.
+
+That is why the free plan's "one band" limit counts the bands an account **administers**:
+joining a band is always free, and a per-account entitlement would have left the songbook limit
+applying to the members who did not buy anything.
 
 ### The web buys the plan from Stripe
 
 The mobile build buys the plan from **Google Play**; the web build buys the same plan from **Stripe
 Checkout**, because Play Billing has no web implementation. Both paths write the **same** entitlement
-document, so the plan belongs to the account and not to the device: buy it on Android and the web is
-Pro too.
+document, so the plan follows the band and not the device: buy it on Android and the web is Pro too.
 
 How it works:
 

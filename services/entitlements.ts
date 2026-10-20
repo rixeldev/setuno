@@ -12,24 +12,28 @@ import {
 /**
  * The Pro plan (roadmap #61).
  *
- * The entitlement is **server-written**: the `syncProPurchase` callable asks
- * the store whether the purchase is real and writes the document with the
- * Admin SDK. The client only ever reads it (the rules have no `allow write`
- * for it), so a phone can never grant itself the plan.
+ * The entitlement lives on the **band**, not on the account: the band
+ * subscribes (an admin buys it) and every member of it gets the perks — the
+ * ads disappear on every member's device, the band's statistics open, and the
+ * songbook stops having a ceiling. A per-account entitlement would have left
+ * the band's songbook limit applying to the members who did not buy anything.
  *
- * A **missing** document is the free plan — a brand-new account has no
- * entitlement and does not need one.
+ * It is **server-written**: the `syncProPurchase` callable asks the store
+ * whether the purchase is real and writes the document with the Admin SDK, so
+ * the client cannot write it at all. The client only ever *reads* it, so a
+ * phone that has been offline for a month still knows what the band is
+ * entitled to.
+ *
+ * A **missing** document is the free plan — a band that never subscribed does
+ * not need one.
  */
-
-/** The document the entitlement lives under. */
-const ENTITLEMENT_ID = "pro"
 
 /** What the app needs to know about the member's plan. */
 export interface PlanState {
   plan: PlanId
   /** True when the Pro perks apply right now. */
   isPro: boolean
-  /** The free plan's limits, or `null` when the member is Pro. */
+  /** The free plan's limits, or `null` when the band is Pro. */
   limits: typeof FREE_LIMITS | null
   /** The product the plan was bought with. */
   productId: string
@@ -65,15 +69,15 @@ export const freePlanState = (): PlanState => ({
  * what it is entitled to the moment it comes back.
  */
 export const subscribeEntitlement = (
-  uid: string,
+  organizationId: string,
   onChange: (state: PlanState) => void,
 ): Unsubscribe => {
-  if (!uid) {
+  if (!organizationId) {
     onChange(freePlanState())
     return () => undefined
   }
   return onSnapshot(
-    doc(firestore, paths.userEntitlement(uid, ENTITLEMENT_ID)),
+    doc(firestore, paths.organizationEntitlement(organizationId)),
     (snapshot) => {
       const now = new Date().toISOString().slice(0, 10)
       onChange(toPlanState(mapEntitlement(snapshot.exists() ? snapshot.data() : null, now)))
@@ -90,20 +94,27 @@ export const subscribeEntitlement = (
  * The phone never decides what it is entitled to — it only says what the
  * store gave it.
  */
-export const syncPurchase = async (productId: string, purchaseToken: string): Promise<PlanState> => {
-  const call = httpsCallable<{ productId: string; purchaseToken: string }, Entitlement>(
-    getFunctions(),
-    "syncProPurchase",
-  )
-  const response = await call({ productId, purchaseToken })
+export const syncPurchase = async (
+  organizationId: string,
+  productId: string,
+  purchaseToken: string,
+): Promise<PlanState> => {
+  const call = httpsCallable<
+    { organizationId: string; productId: string; purchaseToken: string },
+    Entitlement
+  >(getFunctions(), "syncProPurchase")
+  const response = await call({ organizationId, productId, purchaseToken })
   const now = new Date().toISOString().slice(0, 10)
   return toPlanState(mapEntitlement(response.data, now))
 }
 
 /** Reads the plan once (the "restore purchases" flow, roadmap #62). */
-export const fetchEntitlement = async (): Promise<PlanState> => {
-  const call = httpsCallable<Record<string, never>, Entitlement>(getFunctions(), "getMyEntitlement")
-  const response = await call({})
+export const fetchEntitlement = async (organizationId: string): Promise<PlanState> => {
+  const call = httpsCallable<{ organizationId: string }, Entitlement>(
+    getFunctions(),
+    "getMyEntitlement",
+  )
+  const response = await call({ organizationId })
   const now = new Date().toISOString().slice(0, 10)
   return toPlanState(mapEntitlement(response.data, now))
 }
@@ -136,9 +147,15 @@ export const fetchPlanOffers = async (): Promise<PlanOffer[]> => {
 }
 
 /** Opens Stripe's Checkout for a plan and returns the URL to send the member to. */
-export const startCheckout = async (plan: "monthly" | "annual"): Promise<string> => {
-  const call = httpsCallable<{ plan: string }, { url: string }>(getFunctions(), "startCheckout")
-  const response = await call({ plan })
+export const startCheckout = async (
+  organizationId: string,
+  plan: "monthly" | "annual",
+): Promise<string> => {
+  const call = httpsCallable<{ organizationId: string; plan: string }, { url: string }>(
+    getFunctions(),
+    "startCheckout",
+  )
+  const response = await call({ organizationId, plan })
   return response.data.url
 }
 

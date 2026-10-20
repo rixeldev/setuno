@@ -1580,6 +1580,16 @@ describe("the Pro plan is server-written (#61)", () => {
   it("is invisible to a signed-out visitor", async () => {
     await assertFails(guest().firestore().doc(`users/alice/entitlements/pro`).get())
   })
+
+  it("belongs to the band, and only the band may read it", async () => {
+    // The plan is the band's, so every member reads it — and nobody writes it.
+    await assertSucceeds(
+      alice().firestore().doc(`organizations/${orgId}/entitlement/pro`).get(),
+    )
+    await assertFails(
+      alice().firestore().doc(`organizations/${orgId}/entitlement/pro`).set({ plan: "pro" }),
+    )
+  })
 })
 
 describe("song versions are an admin-written, member-readable history", () => {

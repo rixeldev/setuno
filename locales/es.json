@@ -1202,7 +1202,7 @@
     "statsLocked": "Las estadísticas de la banda son parte del plan Pro.",
     "seePlan": "Ver el plan",
     "limitTitle": "Has llegado al límite del plan gratuito",
-    "limitBands": "El plan gratis admite {{count}} banda. Hazte Pro para tantas bandas como quieras.",
+    "limitBands": "El plan gratis admite {{count}} banda propia. Hazte Pro para tantas como quieras.",
     "limitSongs": "El plan gratis admite {{count}} canciones. Hazte Pro para un cancionero sin límite."
   },
   "liveShow": {

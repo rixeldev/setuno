@@ -1339,7 +1339,7 @@
     "statsLocked": "As estatísticas da banda fazem parte do plano Pro.",
     "seePlan": "Ver o plano",
     "limitTitle": "Você chegou ao limite do plano grátis",
-    "limitBands": "O plano grátis comporta {{count}} banda. Vire Pro para quantas bandas quiser.",
+    "limitBands": "O plano grátis comporta {{count}} banda sua. Vire Pro para quantas quiser.",
     "limitSongs": "O plano grátis comporta {{count}} músicas. Vire Pro para um repertório sem limite."
   },
   "liveShow": {

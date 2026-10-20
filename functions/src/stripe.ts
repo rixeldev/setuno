@@ -178,6 +178,8 @@ export const createCheckoutSession = async (input: {
   uid: string
   email: string
   plan: "monthly" | "annual"
+  /** The band the plan belongs to — the webhook settles that band's plan. */
+  organizationId: string
   /** Where Stripe sends the member when the payment is done (or cancelled). */
   successUrl: string
   cancelUrl: string
@@ -189,8 +191,10 @@ export const createCheckoutSession = async (input: {
     client_reference_id: input.uid,
     "metadata[uid]": input.uid,
     "metadata[plan]": input.plan,
+    "metadata[organizationId]": input.organizationId,
     "subscription_data[metadata][uid]": input.uid,
     "subscription_data[metadata][plan]": input.plan,
+    "subscription_data[metadata][organizationId]": input.organizationId,
     success_url: input.successUrl,
     cancel_url: input.cancelUrl,
     ...(input.email ? { customer_email: input.email } : {}),
@@ -275,6 +279,8 @@ export const verifyStripeSignature = (input: {
 export interface StripeEntitlement {
   /** The member's uid, as Stripe's metadata carries it. */
   uid: string
+  /** The band the plan belongs to, as Stripe's metadata carries it. */
+  organizationId: string
   plan: "monthly" | "annual"
   /** The Stripe customer, for the billing portal later. */
   customerId: string
@@ -290,17 +296,19 @@ export interface StripeEntitlement {
  * Reads a Stripe subscription into what the entitlement needs.
  *
  * The uid comes from the **metadata** Stripe stored with the subscription —
- * never from the browser ✓ — and a subscription without it is ignored: an
- * unknown purchase must never grant a plan to a guess.
+ * never from the browser ✓ — and so does the band: the plan belongs to a
+ * band, and the webhook has to know which one. A subscription without both
+ * grants nothing at all.
  */
 export const subscriptionFromStripe = (
   subscription: Record<string, unknown>,
 ): StripeEntitlement | null => {
   const metadata = (subscription.metadata ?? {}) as Record<string, unknown>
   const uid = typeof metadata.uid === "string" ? metadata.uid : ""
+  const organizationId = typeof metadata.organizationId === "string" ? metadata.organizationId : ""
   const plan = metadata.plan === "annual" ? "annual" : metadata.plan === "monthly" ? "monthly" : null
   const id = typeof subscription.id === "string" ? subscription.id : ""
-  if (!uid || !plan || !id) return null
+  if (!uid || !organizationId || !plan || !id) return null
   const customer = subscription.customer
   const customerId = typeof customer === "string" ? customer : ""
   const status = typeof subscription.status === "string" ? subscription.status : ""
@@ -311,6 +319,7 @@ export const subscriptionFromStripe = (
       : null
   return {
     uid,
+    organizationId,
     plan,
     customerId,
     subscriptionId: id,
