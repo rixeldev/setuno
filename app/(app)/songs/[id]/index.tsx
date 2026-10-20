@@ -74,6 +74,7 @@ import {
   touchShowSong,
   writeImmersiveMode,
 } from "@/hooks/useReaderSession"
+import { useReviewPrompt } from "@/hooks/useReviewPrompt"
 import { useShowLogSync } from "@/hooks/useShowLogSync"
 import { useWakeLock } from "@/hooks/useWakeLock"
 import { useAutoscroll } from "@/hooks/useAutoscroll"
@@ -242,6 +243,11 @@ export default function SongScreen() {
     touchShowSong(setlistId, songId)
     return () => releaseShowSong(setlistId, songId)
   }, [songId, setlistId])
+
+  // In-app review (roadmap #71): a setlist read is the milestone occasion —
+  // mounting opens it, and leaving the reader for good (never a song step,
+  // never launch) is when the store may be asked, quotas included.
+  useReviewPrompt(Boolean(setlistId))
 
   // Public live setlist (roadmap #57): arriving at a song of the event's
   // *shared* setlist moves the fan page's "now playing" marker. Only that

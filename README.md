@@ -109,6 +109,7 @@ a sidebar layout on the web.
 | **Settings** | Profile, theme (dark/light/system), language (EN/ES), band settings, danger zone |
 | **Modals** | Members, suggestions, the band switcher, profile and the chord play guide open as modal sheets over the current screen |
 | **Ads** | Google Mobile Ads banner under the navigation (native builds; hidden when there is no fill) |
+| **In-app rating** | Once you have read through setlists three times, the app asks for your App Store / Play rating at a quiet moment — after you leave the reader, never mid-song or at launch — at most three times a year and at least 90 days apart. The browser version skips it: ratings belong to the stores |
 | **i18n** | Full English and Spanish translations, guarded by a structural test |
 | **Realtime** | Live Firestore listeners keep every device in sync |
 | **Offline** | Writes are stored on the device and synchronized automatically when the connection returns |
