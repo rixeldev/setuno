@@ -573,20 +573,27 @@ entitlement written. The client has no way to write it — the security rules al
 
 The plan cannot be bought until the products exist and the server can ask Google about them.
 
-1. **The products** — in the Play Console, create the two subscriptions with these exact ids:
-   `setuno_pro_monthly` and `setuno_pro_annual` (the ids are a contract between the app, the store
-   and the callable; a purchase of an unknown id is never granted). The prices are yours to choose —
-   the app shows whatever the store answers.
+1. **The products** — in the Play Console, create one subscription with two base plans:
+   - the subscription's product id: `setuno_pro`;
+   - a base plan per period, with the ids **`monthly`** and **`annual`** (these are the skus the
+     app asks the store for — with other names the plan never shows up in the app);
+   - auto-renewing, with the prices you choose. The app shows whatever the store answers.
+
 2. **The service account** — in the Google Cloud console, create a service account for the project,
    then in the Play Console (*Users and permissions*) invite it and grant it the **"App orders"** and
-   **"Financial data"** permissions. Put its key in the functions' environment, in **either** of these
-   shapes (both are accepted, so pick whichever your setup handles better):
-   - `PLAY_SERVICE_ACCOUNT_JSON` — the whole key file as a single line, or
-   - `PLAY_SERVICE_ACCOUNT_CLIENT_EMAIL` + `PLAY_SERVICE_ACCOUNT_PRIVATE_KEY` — the address and the
-     PEM (with the newlines written as `\n`).
-
-   It is a credential, so it never goes into the repo.
-3. **Deploy** — the callables ship with the functions (`pnpm deploy:functions`).
+   **"Financial data"** permissions. Give it **no IAM roles** in the project: the Play permission is
+   the one that matters, and a key for an account with roles on the project is a much bigger key.
+   (The project's default App Engine service account works too — that is the one currently
+   configured — but it is a full-project credential, so a dedicated account is worth the two
+   minutes.)
+3. **The key in the functions** — it lives in **Secret Manager**, never in the repo:
+   `firebase functions:secrets:set PLAY_SERVICE_ACCOUNT_JSON` (the value is the key file, minified to
+   one line). The callable reads the secret and falls back to the environment, so the emulator can
+   run with a plain `.env` too.
+4. **The API enabled** — the *Google Play Android Developer API* must be on in the Cloud project
+   (`androidpublisher.googleapis.com`); without it Google answers `403` and no purchase can ever be
+   confirmed. It is already enabled in the production project.
+5. **Deploy** — the callables ship with the functions (`pnpm deploy:functions`).
 
 Without the service account the callable refuses every purchase: a missing credential must never
 fall back to "probably fine". Until the products exist, the plan screen says the plan is not

@@ -20,7 +20,7 @@ export interface PlayPurchase {
   expiresAt: string | null
 }
 
-interface ServiceAccount {
+export interface ServiceAccount {
   client_email: string
   private_key: string
 }
@@ -44,12 +44,8 @@ interface ServiceAccount {
 export const serviceAccountFromEnv = (): ServiceAccount | null => {
   const json = process.env.PLAY_SERVICE_ACCOUNT_JSON
   if (json && json.trim().length > 0) {
-    try {
-      const parsed = JSON.parse(json) as ServiceAccount
-      if (parsed?.client_email && parsed?.private_key) return parsed
-    } catch {
-      // A malformed JSON falls through to the pair below.
-    }
+    const parsed = serviceAccountFromJson(json)
+    if (parsed) return parsed
   }
   const email = process.env.PLAY_SERVICE_ACCOUNT_CLIENT_EMAIL
   const key = process.env.PLAY_SERVICE_ACCOUNT_PRIVATE_KEY
@@ -59,6 +55,22 @@ export const serviceAccountFromEnv = (): ServiceAccount | null => {
     return { client_email: email, private_key: key.replace(/\\n/g, "\n") }
   }
   return null
+}
+
+/** The same credential read from a JSON blob (the Secret Manager's value). */
+export const serviceAccountFromJson = (json: string): ServiceAccount | null => {
+  try {
+    const parsed = JSON.parse(json) as ServiceAccount
+    if (parsed?.client_email && parsed?.private_key) {
+      return {
+        client_email: parsed.client_email,
+        private_key: parsed.private_key.replace(/\\n/g, "\n"),
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
 const PLAY_API = "https://androidpublisher.googleapis.com/androidpublisher/v3"

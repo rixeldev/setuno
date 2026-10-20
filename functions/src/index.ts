@@ -10,6 +10,7 @@ import {
   onDocumentUpdatedWithAuthContext,
 } from "firebase-functions/v2/firestore"
 import { HttpsError, onCall } from "firebase-functions/v2/https"
+import { defineSecret } from "firebase-functions/params"
 import { onSchedule } from "firebase-functions/v2/scheduler"
 
 import { TRASH_TTL_DAYS, purgeExpiredSongs } from "./purge"
@@ -46,9 +47,40 @@ import {
   mapEntitlement,
   type Entitlement,
 } from "./entitlements"
-import { consumePlayPurchase, serviceAccountFromEnv, verifyPlayPurchase } from "./playBilling"
+import {
+  consumePlayPurchase,
+  serviceAccountFromEnv,
+  serviceAccountFromJson,
+  verifyPlayPurchase,
+  type ServiceAccount,
+} from "./playBilling"
 
 initializeApp()
+
+/**
+ * The store credential.
+ *
+ * It lives in **Secret Manager** (`PLAY_SERVICE_ACCOUNT_JSON`), which the
+ * deploy binds to the callable: a credential never travels inside the
+ * deployment, and it can be rotated without a code change. The environment is
+ * the fallback (the emulator reads it from the local `.env`).
+ */
+const playServiceAccount = defineSecret("PLAY_SERVICE_ACCOUNT_JSON")
+
+/** The credential, from the secret first and the environment after. */
+const resolveServiceAccount = async (): Promise<ServiceAccount | null> => {
+  try {
+    const value = await playServiceAccount.value()
+    if (value) {
+      const fromSecret = serviceAccountFromJson(value)
+      if (fromSecret) return fromSecret
+    }
+  } catch {
+    // The secret is not bound (or not readable here) — the environment may
+    // still carry it.
+  }
+  return serviceAccountFromEnv()
+}
 
 /**
  * The Cloud Functions workspace (roadmap P0.1) opens with the scheduled half
@@ -676,7 +708,7 @@ export const getMyEntitlement = onCall(async (request) => {
  * A tip (a consumable, roadmap #64) is confirmed and consumed, so the member
  * can tip again, but it never grants the plan.
  */
-export const syncProPurchase = onCall(async (request) => {
+export const syncProPurchase = onCall({ secrets: [playServiceAccount] }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to manage your plan")
   const uid = request.auth.uid
   const data = readCallInput(request.data)
@@ -688,7 +720,7 @@ export const syncProPurchase = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "A purchase token is required")
   }
 
-  const serviceAccount = serviceAccountFromEnv()
+  const serviceAccount = await resolveServiceAccount()
   if (!serviceAccount) {
     // A missing credential must never fall back to "probably fine": the plan
     // stays free until the store can actually be asked.
