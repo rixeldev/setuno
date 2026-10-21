@@ -5,7 +5,7 @@ import { Platform } from "react-native"
 
 import { deleteDoc, doc, firestore, getDoc, paths, serverTimestamp, setDoc } from "@/db/Fire"
 import type { LanguageCode } from "@/libs/language"
-import type { PushDeviceState, PushPermissionState } from "@/interfaces/push"
+import type { PushDeviceState, PushPermissionInfo, PushPermissionState } from "@/interfaces/push"
 
 /**
  * Push registration for this install (roadmap #52).
@@ -33,13 +33,13 @@ import type { PushDeviceState, PushPermissionState } from "@/interfaces/push"
  * `expo-notifications`.
  */
 
-export type { PushDeviceState, PushPermissionState }
+export type { PushDeviceState, PushPermissionInfo, PushPermissionState }
 
 /** The Expo push token is both the registration and the document id. */
 const TOKEN_KEY = "setuno:push-device-token"
 
 /** Whether this install has already been asked about notifications. */
-const ASKED_KEY = "setuno:push-asked:v1"
+const ASKED_KEY = "setuno:push-asked:v2"
 
 /** The channel `app.config.js` declares as the default one. */
 const CHANNEL_ID = "default"
@@ -103,12 +103,25 @@ const deviceReference = (uid: string, token: string) =>
  * The app-start question needs to know whether asking is still worth it, and
  * the settings screen needs the full state (with the document) — so the two
  * are separate reads.
+ *
+ * `canAskAgain` is the half that matters: on Android 13+ a fresh install
+ * reports the permission as **denied** (it was never granted), so the status
+ * alone cannot tell "not decided yet" from "blocked for good".
  */
-export const getPushPermissionState = async (): Promise<PushPermissionState> =>
-  permissionOf(await Notifications.getPermissionsAsync())
+export const getPushPermissionInfo = async (): Promise<PushPermissionInfo> => {
+  const response = await Notifications.getPermissionsAsync()
+  return {
+    permission: permissionOf(response),
+    canAskAgain: response.canAskAgain !== false,
+  }
+}
 
 /**
  * Whether this install has already been asked.
+ *
+ * The ledger is written **only when the member answers** — never because the
+ * permission happened to be settled — so a device that was never asked can
+ * still be asked later.
  *
  * A ledger that cannot be read answers "yes" (do not ask): a member who said
  * no must not be nagged on every start, and the settings screen is always

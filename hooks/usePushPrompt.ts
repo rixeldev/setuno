@@ -6,7 +6,7 @@ import { matchLanguage } from "@/libs/language"
 import { shouldAskForPush } from "@/libs/pushPrompt"
 import {
   enablePushForThisDevice,
-  getPushPermissionState,
+  getPushPermissionInfo,
   hasAskedForPush,
   rememberPushPrompt,
 } from "@/services/notifications"
@@ -47,18 +47,12 @@ export function usePushPrompt(): PushPromptApi {
     if (!uid) return
     let alive = true
     void (async () => {
-      const [asked, permission] = await Promise.all([
-        hasAskedForPush(),
-        getPushPermissionState(),
-      ])
+      const [asked, info] = await Promise.all([hasAskedForPush(), getPushPermissionInfo()])
       if (!alive) return
-      if (shouldAskForPush(asked, permission)) {
-        setVisible(true)
-        return
-      }
-      // The permission is settled (granted or blocked): the question would
-      // never be answered, so the install is marked as asked.
-      if (permission !== "undetermined") await rememberPushPrompt()
+      // The ledger is written when the member **answers**, never because the
+      // permission happened to be settled: a device that was never asked can
+      // still be asked later.
+      if (shouldAskForPush(asked, info)) setVisible(true)
     })().catch(() => undefined)
     return () => {
       alive = false

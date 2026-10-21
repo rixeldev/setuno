@@ -16,3 +16,17 @@ export interface PushDeviceState {
   /** This install's device document exists, i.e. push is routed to it. */
   registered: boolean
 }
+
+/**
+ * The permission, and whether the OS would still show its own dialog.
+ *
+ * The second half matters on Android 13+: a fresh install reports the
+ * permission as **denied** (it was never granted), and the only thing that
+ * says the system dialog can still appear is `canAskAgain`. Without it, the
+ * app could never ask a member who has not decided yet.
+ */
+export interface PushPermissionInfo {
+  permission: PushPermissionState
+  /** True while the OS would still show its own permission dialog. */
+  canAskAgain: boolean
+}
