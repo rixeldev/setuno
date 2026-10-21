@@ -929,7 +929,14 @@
       "unsure": "La lecture est incertaine — vérifiez les accords.",
       "too-short": "Très peu a été lu.",
       "no-lyrics": "Aucune parole n'a été reconnue."
-    }
+    },
+    "cleanupAction": "Nettoyer",
+    "cleanupMerged_one": "{{count}} ligne d'accords fusionnée",
+    "cleanupMerged_other": "{{count}} lignes d'accords fusionnées",
+    "cleanupHeaders_one": "{{count}} en-tête nettoyé",
+    "cleanupHeaders_other": "{{count}} en-têtes nettoyés",
+    "cleanupDropped_one": "{{count}} ligne supprimée",
+    "cleanupDropped_other": "{{count}} lignes supprimées"
   },
   "backup": {
     "title": "Sauvegarde et import",

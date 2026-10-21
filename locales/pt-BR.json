@@ -929,7 +929,14 @@
       "unsure": "A leitura é incerta — confira os acordes.",
       "too-short": "Foi lido muito pouco.",
       "no-lyrics": "Nenhuma letra foi reconhecida."
-    }
+    },
+    "cleanupAction": "Organizar",
+    "cleanupMerged_one": "{{count}} linha de acordes unida",
+    "cleanupMerged_other": "{{count}} linhas de acordes unidas",
+    "cleanupHeaders_one": "{{count}} cabeçalho ajustado",
+    "cleanupHeaders_other": "{{count}} cabeçalhos ajustados",
+    "cleanupDropped_one": "{{count}} linha removida",
+    "cleanupDropped_other": "{{count}} linhas removidas"
   },
   "backup": {
     "title": "Backup e importação",

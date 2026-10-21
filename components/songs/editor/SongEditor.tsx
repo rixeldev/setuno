@@ -34,6 +34,7 @@ import {
   transposeSections,
 } from "@/libs/songUtils"
 import { transposeChord, transposeKey } from "@/libs/chords"
+import { cleanLyricText } from "@/libs/lyricCleanup"
 import type { SongSection, SongSectionType } from "@/interfaces"
 
 interface SongEditorProps {
@@ -85,6 +86,19 @@ export function SongEditor({
   const chordCount = useMemo(() => countSongChords(sections), [sections])
   // Live preview of what the paste will become, so the user commits knowingly (#19).
   const pastePreview = useMemo(() => parseLyricBlock(pasteText), [pasteText])
+  // What the cleanup would do to this paste (roadmap #87): a chord line merged
+  // into its lyric, a header tidied, a line that is not a lyric dropped.
+  const pasteCleanup = useMemo(() => cleanLyricText(pasteText), [pasteText])
+  const cleanupSummary = useMemo(() => {
+    const parts: string[] = []
+    const merged = pasteCleanup.counts["merged-chords"] ?? 0
+    const headers = pasteCleanup.counts["header-tidied"] ?? 0
+    const dropped = pasteCleanup.counts["dropped-noise"] ?? 0
+    if (merged > 0) parts.push(t("songs.cleanupMerged", { count: merged }))
+    if (headers > 0) parts.push(t("songs.cleanupHeaders", { count: headers }))
+    if (dropped > 0) parts.push(t("songs.cleanupDropped", { count: dropped }))
+    return parts.join(" · ")
+  }, [pasteCleanup, t])
 
   const updateSection = (index: number, next: SongSection): void => {
     onChange(
@@ -462,6 +476,21 @@ export function SongEditor({
           placeholder={t("songs.pastePlaceholder")}
           autoCapitalize="sentences"
         />
+        {pasteText.trim().length > 0 ? (
+          <View style={styles.cleanupRow}>
+            <Button
+              label={t("songs.cleanupAction")}
+              onPress={() => setPasteText(pasteCleanup.text)}
+              variant="secondary"
+              disabled={cleanupSummary.length === 0}
+            />
+            {cleanupSummary.length > 0 ? (
+              <AppText variant="caption" tone="faint">
+                {cleanupSummary}
+              </AppText>
+            ) : null}
+          </View>
+        ) : null}
         <View style={styles.modeRow}>
           {(["replace", "append"] as const).map((mode) => (
             <Pressable
@@ -647,6 +676,7 @@ const createStyles = () =>
       borderColor: Theme.colors.border,
     },
     modeRow: { flexDirection: "row", gap: Theme.spacing.s },
+    cleanupRow: { gap: Theme.spacing.xs },
     modeChip: {
       paddingHorizontal: Theme.spacing.m,
       paddingVertical: 7,

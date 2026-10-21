@@ -792,7 +792,14 @@
       "unsure": "La lectura es dudosa: revisa los acordes.",
       "too-short": "Se leyó muy poco.",
       "no-lyrics": "No se reconoció ninguna letra."
-    }
+    },
+    "cleanupAction": "Ordenar",
+    "cleanupMerged_one": "{{count}} línea de acordes unida",
+    "cleanupMerged_other": "{{count}} líneas de acordes unidas",
+    "cleanupHeaders_one": "{{count}} encabezado ordenado",
+    "cleanupHeaders_other": "{{count}} encabezados ordenados",
+    "cleanupDropped_one": "{{count}} línea eliminada",
+    "cleanupDropped_other": "{{count}} líneas eliminadas"
   },
   "backup": {
     "title": "Copia e importación",

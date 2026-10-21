@@ -572,6 +572,21 @@ read page by page.
 The screen says how sure the recognition was: a sheet is never certain, and the warnings
 (no chords, unsure, too little) are part of the feature.
 
+## Tidy up a pasted sheet
+
+A chord sheet pasted from a website arrives as plain text: the chords on their own row, the header
+between dashes, a few lines that are not lyrics at all. The paste dialog has a **Tidy up** button
+that fixes the three things that matter, **offline** — no provider, no network, no cost:
+
+- a **chord line is merged into the lyric under it** (the column of the chord is the column of the
+  word, so the chord ends up over the word it changes),
+- a **header is tidied** ("— Chorus —" becomes "Chorus", so the app recognises it),
+- the **lines that are not lyrics are dropped** (the key, the capo, the tempo, the tuning).
+
+The dialog says what it would do before the member commits to it. The core is pure and lives in
+`libs/lyricCleanup.ts` (+11 tests); the metadata it reads is shared with the photo importer
+through `libs/lyricMeta.ts`.
+
 ## The Pro plan
 
 Setuno has a **free plan** and a **Pro plan**. Pro removes the ads, opens the band's statistics

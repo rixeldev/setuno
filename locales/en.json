@@ -929,7 +929,14 @@
       "unsure": "The reading was unsure — check the chords.",
       "too-short": "Very little was read.",
       "no-lyrics": "No lyrics were recognized."
-    }
+    },
+    "cleanupAction": "Tidy up",
+    "cleanupMerged_one": "{{count}} chord line merged",
+    "cleanupMerged_other": "{{count}} chord lines merged",
+    "cleanupHeaders_one": "{{count}} header tidied",
+    "cleanupHeaders_other": "{{count}} headers tidied",
+    "cleanupDropped_one": "{{count}} line dropped",
+    "cleanupDropped_other": "{{count}} lines dropped"
   },
   "backup": {
     "title": "Backup and import",

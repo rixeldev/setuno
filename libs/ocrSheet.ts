@@ -2,6 +2,7 @@ import type { ChordPosition, LyricLine } from "@/interfaces/song"
 import type { OcrResult, OcrWord } from "@/interfaces/ocr"
 import { serializeChordLine } from "@/libs/chordLine"
 import { isRecognizedChord } from "@/libs/chords"
+import { readLyricMeta, type LyricMeta } from "@/libs/lyricMeta"
 import { detectSectionHeader } from "@/libs/songUtils"
 
 /**
@@ -57,13 +58,6 @@ interface Row {
 /** Tokens a chord row carries that are not chords (bar lines, repeat marks). */
 const NOISE = new Set(["|", "||", "|||", "|:", ":|", "|:|", "x", "X", "x2", "-", "—", "•", "."])
 
-/** The metadata a sheet may carry. */
-const KEY_PATTERN = /^(?:key|tone|tonality)\s*(?:of\s+)?[:=]?\s*(.+)$/i
-const CAPO_PATTERN = /^capo\s*[:=]?\s*(\d{1,2})$/i
-const BPM_PATTERN = /^(?:tempo|bpm)\s*[:=]?\s*(\d{2,3})$/i
-const BPM_SUFFIX_PATTERN = /^(\d{2,3})\s*bpm$/i
-const TUNING_PATTERN = /^tuning\s*[:=]/i
-
 /** A chord as it is written on the sheet, without the punctuation OCR adds. */
 const cleanChord = (raw: string): string =>
   raw
@@ -72,33 +66,10 @@ const cleanChord = (raw: string): string =>
     .trim()
 
 /** The metadata a row carries, if it is a metadata row at all. */
-interface RowMeta {
-  kind: "meta"
-  key: string | null
-  capo: number | null
-  bpm: number | null
-}
+type RowMeta = LyricMeta
 
 /** Reads the metadata of a row, or `null` when the row is not metadata. */
-const readMeta = (text: string): RowMeta | null => {
-  const trimmed = text.trim()
-  const capo = CAPO_PATTERN.exec(trimmed)
-  if (capo) return { kind: "meta", key: null, capo: Number(capo[1]), bpm: null }
-  const bpm = BPM_PATTERN.exec(trimmed) ?? BPM_SUFFIX_PATTERN.exec(trimmed)
-  if (bpm) return { kind: "meta", key: null, capo: null, bpm: Number(bpm[1]) }
-  const key = KEY_PATTERN.exec(trimmed)
-  if (key) {
-    const value = cleanChord(key[1] ?? "")
-    return {
-      kind: "meta",
-      key: isRecognizedChord(value) && !value.includes("/") ? value : null,
-      capo: null,
-      bpm: null,
-    }
-  }
-  if (TUNING_PATTERN.test(trimmed)) return { kind: "meta", key: null, capo: null, bpm: null }
-  return null
-}
+const readMeta = (text: string): RowMeta | null => readLyricMeta(text)
 
 /** True when every meaningful word of the row is a chord. */
 const isChordRow = (words: OcrWord[]): boolean => {
