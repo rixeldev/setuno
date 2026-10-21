@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { detectChords, detectKey, noteToFreq } from "@/libs/chordDetection"
+import { detectChords, detectKey, detectTempo, noteToFreq } from "@/libs/chordDetection"
 
 const SAMPLE_RATE = 44100
 
@@ -102,6 +102,36 @@ describe("detectKey", () => {
 
   it("has nothing to say about an empty recording", () => {
     expect(detectKey([])).toBeNull()
+  })
+})
+
+describe("detectTempo", () => {
+  /** A click track: one short hit every beat. */
+  const clickTrack = (bpm: number, seconds: number, sampleRate = SAMPLE_RATE): Float32Array => {
+    const out = new Float32Array(Math.floor(seconds * sampleRate))
+    const period = (60 / bpm) * sampleRate
+    const length = Math.floor(0.03 * sampleRate)
+    for (let start = 0; start < out.length; start += period) {
+      for (let i = 0; i < length; i += 1) {
+        const index = Math.floor(start) + i
+        if (index < out.length) {
+          out[index] = Math.sin((2 * Math.PI * 1000 * i) / sampleRate) * (1 - i / length)
+        }
+      }
+    }
+    return out
+  }
+
+  it("hears a click track of 120", () => {
+    expect(detectTempo(clickTrack(120, 4), SAMPLE_RATE)).toBe(120)
+  })
+
+  it("hears a click track of 90", () => {
+    expect(detectTempo(clickTrack(90, 4), SAMPLE_RATE)).toBe(90)
+  })
+
+  it("says nothing about silence", () => {
+    expect(detectTempo(new Float32Array(SAMPLE_RATE), SAMPLE_RATE)).toBeNull()
   })
 })
 

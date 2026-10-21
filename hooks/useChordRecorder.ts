@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react"
 import { Platform } from "react-native"
 import { requestRecordingPermissionsAsync, useAudioStream } from "expo-audio"
 
-import { detectChords, detectKey, type ChordSegment } from "@/libs/chordDetection"
+import { detectChords, detectKey, detectTempo, type ChordSegment } from "@/libs/chordDetection"
 
 /**
  * Records a passage and estimates the chords (roadmap #85).
@@ -30,6 +30,8 @@ export interface ChordRecorder {
   segments: ChordSegment[]
   /** The key the recording sounds like it is in. */
   key: string | null
+  /** The tempo it was played at, in beats per minute. */
+  tempo: number | null
   /** True when the platform can record at all. */
   available: boolean
   start: () => Promise<void>
@@ -41,6 +43,7 @@ export function useChordRecorder(): ChordRecorder {
   const [status, setStatus] = useState<ChordRecorderStatus>("idle")
   const [segments, setSegments] = useState<ChordSegment[]>([])
   const [key, setKey] = useState<string | null>(null)
+  const [tempo, setTempo] = useState<number | null>(null)
   // The chunks live in a ref: they are data, not state, and they must not
   // re-render the screen on every 100 ms buffer.
   const chunks = useRef<Float32Array[]>([])
@@ -102,6 +105,7 @@ export function useChordRecorder(): ChordRecorder {
     const found = detectChords(samples, sampleRate.current)
     setSegments(found)
     setKey(detectKey(found))
+    setTempo(detectTempo(samples, sampleRate.current))
     setStatus("done")
   }, [stream])
 
@@ -109,6 +113,7 @@ export function useChordRecorder(): ChordRecorder {
     chunks.current = []
     setSegments([])
     setKey(null)
+    setTempo(null)
     setStatus("idle")
   }, [])
 
@@ -116,6 +121,7 @@ export function useChordRecorder(): ChordRecorder {
     status,
     segments,
     key,
+    tempo,
     // The web build of expo-audio has no microphone stream.
     available: Platform.OS !== "web",
     start,

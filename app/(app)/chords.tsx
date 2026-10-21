@@ -85,9 +85,14 @@ export default function ChordDetectionScreen() {
             <AppText style={styles.text}>{t("chords.analyzing")}</AppText>
           ) : null}
 
-          {recorder.key ? (
+          {recorder.key || recorder.tempo ? (
             <Card style={styles.card}>
-              <AppText style={styles.key}>{t("chords.key", { key: recorder.key })}</AppText>
+              {recorder.key ? (
+                <AppText style={styles.key}>{t("chords.key", { key: recorder.key })}</AppText>
+              ) : null}
+              {recorder.tempo ? (
+                <AppText style={styles.text}>{t("chords.bpm", { bpm: recorder.tempo })}</AppText>
+              ) : null}
             </Card>
           ) : null}
 

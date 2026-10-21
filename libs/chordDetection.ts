@@ -266,3 +266,68 @@ export const detectKey = (segments: ChordSegment[]): string | null => {
   }
   return best
 }
+
+/**
+ * Estimates the tempo of a recording, in beats per minute.
+ *
+ * The energy of every frame rises where the band hits something; the rhythm
+ * is the period that repeats. The autocorrelation of that rise finds it.
+ *
+ * It is an **approximation** like everything else here: a slow groove and a
+ * fast one can be the same recording, and the band plays rubato.
+ */
+export const detectTempo = (samples: Float32Array, sampleRate: number): number | null => {
+  if (samples.length < sampleRate / 4 || sampleRate <= 0) return null
+
+  const frameSize = 1024
+  const hop = 512
+  const energies: number[] = []
+  for (let start = 0; start + frameSize <= samples.length; start += hop) {
+    let sum = 0
+    for (let i = 0; i < frameSize; i += 1) {
+      const value = samples[start + i]!
+      sum += value * value
+    }
+    energies.push(Math.sqrt(sum / frameSize))
+  }
+  if (energies.length < 16) return null
+  const framesPerSecond = sampleRate / hop
+
+  // The rise of the energy: that is where the hits are.
+  const onsets = energies.map((value, index) =>
+    index === 0 ? 0 : Math.max(0, value - energies[index - 1]!),
+  )
+
+  // The peaks of that rise are the hits. They are picked instead of running
+  // an autocorrelation because a frame is not a beat: the hits land between
+  // two frames and drift, and the **interval between the hits** does not.
+  const loudest = onsets.reduce((max, value) => Math.max(max, value), 0)
+  if (loudest <= 0) return null
+  const threshold = loudest * 0.3
+  const peaks: number[] = []
+  for (let index = 1; index < onsets.length - 1; index += 1) {
+    const value = onsets[index]!
+    if (value > threshold && value > onsets[index - 1]! && value >= onsets[index + 1]!) {
+      peaks.push(index)
+    }
+  }
+  if (peaks.length < 3) return null
+
+  const intervals: number[] = []
+  for (let index = 1; index < peaks.length; index += 1) {
+    const gap = peaks[index]! - peaks[index - 1]!
+    if (gap > 0) intervals.push(gap)
+  }
+  if (intervals.length === 0) return null
+
+  const sorted = [...intervals].sort((a, b) => a - b)
+  const middle = Math.floor(sorted.length / 2)
+  const median =
+    sorted.length % 2 === 1
+      ? sorted[middle]!
+      : (sorted[middle - 1]! + sorted[middle]!) / 2
+
+  const bpm = (60 * framesPerSecond) / median
+  if (!Number.isFinite(bpm) || bpm < 40 || bpm > 200) return null
+  return Math.round(bpm)
+}

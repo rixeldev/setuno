@@ -2050,6 +2050,7 @@
     "confidence": "{{percent}} % de certeza",
     "record": "Grabar",
     "stop": "Parar",
-    "again": "Grabar otra"
+    "again": "Grabar otra",
+    "bpm": "Unos {{bpm}} BPM"
   }
 }

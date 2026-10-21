@@ -2050,6 +2050,7 @@
     "confidence": "{{percent}}% sure",
     "record": "Record",
     "stop": "Stop",
-    "again": "Record another one"
+    "again": "Record another one",
+    "bpm": "About {{bpm}} BPM"
   }
 }
