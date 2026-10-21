@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next"
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { displayChord } from "@/libs/chords"
+import { splitLyricRows } from "@/libs/lyricRows"
 import { buildChordSegments } from "@/libs/songUtils"
 import type { ChordNotation, ChordView, LyricLine } from "@/interfaces"
 
@@ -19,6 +20,11 @@ interface ChordLineProps {
   notation?: ChordNotation
   /** Makes every chord tappable (the reader opens its “how to play” sheet). */
   onChordPress?: (chord: string) => void
+  /**
+   * How many monospace characters fit on a row. `0` (the default) means the
+   * room is unknown, and the line is drawn as one row.
+   */
+  charsPerRow?: number
 }
 
 /**
@@ -28,6 +34,13 @@ interface ChordLineProps {
  * deterministic on Android and Web alike. Chords-only mode drops the lyrics and
  * lays the progression out as pills instead, and any line without lyrics
  * (intro, instrumental, riff) is always a progression.
+ *
+ * **A line that does not fit is cut here, not by the platform.** The chord row
+ * is mostly padding, so the platform wraps it wherever it happens to fit while
+ * the lyric wraps at word boundaries — and from that row on, every chord sits
+ * over the wrong word. `splitLyricRows` cuts the line into rows that fit (a
+ * chord that would not fit moves the cut earlier), and each row is drawn as
+ * its own chord row over its own lyric row, so the two can never drift apart.
  */
 export function ChordLine({
   line,
@@ -36,6 +49,7 @@ export function ChordLine({
   songKey = "",
   notation = "letters",
   onChordPress,
+  charsPerRow = 0,
 }: ChordLineProps) {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
@@ -50,13 +64,13 @@ export function ChordLine({
     () => chords.map((chord) => displayChord(chord.chord, notation, songKey)),
     [chords, notation, songKey],
   )
-  const segments = useMemo(
-    () =>
-      buildChordSegments(
-        chords.map((chord, index) => ({ ...chord, label: labels[index] ?? chord.chord })),
-        line.text,
-      ),
-    [chords, labels, line.text],
+  const entries = useMemo(
+    () => chords.map((chord, index) => ({ ...chord, label: labels[index] ?? chord.chord })),
+    [chords, labels],
+  )
+  const rows = useMemo(
+    () => splitLyricRows(line.text, entries, charsPerRow),
+    [line.text, entries, charsPerRow],
   )
   const lineHeight = Math.round(fontSize * 1.65)
   const hasLyrics = line.text.trim().length > 0
@@ -117,33 +131,53 @@ export function ChordLine({
 
   return (
     <View style={styles.line}>
-      {segments.length > 0 ? (
-        <Text
-          selectable={false}
-          accessibilityLabel={onChordPress ? undefined : t("songs.chordListA11y", { chords: chordList })}
-          style={[styles.chords, { fontSize, lineHeight: Math.round(fontSize * 1.25) }]}
-        >
-          {segments.map((segment, segmentIndex) => {
-            const chordValue = segment.chord
-            return chordValue && onChordPress ? (
+      {rows.map((row, rowIndex) => {
+        const segments = buildChordSegments(
+          row.chords.map((chord) => ({
+            chord: chord.chord,
+            position: chord.offset,
+            label: chord.label,
+          })),
+          row.text,
+        )
+        const rowChordList = row.chords.map((chord) => chord.label).join(", ")
+        return (
+          <View key={`row-${rowIndex}`} style={styles.row}>
+            {segments.length > 0 ? (
               <Text
-                key={`chord-${segmentIndex}`}
-                suppressHighlighting
-                accessibilityRole="button"
-                accessibilityLabel={t("songs.openChord", { chord: segment.text })}
-                onPress={() => onChordPress(chordValue)}
+                selectable={false}
+                accessibilityLabel={
+                  onChordPress ? undefined : t("songs.chordListA11y", { chords: rowChordList })
+                }
+                style={[styles.chords, { fontSize, lineHeight: Math.round(fontSize * 1.25) }]}
               >
-                {segment.text}
+                {segments.map((segment, segmentIndex) => {
+                  const chordValue = segment.chord
+                  if (chordValue && onChordPress) {
+                    return (
+                      <Text
+                        key={`chord-${segmentIndex}`}
+                        suppressHighlighting
+                        accessibilityRole="button"
+                        accessibilityLabel={t("songs.openChord", { chord: segment.text })}
+                        onPress={() => onChordPress(chordValue)}
+                      >
+                        {segment.text}
+                      </Text>
+                    )
+                  }
+                  // The padding of the grid is a non-breaking space: the row
+                  // is drawn as one block and must never wrap on its own.
+                  return chordValue ? segment.text : segment.text.replace(/ /g, "\u00A0")
+                })}
               </Text>
-            ) : (
-              segment.text
-            )
-          })}
-        </Text>
-      ) : null}
-      <Text selectable style={[styles.lyrics, { fontSize, lineHeight }]}>
-        {line.text}
-      </Text>
+            ) : null}
+            <Text selectable style={[styles.lyrics, { fontSize, lineHeight }]}>
+              {row.text}
+            </Text>
+          </View>
+        )
+      })}
     </View>
   )
 }
@@ -154,6 +188,8 @@ const createStyles = () =>
       gap: 0,
       paddingVertical: 2,
     },
+    // One visual row of the line: its chord row and the lyric under it.
+    row: { gap: 0 },
     chords: {
       color: Theme.colors.accent,
       fontFamily: Theme.fonts.mono,
