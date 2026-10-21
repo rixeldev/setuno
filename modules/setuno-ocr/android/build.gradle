@@ -1,0 +1,19 @@
+apply plugin: 'com.android.library'
+apply plugin: 'expo-module-gradle-plugin'
+
+group = 'com.rixeldev.setuno'
+version = '1.0.0'
+
+android {
+  namespace "com.rixeldev.setuno.ocr"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  // The *bundled* Latin recognizer: the model ships with the app, so the
+  // recognition works offline and never asks Google for anything.
+  implementation 'com.google.mlkit:text-recognition:16.0.1'
+}

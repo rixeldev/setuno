@@ -907,7 +907,29 @@
     "sortArtist": "Artiste (A→Z)",
     "sortAdded": "Ajoutés récemment",
     "sortTempo": "Tempo (le plus lent d'abord)",
-    "sortLength": "Durée (la plus courte d'abord)"
+    "sortLength": "Durée (la plus courte d'abord)",
+    "scanTitle": "Scanner une chanson",
+    "scanSubtitle": "Lisez une grille d'accords avec le téléphone — sur l'appareil, rien n'est envoyé.",
+    "scanTakePhoto": "Prendre une photo",
+    "scanChoosePhoto": "Choisir une photo",
+    "scanChoosePdf": "Choisir un PDF",
+    "scanPrivacy": "La reconnaissance se fait sur ce téléphone. La photo n'est jamais envoyée.",
+    "scanReading": "Lecture de la grille…",
+    "scanUnavailable": "La reconnaissance de texte n'est pas disponible sur cette plateforme. Utilisez l'app sur Android ou iOS, ou collez les paroles à la main.",
+    "scanNotAPdf": "Ce fichier n'est pas un PDF.",
+    "scanConfidence": "La grille a été lue à {{percent}} % de confiance.",
+    "scanTitleLabel": "Titre",
+    "scanTitlePlaceholder": "Le titre de la chanson",
+    "scanRecognized": "Ce qui a été lu",
+    "scanContinue": "Vérifier dans l'éditeur",
+    "scanAgain": "Scanner une autre",
+    "scanOpen": "Scanner une photo ou un PDF",
+    "scanWarning": {
+      "no-chords": "Aucun accord n'a été reconnu.",
+      "unsure": "La lecture est incertaine — vérifiez les accords.",
+      "too-short": "Très peu a été lu.",
+      "no-lyrics": "Aucune parole n'a été reconnue."
+    }
   },
   "backup": {
     "title": "Sauvegarde et import",

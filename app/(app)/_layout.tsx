@@ -50,6 +50,7 @@ export default function AppLayout() {
         <Stack.Screen name="songs/trash" options={modalOptions} />
 
         <Stack.Screen name="songs/import" options={modalOptions} />
+      <Stack.Screen name="songs/scan" options={modalOptions} />
         {/* Personal notes of one song (roadmap #3). */}
         <Stack.Screen name="annotations/[id]" options={modalOptions} />
         <Stack.Screen name="setlists/index" options={{ animation: "none" }} />

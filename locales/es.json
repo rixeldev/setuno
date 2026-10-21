@@ -770,7 +770,29 @@
     "sortArtist": "Artista (A→Z)",
     "sortAdded": "Añadidas recientemente",
     "sortTempo": "Tempo (más lento primero)",
-    "sortLength": "Duración (más corta primero)"
+    "sortLength": "Duración (más corta primero)",
+    "scanTitle": "Escanear una canción",
+    "scanSubtitle": "Lee una hoja de acordes con el móvil — en el propio dispositivo, no se sube nada.",
+    "scanTakePhoto": "Hacer una foto",
+    "scanChoosePhoto": "Elegir una foto",
+    "scanChoosePdf": "Elegir un PDF",
+    "scanPrivacy": "El reconocimiento ocurre en este móvil. La foto nunca se sube.",
+    "scanReading": "Leyendo la hoja…",
+    "scanUnavailable": "El reconocimiento de texto no está disponible en esta plataforma. Usa la app en Android o iOS, o pega la letra a mano.",
+    "scanNotAPdf": "Ese archivo no es un PDF.",
+    "scanConfidence": "La hoja se leyó con un {{percent}} % de confianza.",
+    "scanTitleLabel": "Título",
+    "scanTitlePlaceholder": "El título de la canción",
+    "scanRecognized": "Lo que se ha leído",
+    "scanContinue": "Revisar en el editor",
+    "scanAgain": "Escanear otra",
+    "scanOpen": "Escanear una foto o un PDF",
+    "scanWarning": {
+      "no-chords": "No se reconocieron acordes.",
+      "unsure": "La lectura es dudosa: revisa los acordes.",
+      "too-short": "Se leyó muy poco.",
+      "no-lyrics": "No se reconoció ninguna letra."
+    }
   },
   "backup": {
     "title": "Copia e importación",

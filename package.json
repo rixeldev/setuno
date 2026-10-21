@@ -95,7 +95,9 @@
     "react-native-svg": "~15.15.5",
     "react-native-view-shot": "5.1.0",
     "react-native-web": "~0.21.3",
-    "react-native-worklets": "~0.13.0"
+    "react-native-worklets": "~0.13.0",
+    "setuno-ocr": "file:./modules/setuno-ocr",
+    "setuno-widget": "file:./modules/setuno-widget"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.2",

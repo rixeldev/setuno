@@ -185,6 +185,12 @@ importers:
       react-native-worklets:
         specifier: ~0.13.0
         version: 0.13.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.2.0(supports-color@8.1.1)(typescript@6.0.3))(@react-native/metro-config@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)
+      setuno-ocr:
+        specifier: file:./modules/setuno-ocr
+        version: file:modules/setuno-ocr
+      setuno-widget:
+        specifier: file:./modules/setuno-widget
+        version: file:modules/setuno-widget
     devDependencies:
       '@firebase/rules-unit-testing':
         specifier: 5.0.2
@@ -5346,6 +5352,12 @@ packages:
 
   setprototypeof@1.2.0:
     resolution: {integrity: sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==}
+
+  setuno-ocr@file:modules/setuno-ocr:
+    resolution: {directory: modules/setuno-ocr, type: directory}
+
+  setuno-widget@file:modules/setuno-widget:
+    resolution: {directory: modules/setuno-widget, type: directory}
 
   sf-symbols-typescript@2.2.0:
     resolution: {integrity: sha512-TPbeg0b7ylrswdGCji8FRGFAKuqbpQlLbL8SOle3j1iHSs5Ob5mhvMAxWN2UItOjgALAB5Zp3fmMfj8mbWvXKw==}
@@ -12594,6 +12606,10 @@ snapshots:
   setimmediate@1.0.5: {}
 
   setprototypeof@1.2.0: {}
+
+  setuno-ocr@file:modules/setuno-ocr: {}
+
+  setuno-widget@file:modules/setuno-widget: {}
 
   sf-symbols-typescript@2.2.0: {}
 

@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["SetunoOcrModule"]
+  },
+  "android": {
+    "modules": ["com.rixeldev.setuno.ocr.SetunoOcrModule"]
+  }
+}

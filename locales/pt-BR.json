@@ -907,7 +907,29 @@
     "sortArtist": "Artista (A→Z)",
     "sortAdded": "Adicionadas recentemente",
     "sortTempo": "Andamento (mais lento primeiro)",
-    "sortLength": "Duração (mais curta primeiro)"
+    "sortLength": "Duração (mais curta primeiro)",
+    "scanTitle": "Digitalizar uma música",
+    "scanSubtitle": "Leia uma cifra no celular — no próprio aparelho, nada é enviado.",
+    "scanTakePhoto": "Tirar uma foto",
+    "scanChoosePhoto": "Escolher uma foto",
+    "scanChoosePdf": "Escolher um PDF",
+    "scanPrivacy": "O reconhecimento acontece neste celular. A foto nunca é enviada.",
+    "scanReading": "Lendo a cifra…",
+    "scanUnavailable": "O reconhecimento de texto não está disponível nesta plataforma. Use o app no Android ou no iOS, ou cole a letra na mão.",
+    "scanNotAPdf": "Esse arquivo não é um PDF.",
+    "scanConfidence": "A cifra foi lida com {{percent}}% de confiança.",
+    "scanTitleLabel": "Título",
+    "scanTitlePlaceholder": "O título da música",
+    "scanRecognized": "O que foi lido",
+    "scanContinue": "Revisar no editor",
+    "scanAgain": "Digitalizar outra",
+    "scanOpen": "Digitalizar uma foto ou um PDF",
+    "scanWarning": {
+      "no-chords": "Nenhum acorde foi reconhecido.",
+      "unsure": "A leitura é incerta — confira os acordes.",
+      "too-short": "Foi lido muito pouco.",
+      "no-lyrics": "Nenhuma letra foi reconhecida."
+    }
   },
   "backup": {
     "title": "Backup e importação",

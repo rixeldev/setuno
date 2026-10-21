@@ -171,6 +171,11 @@ export default function ImportSongsScreen() {
         <AppText variant="caption" tone="muted">
           {t("backup.intro")}
         </AppText>
+        <Button
+          label={t("songs.scanOpen")}
+          onPress={() => router.push("/songs/scan")}
+          variant="secondary"
+        />
         <AppText variant="caption" tone="faint">
           {t("backup.csvHint")}
         </AppText>

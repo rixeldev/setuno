@@ -42,7 +42,8 @@ import { createSong, updateSong } from "@/services/songs"
 import { toFriendlyError } from "@/services/errors"
 import { logFunnelEvent } from "@/services/telemetry"
 import { MAJOR_KEYS, MINOR_KEYS, collectSongChords } from "@/libs/chords"
-import { createSection, emptyLine, sectionLabel } from "@/libs/songUtils"
+import { createSection, emptyLine, parseLyricBlock, sectionLabel } from "@/libs/songUtils"
+import type { SongDraft } from "@/libs/ocrDraft"
 import { parseTags, validateBpm, validateCapo, validateDuration, validateRequired } from "@/libs/validation"
 import { parseDurationInput } from "@/libs/format"
 import { parseChordPro } from "@/libs/chordpro"
@@ -65,6 +66,8 @@ interface SongFormProps {
   notice?: React.ReactNode
   /** Extra block rendered above the form (used by the guided tour, #65). */
   tourHint?: React.ReactNode
+  /** A scanned proposal to review (roadmap #84) — the editor is where it is fixed. */
+  draft?: SongDraft | null
 }
 
 interface SongFormState {
@@ -112,7 +115,7 @@ const formStateFrom = (
  * “More details”. The primary action lives in a sticky footer so it is always
  * one tap away, no matter how long the lyrics are.
  */
-export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, tourHint }: SongFormProps) {
+export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, tourHint, draft }: SongFormProps) {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
   const router = useRouter()
@@ -128,11 +131,13 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, 
   const atSongLimit = !song && !plan.isPro && songLimit > 0 && songs.length >= songLimit
   const [limitReached, setLimitReached] = useState(false)
 
-  const [songTitle, setSongTitle] = useState(song?.title ?? "")
+  const [songTitle, setSongTitle] = useState(song?.title ?? draft?.title ?? "")
   const [artist, setArtist] = useState(song?.artist ?? "")
-  const [key, setKey] = useState(song?.key ?? "C")
-  const [capo, setCapo] = useState(String(song?.capo ?? 0))
-  const [bpm, setBpm] = useState(song?.bpm ? String(song.bpm) : "")
+  const [key, setKey] = useState(song?.key ?? draft?.key ?? "C")
+  const [capo, setCapo] = useState(String(song?.capo ?? draft?.capo ?? 0))
+  const [bpm, setBpm] = useState(
+    song?.bpm ? String(song.bpm) : draft?.bpm ? String(draft.bpm) : "",
+  )
   const [duration, setDuration] = useState(song?.durationSec ? formatSeconds(song.durationSec) : "")
   const [genre, setGenre] = useState(song?.genre ?? "")
   const [tags, setTags] = useState(song?.tags.join(", ") ?? "")
@@ -144,7 +149,15 @@ export function SongForm({ song, onSaved, title, subtitle, headerRight, notice, 
   const [sectionTemplate] = useState<SongSection[]>(() => [
     createSection("verse", sectionLabel("verse", 1), [emptyLine()]),
   ])
-  const sectionsHistory = useUndoRedo<SongSection[]>(song?.sections ?? sectionTemplate)
+  // A scanned proposal arrives as text (roadmap #84): the same parser the paste
+  // importer uses turns it into the sections the editor shows.
+  const draftSections = useMemo(
+    () => (draft && draft.text.trim().length > 0 ? parseLyricBlock(draft.text) : null),
+    [draft],
+  )
+  const sectionsHistory = useUndoRedo<SongSection[]>(
+    song?.sections ?? draftSections ?? sectionTemplate,
+  )
   const sections = sectionsHistory.value
   const setSections = sectionsHistory.set
   const [detailsOpen, setDetailsOpen] = useState(

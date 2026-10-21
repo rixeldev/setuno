@@ -907,7 +907,29 @@
     "sortArtist": "Artist (A→Z)",
     "sortAdded": "Recently added",
     "sortTempo": "Tempo (slowest first)",
-    "sortLength": "Length (shortest first)"
+    "sortLength": "Length (shortest first)",
+    "scanTitle": "Scan a song",
+    "scanSubtitle": "Read a chord sheet with the phone — on the device, nothing is uploaded.",
+    "scanTakePhoto": "Take a photo",
+    "scanChoosePhoto": "Choose a photo",
+    "scanChoosePdf": "Choose a PDF",
+    "scanPrivacy": "The recognition happens on this phone. The photo is never uploaded.",
+    "scanReading": "Reading the sheet…",
+    "scanUnavailable": "On-device text recognition is not available on this platform. Use the app on Android or iOS, or paste the lyrics by hand.",
+    "scanNotAPdf": "That file is not a PDF.",
+    "scanConfidence": "The sheet was read at {{percent}}% confidence.",
+    "scanTitleLabel": "Title",
+    "scanTitlePlaceholder": "The title of the song",
+    "scanRecognized": "What was read",
+    "scanContinue": "Review in the editor",
+    "scanAgain": "Scan another one",
+    "scanOpen": "Scan a photo or PDF",
+    "scanWarning": {
+      "no-chords": "No chords were recognized.",
+      "unsure": "The reading was unsure — check the chords.",
+      "too-short": "Very little was read.",
+      "no-lyrics": "No lyrics were recognized."
+    }
   },
   "backup": {
     "title": "Backup and import",

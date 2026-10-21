@@ -1,0 +1,7 @@
+{
+  "name": "setuno-ocr",
+  "version": "1.0.0",
+  "description": "On-device text recognition (ML Kit on Android, Vision on iOS) for Setuno (roadmap #84).",
+  "main": "index.ts",
+  "private": true
+}

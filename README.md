@@ -551,6 +551,27 @@ piece of work: it needs an EAS build and a config plugin, and iOS does not ship 
 
 ---
 
+## Import a song from a photo or a PDF
+
+A member can photograph a chord sheet (or pick a PDF) and get a **proposal** for the song: the
+lyrics, the sections and the chords put back over the words they change. The proposal is always
+reviewed in the editor before anything is saved.
+
+The recognition happens **on the device** — ML Kit on Android, the system's Vision framework on
+iOS, both through the same local Expo module (`modules/setuno-ocr`). The photo never leaves the
+phone, and nothing is uploaded. A PDF is rasterized by the platform (`PdfRenderer` / `PDFKit`) and
+read page by page.
+
+| Piece | Where |
+| --- | --- |
+| The native module | `modules/setuno-ocr` (Kotlin on Android, Swift on iOS) |
+| The pure core | `libs/ocrSheet.ts` — the recognized sheet becomes a proposal (+9 tests) |
+| The screen | `app/(app)/songs/scan.tsx` (a modal route) |
+| The hand-off to the editor | `libs/ocrDraft.ts` — the draft travels through a token in the URL |
+
+The screen says how sure the recognition was: a sheet is never certain, and the warnings
+(no chords, unsure, too little) are part of the feature.
+
 ## The Pro plan
 
 Setuno has a **free plan** and a **Pro plan**. Pro removes the ads, opens the band's statistics
