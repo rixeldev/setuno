@@ -129,6 +129,9 @@ export default {
       themeColor: "#0B0B14",
     },
     plugins: [
+      // Keeps the Gradle daemon on JDK 17 (AGP's native tasks abort on 24+).
+      // Local plugin: see `plugins/withGradleJdk17.js`.
+      "./plugins/withGradleJdk17",
       "@react-native-firebase/app",
       "@react-native-firebase/crashlytics",
       "@react-native-firebase/app-check",
