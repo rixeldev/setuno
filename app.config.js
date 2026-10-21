@@ -11,7 +11,9 @@
 // claimed by the app and a host served by the deploy can never drift.
 import { readFileSync } from "node:fs"
 
-const appLinks = JSON.parse(readFileSync(new URL("./app-links.json", import.meta.url), "utf8"))
+const appLinks = JSON.parse(
+  readFileSync(new URL("./app-links.json", import.meta.url), "utf8"),
+)
 
 const stagingEnv = process.env.APP_ENV === "staging"
 
@@ -45,7 +47,7 @@ export default {
     name: "Setuno",
     slug: "setuno",
     scheme: "setuno",
-    version: "1.0.0",
+    version: "1.1.0",
     orientation: "portrait",
     icon: "./assets/icons/mipmap-xxxhdpi/ic_launcher.png",
     userInterfaceStyle: "automatic",
@@ -71,21 +73,25 @@ export default {
       // sign-in link open the app on an iPhone (#67) and a link to a song
       // open the song (#76). Declared now so iOS ships with the deep-link
       // plumbing instead of without it.
-      associatedDomains: [...authHosts, ...appLinks.hosts].map((host) => `applinks:${host}`),
+      associatedDomains: [...authHosts, ...appLinks.hosts].map(
+        (host) => `applinks:${host}`,
+      ),
       googleServicesFile: stagingEnv
-        ? (process.env.GOOGLE_SERVICES_PLIST_STAGING ?? "./GoogleService-Info-staging.plist")
+        ? (process.env.GOOGLE_SERVICES_PLIST_STAGING ??
+          "./GoogleService-Info-staging.plist")
         : "./GoogleService-Info.plist",
       buildNumber: "1",
     },
     android: {
       package: appLinks.packageName,
-      versionCode: 1,
-      version: "1.0.0",
+      versionCode: 2,
+      version: "1.1.0",
       minSdkVersion: 24,
       ndkVersion: "29.0.14206865",
       targetSdkVersion: 36,
       googleServicesFile: stagingEnv
-        ? (process.env.GOOGLE_SERVICES_JSON_STAGING ?? "./google-services-staging.json")
+        ? (process.env.GOOGLE_SERVICES_JSON_STAGING ??
+          "./google-services-staging.json")
         : "./google-services.json",
       // Deep links (#67 and #76): claim two families of URL as **Android App
       // Links**, so a tap opens the app instead of a browser tab —
