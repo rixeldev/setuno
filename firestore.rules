@@ -272,6 +272,14 @@ service cloud.firestore {
         && (
           request.resource.data.displayName == resource.data.displayName
           || (
+            // The placeholder: an account created before its name arrived
+            // takes its real name now, and the three-month window does not
+            // apply to it (the member never chose that name).
+            resource.data.displayName.matches('Musician(-\\d{4})?')
+            && request.resource.data.usernameChangedAt == resource.data.get('usernameChangedAt', null)
+            && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.displayName.lower())).data.uid == request.auth.uid
+          )
+          || (
             // Renaming: stamp the change, respect the three-month cooldown and
             // make sure the caller owns the claim for the new name.
             request.resource.data.usernameChangedAt == request.time

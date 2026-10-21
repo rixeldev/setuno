@@ -2236,3 +2236,44 @@ describe("song edit presence is a soft heartbeat (roadmap #28)", () => {
     await assertSucceeds(alice().firestore().doc(presencePath("bob")).delete())
   })
 })
+
+describe("the profile's name takes the real one when it arrives", () => {
+  // The profile's email must mirror the token's, so this context carries one.
+  const named = () => env.authenticatedContext("alice", { email: "alice@example.com" })
+  const seedProfile = async (displayName: string): Promise<void> => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore()
+      await db.doc(`usernames/${displayName.toLowerCase()}`).set({ uid: "alice" })
+      await db.doc("users/alice").set({
+        uid: "alice",
+        displayName,
+        email: "alice@example.com",
+        photoURL: "",
+        organizationIds: [],
+        activeOrganizationId: null,
+        preferences: {},
+        onboarded: true,
+        usernameChangedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+    })
+  }
+
+  it("lets a placeholder profile take the real name, without the three-month window", async () => {
+    await seedProfile("Musician")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("usernames/rixel").set({ uid: "alice" })
+    })
+    await assertSucceeds(named().firestore().doc("users/alice").update({ displayName: "Rixel" }))
+  })
+
+  it("stops the placeholder from overwriting a name that is already there", async () => {
+    await seedProfile("Rixel")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("usernames/musician").set({ uid: "alice" })
+    })
+    // A rename has to be stamped, so a silent overwrite is refused.
+    await assertFails(named().firestore().doc("users/alice").update({ displayName: "Musician" }))
+  })
+})

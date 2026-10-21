@@ -84,7 +84,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = useCallback(
     async (input: { email: string; password: string; displayName: string }) => {
-      await registerWithEmail(input)
+      const user = await registerWithEmail(input)
+      // The account's name is set right after the account is created, so the
+      // profile is written here with the real name — the account's own
+      // backfill may have run a moment earlier, before the name was there.
+      await ensureUserProfile({
+        uid: user.uid,
+        email: user.email ?? input.email,
+        displayName: input.displayName,
+        photoURL: user.photoURL,
+      }).catch(() => undefined)
     },
     [],
   )

@@ -9,6 +9,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  writeBatch,
   type Unsubscribe,
 } from "@/db/Fire"
 import {
@@ -20,7 +21,9 @@ import {
 import { applyAccent, applyAppearanceMode, applyAppearance } from "@/services/themeManager"
 import { updateCachedPreferences, writeCachedPreferences } from "@/services/prefs"
 import { claimUsername } from "@/services/usernames"
+import { getCurrentUser } from "@/services/auth"
 import { isAccentId, isAppearanceMode } from "@/libs/appearance"
+import { isPlaceholderUsername, usernameKey } from "@/libs/username"
 import { takePendingSignupConsent } from "@/libs/telemetry"
 import { applyTelemetryConsent, noteSignUpCompleted } from "@/services/telemetry"
 
@@ -65,7 +68,12 @@ export const ensureUserProfile = async (input: EnsureProfileInput): Promise<User
     // The sign-up screen's asked telemetry answer rides in here (#73): stamped
     // only on create — a backfill never re-asks or overwrites the choice.
     const telemetry = takePendingSignupConsent()
-    const username = await claimUsername(input.uid, input.displayName)
+    // The account's name can arrive a moment after the account itself (the
+    // email sign-up sets it right after creating it), so the live user is
+    // read again here: a profile must never be born with the placeholder
+    // while the real name is already there.
+    const liveName = getCurrentUser()?.displayName?.trim() ?? ""
+    const username = await claimUsername(input.uid, liveName || input.displayName)
     const payload = {
       displayName: username,
       email: normalizeEmail(input.email),
@@ -90,6 +98,26 @@ export const ensureUserProfile = async (input: EnsureProfileInput): Promise<User
 
   const data = snapshot.data() as Record<string, unknown>
   const patch: Record<string, unknown> = {}
+  const storedName = String(data.displayName ?? "")
+  const accountName = input.displayName.trim()
+
+  // A profile that still carries the placeholder takes the account's real
+  // name now. The name can arrive a moment after the account (the email
+  // sign-up sets it right after creating it), and the profile must not stay
+  // "Musician" for ever — the member would have to rename it by hand.
+  if (isPlaceholderUsername(storedName) && !isPlaceholderUsername(accountName)) {
+    const username = await claimUsername(input.uid, accountName)
+    const batch = writeBatch(firestore)
+    batch.update(reference, { displayName: username, updatedAt: now })
+    const previousKey = usernameKey(storedName)
+    if (previousKey.length > 0 && previousKey !== usernameKey(username)) {
+      // The placeholder is released, so nobody else has to sit on it either.
+      batch.delete(doc(firestore, paths.username(previousKey)))
+    }
+    await batch.commit()
+    return mapUser({ ...data, displayName: username }, input.uid)
+  }
+
   // The display name is the claimed username: only seed it while empty, never
   // overwrite it from the auth account (the username is the source of truth).
   if (!data.displayName && input.displayName.length > 0) {

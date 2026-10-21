@@ -1,5 +1,10 @@
 import { doc, firestore, getDoc, paths, serverTimestamp, setDoc, writeBatch } from "@/db/Fire"
-import { normalizeUsername, usernameKey, usernameWithSuffix } from "@/libs/username"
+import {
+  normalizeUsername,
+  PLACEHOLDER_USERNAME,
+  usernameKey,
+  usernameWithSuffix,
+} from "@/libs/username"
 import { ValidationError } from "@/services/errors"
 
 /** Suffixed candidates attempted before giving up on a base name. */
@@ -22,7 +27,7 @@ export const isUsernameTaken = async (username: string): Promise<boolean> => {
  * Google sign-ins land here with the account name and fall back to `Name-1234`.
  */
 export const claimUsername = async (uid: string, base: string): Promise<string> => {
-  const plain = normalizeUsername(base) || "Musician"
+  const plain = normalizeUsername(base) || PLACEHOLDER_USERNAME
   for (let attempt = 0; attempt <= CLAIM_ATTEMPTS; attempt += 1) {
     const candidate = attempt === 0 ? plain : usernameWithSuffix(plain)
     try {
