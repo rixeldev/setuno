@@ -30,7 +30,16 @@ export function BannerAdSlot({ fullWidth = false }: { fullWidth?: boolean }) {
   if (plan.isPro || BANNER_UNIT_ID === null) return null
 
   return (
-    <View style={loaded ? styles.host : styles.collapsed}>
+    <View
+      style={[
+        loaded ? styles.host : styles.collapsed,
+        // The anchored adaptive banner is meant to sit **against the bottom
+        // edge**: it is the last thing on the screen, and the padding that
+        // suits the dashboard slot would leave a strip of empty background
+        // under it.
+        fullWidth && styles.hostFlush,
+      ]}
+    >
       <BannerAd
         unitId={BANNER_UNIT_ID}
         size={fullWidth ? BannerAdSize.ANCHORED_ADAPTIVE_BANNER : BANNER_SIZE}
@@ -45,5 +54,7 @@ export function BannerAdSlot({ fullWidth = false }: { fullWidth?: boolean }) {
 const createStyles = () =>
   StyleSheet.create({
     host: { alignItems: "center", paddingVertical: Theme.spacing.s },
+    // No padding: the banner touches the bottom of the screen.
+    hostFlush: { paddingVertical: 0 },
     collapsed: { height: 0, overflow: "hidden" },
   })
