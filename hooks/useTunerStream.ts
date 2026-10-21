@@ -12,7 +12,7 @@
  * (`stream: null`) — browsers get `useTunerStream.web.ts` instead.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useRef, useState } from "react"
 import { requestRecordingPermissionsAsync, useAudioStream } from "expo-audio"
 
 import type { TunerStream, TunerStreamStatus } from "@/interfaces/tuner"
@@ -36,6 +36,22 @@ export function useTunerStream(): TunerStream {
     },
   })
 
+  /**
+   * `AudioStream.stop()` is typed `void`, but expo-modules-core routes it
+   * through an **async** native call: when the shared object has already been
+   * released the call *rejects*, and an unhandled rejection is fatal in a
+   * release build (v1.1.0 crashed exactly this way on the way out of the
+   * tuner). Stopping something that is already gone is not an error here.
+   */
+  const stopStream = useCallback(() => {
+    try {
+      const pending: unknown = stream.stop()
+      if (pending instanceof Promise) void pending.catch(() => undefined)
+    } catch {
+      // Released already: nothing left to stop.
+    }
+  }, [stream])
+
   const start = useCallback(async () => {
     setStatus("requesting")
     try {
@@ -48,8 +64,9 @@ export function useTunerStream(): TunerStream {
       streamingRef.current = true
       setStatus("running")
     } catch {
-      // The mic is held by another app, the device has none, or the stream
-      // failed to initialize — all three read as "unavailable" to the user.
+      // The mic is held by another app, the device has none, the stream failed
+      // to initialize, or the screen was left while the permission dialog was
+      // up (the stream is released by then) — all read as "unavailable".
       streamingRef.current = false
       setStatus("error")
     }
@@ -58,24 +75,20 @@ export function useTunerStream(): TunerStream {
   const stop = useCallback(() => {
     if (streamingRef.current) {
       streamingRef.current = false
-      stream.stop()
+      stopStream()
     }
     engine.reset()
     setReading(null)
     setStatus("idle")
-  }, [engine, stream])
+  }, [engine, stopStream])
 
-  // Unmount: release the native audio resources; setState after unmount is a
-  // no-op in React 18+, and the engine dies with the closure anyway.
-  useEffect(
-    () => () => {
-      if (streamingRef.current) {
-        streamingRef.current = false
-        stream.stop()
-      }
-    },
-    [stream]
-  )
+  // **No `stop()` on unmount, on purpose.** `useAudioStream` releases its
+  // shared object when this component unmounts, and that release stops the
+  // capture by itself (`sharedObjectDidRelease` → `stop()` on Android, `deinit`
+  // on iOS). Its cleanup is registered before this hook's own effects, so it
+  // runs first: a `stop()` here would always target an already released
+  // object. setState after unmount is a no-op in React 18+, and the engine
+  // dies with the closure anyway.
 
   return { status, reading, start, stop }
 }
