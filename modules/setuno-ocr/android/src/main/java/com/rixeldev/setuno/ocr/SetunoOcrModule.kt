@@ -33,17 +33,23 @@ class SetunoOcrModule : Module() {
     AsyncFunction("recognizeImage") { uri: String, promise: Promise ->
       val context = appContext.reactContext
       if (context == null) {
-        promise.reject("E_OCR_NO_CONTEXT", "The app is not running.")
+        promise.reject("E_OCR_NO_CONTEXT", "The app is not running.", null)
         return@AsyncFunction
       }
       executor.execute {
         try {
           val bitmap = decodeBitmap(context, Uri.parse(uri))
           if (bitmap == null) {
-            promise.reject("E_OCR_IMAGE", "The photo could not be read.")
+            promise.reject("E_OCR_IMAGE", "The photo could not be read.", null)
             return@execute
           }
-          recognizeBitmap(context, bitmap) { pages -> promise.resolve(mapOf("pages" to pages)) }
+          readBitmap(context, bitmap) { page, error ->
+            if (error != null) {
+              promise.reject("E_OCR", error.message, error)
+            } else {
+              promise.resolve(mapOf("pages" to listOf(page)))
+            }
+          }
         } catch (error: Exception) {
           promise.reject("E_OCR", error.message, error)
         }
@@ -53,23 +59,29 @@ class SetunoOcrModule : Module() {
     AsyncFunction("recognizePdf") { uri: String, promise: Promise ->
       val context = appContext.reactContext
       if (context == null) {
-        promise.reject("E_OCR_NO_CONTEXT", "The app is not running.")
+        promise.reject("E_OCR_NO_CONTEXT", "The app is not running.", null)
         return@AsyncFunction
       }
       executor.execute {
         try {
           val renderer = openPdf(context, Uri.parse(uri))
           if (renderer == null) {
-            promise.reject("E_OCR_PDF", "The PDF could not be opened.")
+            promise.reject("E_OCR_PDF", "The PDF could not be opened.", null)
             return@execute
           }
           val bitmaps = renderPages(renderer)
           renderer.close()
           if (bitmaps.isEmpty()) {
-            promise.reject("E_OCR_PDF", "The PDF has no pages.")
+            promise.reject("E_OCR_PDF", "The PDF has no pages.", null)
             return@execute
           }
-          recognizeAll(context, bitmaps) { pages -> promise.resolve(mapOf("pages" to pages)) }
+          readAll(context, bitmaps) { pages, error ->
+            if (error != null) {
+              promise.reject("E_OCR", error.message, error)
+            } else {
+              promise.resolve(mapOf("pages" to pages))
+            }
+          }
         } catch (error: Exception) {
           promise.reject("E_OCR", error.message, error)
         }
@@ -88,48 +100,49 @@ class SetunoOcrModule : Module() {
     const val PDF_SCALE = 2f
   }
 
-  /** Reads one bitmap, line by line, with the geometry of every word. */
-  private fun recognizeBitmap(
+  /**
+   * Reads one bitmap, line by line, with the geometry of every word.
+   *
+   * The recognizer answers on its own thread, so the result is handed back
+   * through the callback instead of being returned.
+   */
+  private fun readBitmap(
     context: Context,
     bitmap: Bitmap,
-    onResult: (List<Map<String, Any?>>) -> Unit,
+    onResult: (Map<String, Any?>?, Exception?) -> Unit,
   ) {
     val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     recognizer
       .process(InputImage.fromBitmap(bitmap, 0))
-      .addOnSuccessListener { text -> onResult(listOf(mapPage(bitmap, text))) }
-      .addOnFailureListener { error -> throw error }
+      .addOnSuccessListener { text -> onResult(mapPage(bitmap, text), null) }
+      .addOnFailureListener { error -> onResult(null, error) }
       .addOnCompleteListener { recognizer.close() }
   }
 
   /** Reads a list of bitmaps in order, one after the other. */
-  private fun recognizeAll(
+  private fun readAll(
     context: Context,
     bitmaps: List<Bitmap>,
-    onResult: (List<Map<String, Any?>>) -> Unit,
+    onResult: (List<Map<String, Any?>>, Exception?) -> Unit,
   ) {
     val pages = mutableListOf<Map<String, Any?>>()
     var index = 0
 
     fun next() {
       if (index >= bitmaps.size) {
-        onResult(pages)
+        onResult(pages, null)
         return
       }
       val bitmap = bitmaps[index]
       index += 1
-      val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-      recognizer
-        .process(InputImage.fromBitmap(bitmap, 0))
-        .addOnSuccessListener { text ->
-          pages.add(mapPage(bitmap, text))
-          recognizer.close()
-          next()
+      readBitmap(context, bitmap) { page, error ->
+        if (error != null || page == null) {
+          onResult(pages, error ?: Exception("The page could not be read."))
+          return@readBitmap
         }
-        .addOnFailureListener { error ->
-          recognizer.close()
-          throw error
-        }
+        pages.add(page)
+        next()
+      }
     }
 
     next()

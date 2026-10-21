@@ -10,10 +10,14 @@ Pod::Spec.new do |s|
   s.license        = { :type => 'MIT' }
   s.author         = 'Rixeldev'
   s.homepage       = 'https://github.com/rixeldev/setuno'
-  s.platforms      = { :ios => '15.1' }
+  s.platforms      = { :ios => '16.4' }
   s.source         = { git: '' }
   s.static_framework = true
   s.dependency 'ExpoModulesCore'
+
+  # Vision reads the text and PDFKit rasterizes the pages; both are system
+  # frameworks, so nothing is downloaded.
+  s.frameworks = 'Vision', 'PDFKit'
 
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
