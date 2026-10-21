@@ -118,7 +118,9 @@
     "tunerHint": "Afina cualquier instrumento al oído",
     "switchBandHint": "Toca con otra formación",
     "settingsHint": "Perfil, tema e idioma",
-    "shortcuts": "Accesos"
+    "shortcuts": "Accesos",
+    "chords": "Acordes",
+    "chordsHint": "Estima los acordes de una grabación"
   },
   "auth": {
     "welcome": "Bienvenido a Setuno",
@@ -2031,5 +2033,23 @@
     "cellular": "Estás con datos móviles, así que actualizar es opcional. Te recomendamos hacerlo pronto.",
     "action": "Actualizar ahora",
     "later": "Más tarde"
+  },
+  "chords": {
+    "title": "Estimar los acordes",
+    "subtitle": "Escucha un passage y mira los acordes que toca",
+    "experimentOff": "Esto es un experimento, todavía en pruebas. Actívalo para estimar los acordes de una grabación.",
+    "turnOn": "Activar el experimento",
+    "turnOff": "Desactivar el experimento",
+    "howTo": "Toca o canta un passage y pulsa grabar. Los acordes que oye aparecen aquí, con el tiempo de cada uno.",
+    "approximate": "El resultado es aproximado: una guitarra en una habitación no es un tono limpio. Compruébalo con la música.",
+    "unavailable": "El micrófono no está disponible en esta plataforma.",
+    "failed": "No se pudo leer la grabación.",
+    "analyzing": "Escuchando…",
+    "key": "Suena como {{key}}",
+    "duration": "{{seconds}} s",
+    "confidence": "{{percent}} % de certeza",
+    "record": "Grabar",
+    "stop": "Parar",
+    "again": "Grabar otra"
   }
 }

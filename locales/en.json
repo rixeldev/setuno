@@ -118,7 +118,9 @@
     "tunerHint": "Tune any instrument by ear",
     "switchBandHint": "Play with another lineup",
     "settingsHint": "Profile, theme and language",
-    "shortcuts": "Shortcuts"
+    "shortcuts": "Shortcuts",
+    "chords": "Chords",
+    "chordsHint": "Estimate the chords of a recording"
   },
   "auth": {
     "welcome": "Welcome to Setuno",
@@ -2031,5 +2033,23 @@
     "cellular": "You are on mobile data, so updating is optional. We recommend updating soon.",
     "action": "Update now",
     "later": "Later"
+  },
+  "chords": {
+    "title": "Estimate the chords",
+    "subtitle": "Listen to a passage and see the chords it plays",
+    "experimentOff": "This is an experiment, still finding its shape. Turn it on to estimate the chords of a recording.",
+    "turnOn": "Turn the experiment on",
+    "turnOff": "Turn the experiment off",
+    "howTo": "Play or sing a passage and press record. The chords it hears appear here, with the time each one lasted.",
+    "approximate": "The result is approximate — a guitar in a room is not a clean tone. Check it against the music.",
+    "unavailable": "The microphone is not available on this platform.",
+    "failed": "The recording could not be read.",
+    "analyzing": "Listening…",
+    "key": "It sounds like {{key}}",
+    "duration": "{{seconds}} s",
+    "confidence": "{{percent}}% sure",
+    "record": "Record",
+    "stop": "Stop",
+    "again": "Record another one"
   }
 }

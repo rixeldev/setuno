@@ -572,6 +572,25 @@ read page by page.
 The screen says how sure the recognition was: a sheet is never certain, and the warnings
 (no chords, unsure, too little) are part of the feature.
 
+## Estimate the chords of a recording
+
+An **experiment**, behind a flag: turn it on in the app (or from the *Chords* entry in the sidebar
+and the mobile "More" screen), play or sing a passage, and the app listens.
+
+The estimation is **on the device** and offline: the microphone's samples go through a Hann window
+and an FFT, the spectrum becomes a chroma (twelve pitch classes) and the chroma is matched against
+the chord templates. The core is pure and lives in `libs/chordDetection.ts` (+10 tests).
+
+The result is an **approximation** — a guitar in a room is not a sine wave — so every chord carries
+its confidence and the screen says so plainly. It names the key the recording sounds like it is in.
+
+| Piece | Where |
+| --- | --- |
+| The pure core | `libs/chordDetection.ts` — the samples become chords with their times |
+| The microphone | `hooks/useChordRecorder.ts` — the same seam the tuner uses |
+| The screen | `app/(app)/chords.tsx` |
+| The flag | `services/experiments.ts` — a local preference, nothing travels |
+
 ## Tidy up a pasted sheet
 
 A chord sheet pasted from a website arrives as plain text: the chords on their own row, the header

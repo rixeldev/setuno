@@ -118,7 +118,9 @@
     "tunerHint": "Accordez n'importe quel instrument à l'oreille",
     "switchBandHint": "Jouez avec une autre formation",
     "settingsHint": "Profil, thème et langue",
-    "shortcuts": "Raccourcis"
+    "shortcuts": "Raccourcis",
+    "chords": "Accords",
+    "chordsHint": "Estime les accords d'un enregistrement"
   },
   "auth": {
     "welcome": "Bienvenue sur Setuno",
@@ -2031,5 +2033,23 @@
     "cellular": "Vous êtes en données mobiles, la mise à jour est donc facultative. Nous vous recommandons de la faire bientôt.",
     "action": "Mettre à jour",
     "later": "Plus tard"
+  },
+  "chords": {
+    "title": "Estimer les accords",
+    "subtitle": "Écoutez un passage et voyez les accords qu'il joue",
+    "experimentOff": "C'est une expérience, encore en cours. Activez-la pour estimer les accords d'un enregistrement.",
+    "turnOn": "Activer l'expérience",
+    "turnOff": "Désactiver l'expérience",
+    "howTo": "Jouez ou chantez un passage et appuyez sur enregistrer. Les accords entendus apparaissent ici, avec la durée de chacun.",
+    "approximate": "Le résultat est approximatif — une guitare dans une pièce n'est pas un son pur. Vérifiez avec la musique.",
+    "unavailable": "Le micro n'est pas disponible sur cette plateforme.",
+    "failed": "L'enregistrement n'a pas pu être lu.",
+    "analyzing": "À l'écoute…",
+    "key": "On dirait {{key}}",
+    "duration": "{{seconds}} s",
+    "confidence": "{{percent}} % sûr",
+    "record": "Enregistrer",
+    "stop": "Arrêter",
+    "again": "Enregistrer un autre"
   }
 }
