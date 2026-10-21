@@ -67,9 +67,17 @@ export function SyncBanner() {
         },
       ]}
     >
+      {/*
+        The banner's own content is **out of the flow**: it is measured inside a
+        box that is being resized, and a child of a resized box can be laid out
+        against the smaller height (which is what cut the banner in half). As an
+        absolutely positioned layer it keeps its natural height, so the
+        measurement is always the real one and the host can grow to fit it.
+      */}
       <View
         style={[
           styles.banner,
+          styles.layer,
           view === "offline" && styles.bannerOffline,
           view === "synced" && styles.bannerSynced,
         ]}
@@ -78,13 +86,15 @@ export function SyncBanner() {
         accessibilityElementsHidden={!visible}
         importantForAccessibility={visible ? "yes" : "no-hide-descendants"}
       >
-        {view === "offline" ? (
-          <OfflineIcon size={14} color={Theme.colors.warning} />
-        ) : view === "syncing" ? (
-          <ActivityIndicator size="small" color={Theme.colors.primary} />
-        ) : (
-          <CheckCircleIcon size={14} color={Theme.colors.success} />
-        )}
+        <View style={styles.iconBox}>
+          {view === "offline" ? (
+            <OfflineIcon size={14} color={Theme.colors.warning} />
+          ) : view === "syncing" ? (
+            <ActivityIndicator size="small" color={Theme.colors.primary} />
+          ) : (
+            <CheckCircleIcon size={14} color={Theme.colors.success} />
+          )}
+        </View>
         <AppText
           variant="caption"
           tone={view === "offline" ? "accent" : view === "synced" ? "success" : "primary"}
@@ -105,6 +115,9 @@ const createStyles = () =>
     // The animated host: it clips the banner while it is closed, so the row
     // never takes space it is not using.
     host: { overflow: "hidden" },
+    // The banner's own layer: out of the flow, so the host can resize it
+    // without ever laying it out against a smaller height.
+    layer: { position: "absolute", top: 0, left: 0, right: 0 },
     banner: {
       flexDirection: "row",
       alignItems: "center",
@@ -113,6 +126,9 @@ const createStyles = () =>
       paddingVertical: Theme.spacing.s,
       backgroundColor: Theme.colors.background2,
     },
+    // One box for every state, so the row keeps the same height while the
+    // note changes (the spinner is taller than the icons).
+    iconBox: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
     bannerOffline: { backgroundColor: Theme.colors.warningSoft },
     bannerSynced: { backgroundColor: Theme.colors.successSoft },
   })
