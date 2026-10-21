@@ -17,13 +17,17 @@ import { BANNER_SIZE, BANNER_UNIT_ID } from "@/services/ads"
  *
  * **Pro members see no ads at all** (roadmap #61): the slot is not even
  * mounted, so nothing is requested and nothing is shown.
+ *
+ * A build with no valid unit id renders nothing either: `BannerAd` throws when
+ * it mounts with an empty id, and that throw is fatal. The check lives in
+ * `services/ads.ts`, next to the id itself.
  */
 export function BannerAdSlot({ fullWidth = false }: { fullWidth?: boolean }) {
   const styles = useThemedStyles(createStyles)
   const [loaded, setLoaded] = useState(false)
   const plan = useEntitlement()
 
-  if (plan.isPro) return null
+  if (plan.isPro || BANNER_UNIT_ID === null) return null
 
   return (
     <View style={loaded ? styles.host : styles.collapsed}>
