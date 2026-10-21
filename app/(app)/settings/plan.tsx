@@ -165,8 +165,21 @@ export default function PlanScreen() {
       ) : (
         <Card>
           <AppText variant="body" tone="muted">
-            {t("plan.notOffered")}
+            {!isWeb && !store.connected ? t("plan.storeUnavailable") : t("plan.notOffered")}
           </AppText>
+          {store.error ? (
+            <AppText variant="caption" tone="faint">
+              {t("plan.storeError", { code: store.error })}
+            </AppText>
+          ) : null}
+          {!isWeb && !store.connected ? (
+            <Button
+              label={t("plan.retryStore")}
+              variant="secondary"
+              full
+              onPress={() => void store.reconnect()}
+            />
+          ) : null}
         </Card>
       )}
 

@@ -1367,6 +1367,8 @@
     "proActivated": "Pro is on. Thank you!",
     "purchaseFailed": "The purchase could not be completed.",
     "storeUnavailable": "The store is not available on this device.",
+    "storeError": "The store answered: {{code}}.",
+    "retryStore": "Try again",
     "statsLocked": "The band's statistics are part of the Pro plan.",
     "seePlan": "See the plan",
     "limitTitle": "You have reached the free plan's limit",

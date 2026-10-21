@@ -1367,6 +1367,8 @@
     "proActivated": "Pro est activé. Merci !",
     "purchaseFailed": "L'achat n'a pas pu aboutir.",
     "storeUnavailable": "Le magasin n'est pas disponible sur cet appareil.",
+    "storeError": "Le magasin a répondu : {{code}}.",
+    "retryStore": "Réessayer",
     "statsLocked": "Les statistiques du groupe font partie de l'offre Pro.",
     "seePlan": "Voir l'offre",
     "limitTitle": "Vous avez atteint la limite de l'offre gratuite",

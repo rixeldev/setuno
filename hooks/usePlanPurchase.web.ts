@@ -94,11 +94,18 @@ export const usePlanPurchase = (options: {
     // up, and the tip is a one-time product that would need its own Stripe
     // price.
     tip: null,
+    // The Stripe catalogue is read from the server, not from a device store:
+    // a failure leaves the list empty and the screen says the plan is not
+    // offered here (the web's own copy, not the store's code).
+    error: null,
     buy,
     tipNow: async () => {
       options.onError("store-unavailable")
     },
     restore,
     manage,
+    // The web has no device store to reconnect: Stripe's catalogue comes from
+    // the server, and a reload asks it again.
+    reconnect: async () => undefined,
   }
 }

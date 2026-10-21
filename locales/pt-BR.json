@@ -1367,6 +1367,8 @@
     "proActivated": "Pro ativado. Obrigado!",
     "purchaseFailed": "Não foi possível concluir a compra.",
     "storeUnavailable": "A loja não está disponível neste dispositivo.",
+    "storeError": "A loja respondeu: {{code}}.",
+    "retryStore": "Tentar novamente",
     "statsLocked": "As estatísticas da banda fazem parte do plano Pro.",
     "seePlan": "Ver o plano",
     "limitTitle": "Você chegou ao limite do plano grátis",
