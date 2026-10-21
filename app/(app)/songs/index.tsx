@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next"
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
-import { Button, IconButton } from "@/components/ui/Button"
+import { IconButton } from "@/components/ui/Button"
 import { Chip } from "@/components/ui/Card"
 import { Input, SearchInput } from "@/components/ui/Input"
 import { Dialog } from "@/components/ui/Dialog"
@@ -168,13 +168,22 @@ export default function SongsScreen() {
               icon={<SearchIcon size={16} color={Theme.colors.textFaint} />}
               containerStyle={styles.search}
             />
-            <Button
+            {/* The filter is an icon button like the ones next to it: the row
+                is tight on a phone, and the search field is what needs the
+                width. The count of active filters lives in the button's label
+                (and in the chips below). */}
+            <IconButton
               label={
                 activeCount > 0 ? t("songs.filtersCount", { count: activeCount }) : t("songs.filters")
               }
-              variant={activeCount > 0 ? "primary" : "secondary"}
-              icon={<FilterIcon size={15} color={activeCount > 0 ? Theme.colors.onPrimary : Theme.colors.text} />}
+              variant="secondary"
               onPress={() => setFacet(facet ?? "key")}
+              icon={
+                <FilterIcon
+                  size={16}
+                  color={activeCount > 0 ? Theme.colors.primary : Theme.colors.text}
+                />
+              }
             />
             <IconButton
               label={t("songs.sortA11y", { order: t(SORT_LABELS[sort]) })}
