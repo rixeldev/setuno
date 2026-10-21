@@ -1,9 +1,15 @@
 import { useSyncExternalStore } from "react"
 
 /**
- * Height of the app's bottom chrome (tab bar + banner) as reported by the
- * shell. Floating UI (the toast) anchors just above it instead of guessing a
- * constant that breaks when the banner appears or the bar hides.
+ * Height of the app's bottom chrome (the tab bar) as reported by the shell.
+ * Floating UI (the toast) anchors just above it instead of guessing a
+ * constant that breaks when the bar hides.
+ *
+ * **The ad banner is not part of it.** The banner's height moves with the
+ * fill, the orientation and the SDK's own layout, so a toast that followed it
+ * jumped around the screen; the tab bar is the stable part, and the one the
+ * toast has to clear. The banner lives *below* the bar, so the toast still
+ * never lands on it.
  */
 
 let height = 0

@@ -82,10 +82,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <CommandPaletteHost />
       {pushDialog}
       {focused ? null : (
-        <View
-          onLayout={(event) => setBottomChromeHeight(event.nativeEvent.layout.height)}
-        >
-          <BottomBar />
+        <View>
+          {/* Only the **tab bar** is measured: the ad banner's height changes
+              with the fill, the orientation and the SDK's own layout (it can
+              report a placeholder height for a moment), and a toast that
+              follows it jumps around the screen. The bar is the stable part
+              of the bottom chrome, and it is the one the toast has to clear. */}
+          <View
+            onLayout={(event) => setBottomChromeHeight(event.nativeEvent.layout.height)}
+          >
+            <BottomBar />
+          </View>
           {/* The banner stays mounted under the tab bar across tabs, so it
               never appears and disappears while navigating. */}
           <BannerAdSlot fullWidth />
