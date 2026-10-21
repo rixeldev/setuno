@@ -5,6 +5,7 @@ import { Platform } from "react-native"
 
 import { deleteDoc, doc, firestore, getDoc, paths, serverTimestamp, setDoc } from "@/db/Fire"
 import type { LanguageCode } from "@/libs/language"
+import type { PushDeviceState, PushPermissionState } from "@/interfaces/push"
 
 /**
  * Push registration for this install (roadmap #52).
@@ -21,22 +22,24 @@ import type { LanguageCode } from "@/libs/language"
  * need the network; an empty cache means this install has never registered
  * (every path that learns about a document caches its token).
  *
+ * The app-start question (see `hooks/usePushPrompt.ts`) needs one more thing:
+ * whether this install was **already asked**. That answer is remembered on the
+ * device, because the permission lives in the OS and the registration in
+ * Firestore — a member who said no is not asked again on every start, and the
+ * settings screen is always there to change it.
+ *
  * Native only — the web build loads `services/notifications.web.ts`, which
  * reports push as unavailable, so the web bundle never imports
  * `expo-notifications`.
  */
 
-/** `"unavailable"` only ever comes from the web shim. */
-export type PushPermissionState = "granted" | "denied" | "undetermined" | "unavailable"
-
-export interface PushDeviceState {
-  permission: PushPermissionState
-  /** This install's device document exists, i.e. push is routed to it. */
-  registered: boolean
-}
+export type { PushDeviceState, PushPermissionState }
 
 /** The Expo push token is both the registration and the document id. */
 const TOKEN_KEY = "setuno:push-device-token"
+
+/** Whether this install has already been asked about notifications. */
+const ASKED_KEY = "setuno:push-asked:v1"
 
 /** The channel `app.config.js` declares as the default one. */
 const CHANNEL_ID = "default"
@@ -93,6 +96,40 @@ const expoPushToken = async (): Promise<string> => {
 
 const deviceReference = (uid: string, token: string) =>
   doc(firestore, paths.userDevice(uid, token))
+
+/**
+ * The OS permission, and nothing else: no token, no network, no document.
+ *
+ * The app-start question needs to know whether asking is still worth it, and
+ * the settings screen needs the full state (with the document) — so the two
+ * are separate reads.
+ */
+export const getPushPermissionState = async (): Promise<PushPermissionState> =>
+  permissionOf(await Notifications.getPermissionsAsync())
+
+/**
+ * Whether this install has already been asked.
+ *
+ * A ledger that cannot be read answers "yes" (do not ask): a member who said
+ * no must not be nagged on every start, and the settings screen is always
+ * there to change it.
+ */
+export const hasAskedForPush = async (): Promise<boolean> => {
+  try {
+    return (await AsyncStorage.getItem(ASKED_KEY)) === "1"
+  } catch {
+    return true
+  }
+}
+
+/** Remembers that the question was answered on this install. */
+export const rememberPushPrompt = async (): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(ASKED_KEY, "1")
+  } catch {
+    // A ledger that cannot be written only means the question may come back.
+  }
+}
 
 /**
  * What the settings screen opens on: the OS permission state plus whether

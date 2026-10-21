@@ -1335,6 +1335,12 @@
   "widget": {
     "nothingScheduled": "Nenhum show marcado."
   },
+  "push": {
+    "askTitle": "Notificações da sua banda",
+    "askBody": "O Setuno pode avisar quando chega uma sugestão, quando sai um show ou quando alguém te menciona. Você pode desligar quando quiser nas Configurações.",
+    "askAccept": "Sim, me avise",
+    "askLater": "Agora não"
+  },
   "plan": {
     "title": "Seu plano",
     "subtitle": "O que o Setuno libera nesta conta.",

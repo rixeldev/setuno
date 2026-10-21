@@ -1198,6 +1198,12 @@
   "widget": {
     "nothingScheduled": "No hay bolos programados."
   },
+  "push": {
+    "askTitle": "Notificaciones de tu banda",
+    "askBody": "Setuno puede avisarte cuando llega una sugerencia, cuando se publica un concierto o cuando alguien te menciona. Puedes apagarlo cuando quieras en Ajustes.",
+    "askAccept": "Sí, avísame",
+    "askLater": "Ahora no"
+  },
   "plan": {
     "title": "Tu plan",
     "subtitle": "Lo que Setuno desbloquea en esta cuenta.",

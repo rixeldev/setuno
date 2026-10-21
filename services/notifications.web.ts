@@ -7,18 +7,22 @@
  * bundle never import `expo-notifications`.
  */
 
-/** `"unavailable"` is the only state a browser can report. */
-export type PushPermissionState = "granted" | "denied" | "undetermined" | "unavailable"
+import type { PushDeviceState, PushPermissionState } from "@/interfaces/push"
 
-export interface PushDeviceState {
-  permission: PushPermissionState
-  registered: boolean
-}
+export type { PushDeviceState, PushPermissionState }
 
 export const getPushDeviceState = async (): Promise<PushDeviceState> => ({
   permission: "unavailable",
   registered: false,
 })
+
+/** A browser has no app-level push: there is never anything to ask. */
+export const getPushPermissionState = async (): Promise<PushPermissionState> => "unavailable"
+
+/** The web never asks, so the ledger always answers "already asked". */
+export const hasAskedForPush = async (): Promise<boolean> => true
+
+export const rememberPushPrompt = async (): Promise<void> => undefined
 
 export const enablePushForThisDevice = async (): Promise<PushDeviceState> => ({
   permission: "unavailable",

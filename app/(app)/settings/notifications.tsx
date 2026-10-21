@@ -1,5 +1,6 @@
-import { Fragment, useEffect, useState } from "react"
+import { Fragment, useCallback, useState } from "react"
 import { Linking, StyleSheet, Switch, View } from "react-native"
+import { useFocusEffect } from "expo-router"
 import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
@@ -39,22 +40,27 @@ export default function NotificationsSettingsScreen() {
   const [deviceState, setDeviceState] = useState<PushDeviceState | null>(null)
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => {
-    if (!uid) return
-    let alive = true
-    getPushDeviceState(uid)
-      .then((state) => {
-        if (alive) setDeviceState(state)
-      })
-      .catch(() => {
-        // A state read never carries information the user asked for: fall
-        // back to the "not set up yet" wording and let the switch ask.
-        if (alive) setDeviceState({ permission: "undetermined", registered: false })
-      })
-    return () => {
-      alive = false
-    }
-  }, [uid])
+  // The state is read every time the screen comes into focus, not only when it
+  // mounts: the app-start question (roadmap #52) may have registered this
+  // install, and the master switch has to show that.
+  useFocusEffect(
+    useCallback(() => {
+      if (!uid) return
+      let alive = true
+      void getPushDeviceState(uid)
+        .then((state) => {
+          if (alive) setDeviceState(state)
+        })
+        .catch(() => {
+          // A state read never carries information the user asked for: fall
+          // back to the "not set up yet" wording and let the switch ask.
+          if (alive) setDeviceState({ permission: "undetermined", registered: false })
+        })
+      return () => {
+        alive = false
+      }
+    }, [uid]),
+  )
 
   const notificationsPref = profile?.preferences?.notifications ?? {}
 

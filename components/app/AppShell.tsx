@@ -11,6 +11,8 @@ import { SyncBanner } from "@/components/app/SyncBanner"
 import { BannerAdSlot } from "@/components/ads/BannerAdSlot"
 import { useResponsive } from "@/hooks/useResponsive"
 import { usePushRegistration } from "@/hooks/usePushRegistration"
+import { usePushPrompt } from "@/hooks/usePushPrompt"
+import { PushPromptDialog } from "@/components/app/PushPromptDialog"
 import { useHomeWidget } from "@/hooks/useHomeWidget"
 import { isFocusRoute } from "@/libs/navigation"
 
@@ -34,6 +36,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // never resurrects a device the user switched off in the settings screen.
   usePushRegistration()
 
+  // The app-start question about notifications: it is asked once, while the OS
+  // would still ask, and never on a flow that takes over the screen.
+  const pushPrompt = usePushPrompt()
+  const pushDialog = focused ? null : (
+    <PushPromptDialog
+      visible={pushPrompt.visible}
+      onAccept={pushPrompt.accept}
+      onDecline={pushPrompt.decline}
+    />
+  )
+
   // The Android home-screen widget follows the band's next gig (roadmap #78).
   // The push happens here, where the band data is already subscribed.
   useHomeWidget()
@@ -55,6 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {onDashboard ? <BannerAdSlot /> : null}
         </View>
         <CommandPaletteHost />
+        {pushDialog}
       </View>
     )
   }
@@ -66,6 +80,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </SafeAreaView>
       <CommandPaletteHost />
+      {pushDialog}
       {focused ? null : (
         <View
           onLayout={(event) => setBottomChromeHeight(event.nativeEvent.layout.height)}

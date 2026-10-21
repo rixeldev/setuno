@@ -1335,6 +1335,12 @@
   "widget": {
     "nothingScheduled": "No gigs scheduled."
   },
+  "push": {
+    "askTitle": "Notifications for your band",
+    "askBody": "Setuno can tell you when a suggestion arrives, when a gig is posted or when someone mentions you. You can turn it off any time in Settings.",
+    "askAccept": "Yes, notify me",
+    "askLater": "Not now"
+  },
   "plan": {
     "title": "Your plan",
     "subtitle": "What Setuno unlocks on this account.",

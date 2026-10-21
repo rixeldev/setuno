@@ -1335,6 +1335,12 @@
   "widget": {
     "nothingScheduled": "Aucun concert prévu."
   },
+  "push": {
+    "askTitle": "Notifications de votre groupe",
+    "askBody": "Setuno peut vous prévenir quand une suggestion arrive, quand un concert est publié ou quand quelqu'un vous mentionne. Vous pouvez le désactiver à tout moment dans les réglages.",
+    "askAccept": "Oui, prévenez-moi",
+    "askLater": "Pas maintenant"
+  },
   "plan": {
     "title": "Votre offre",
     "subtitle": "Ce que Setuno débloque sur ce compte.",
