@@ -32,7 +32,7 @@ describe("compareVersions", () => {
 
 describe("maxVersion", () => {
   it("returns the highest version", () => {
-    expect(maxVersion(["1.0.0", "1.1.0", "1.1.9"])).toBe("1.1.0")
+    expect(maxVersion(["1.0.0", "1.1.0", "1.1.9"])).toBe("1.1.9")
   })
 
   it("ignores empty entries", () => {
