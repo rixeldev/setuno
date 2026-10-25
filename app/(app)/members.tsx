@@ -285,9 +285,16 @@ export default function MembersScreen() {
                 </View>
 
                 {member.instruments.length > 0 ? (
-                  <AppText variant="caption" tone="muted" numberOfLines={1}>
-                    {member.instruments.map((id) => t(`bandRoles.${id}`)).join(" · ")}
-                  </AppText>
+                  <View style={styles.instrumentChips}>
+                    {member.instruments.map((id) => (
+                      <Chip
+                        key={id}
+                        label={t(`bandRoles.${id}`)}
+                        size="sm"
+                        disabled
+                      />
+                    ))}
+                  </View>
                 ) : isAdmin || member.uid === profile?.uid ? (
                   <AppText variant="caption" tone="faint" numberOfLines={1}>
                     {t("members.noInstruments")}
@@ -298,9 +305,9 @@ export default function MembersScreen() {
                   {isAdmin || member.uid === profile?.uid ? (
                     <IconButton
                       label={t("members.editInstruments", { name: member.displayName })}
-                      size={32}
+                       size={28}
                       onPress={() => openInstruments(member)}
-                      icon={<GuitarIcon size={16} color={Theme.colors.textMuted} />}
+                       icon={<GuitarIcon size={14} color={Theme.colors.textMuted} />}
                     />
                   ) : null}
                   {canManage(member) ? (
@@ -560,4 +567,5 @@ const createStyles = () =>
     requestButtons: { gap: Theme.spacing.xs },
     roleRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
     rowActions: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.xs },
+    instrumentChips: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 2 },
   })
