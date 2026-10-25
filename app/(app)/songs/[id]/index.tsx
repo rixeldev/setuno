@@ -42,6 +42,7 @@ import {
   SuggestIcon,
   SwapIcon,
   TrashIcon,
+  UsersIcon,
 } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { AppBackground } from "@/components/app/AppBackground"
@@ -125,6 +126,7 @@ import { serializeChordPro } from "@/libs/chordpro"
 import { exportTextFile } from "@/libs/exportFile"
 import { songPrintHtml } from "@/libs/songPrint"
 import { setlistStep } from "@/libs/setlistNavigation"
+import { resolveLineup, lineupSummary } from "@/libs/bandRoles"
 import { canCollaborate } from "@/libs/membership"
 import { FUNNEL_EVENTS } from "@/libs/telemetry"
 import * as Clipboard from "expo-clipboard"
@@ -159,7 +161,7 @@ export default function SongScreen() {
 
   const { profile } = useAuth()
   const { organizationId, role, isAdmin } = useOrganization()
-  const { songLibrary, songs, setlists, suggestions, performances, loading, songUsage } = useOrgData()
+   const { songLibrary, songs, setlists, suggestions, performances, loading, songUsage, members } = useOrgData()
   const [song, setSong] = useState(songId ? (songLibrary.get(songId) ?? null) : null)
   // Derived usage (roadmap #34): only a song the band has actually played
   // carries the footer line — never-played songs stay silent here, because the
@@ -221,6 +223,13 @@ export default function SongScreen() {
   // not — you opened it from there, and the note is meant to be read while you do.
   const entryNote =
     contextSetlist?.songs.find((entry) => entry.songId === song?.id)?.note ?? ""
+  // Who plays this song in the list it was opened from (roadmap #88). Context,
+  // like the note: the same song can be cast differently in another list.
+  const entryLineup = contextSetlist?.songs.find((entry) => entry.songId === song?.id)?.lineup ?? {}
+  const entryLineupSummary = Object.keys(entryLineup).length > 0
+    ? lineupSummary(resolveLineup(entryLineup, members), t)
+    : ""
+
 
   // Live show (#7): the running order with durations, this song's place in it
   // and the setlist's estimate. Shown while reading from an event's setlist.
@@ -1110,6 +1119,15 @@ export default function SongScreen() {
               </AppText>
             </View>
           ) : null}
+           {entryLineupSummary ? (
+             <View style={styles.setlistLineup}>
+               <UsersIcon size={14} color={Theme.colors.accent} />
+               <AppText variant="caption" tone="muted" style={styles.flex} numberOfLines={2}>
+                 {entryLineupSummary}
+               </AppText>
+             </View>
+           ) : null}
+
 
           {details.length > 0 ? (
             <AppText variant="caption" tone="faint">
@@ -1547,6 +1565,12 @@ const createStyles = () =>
       borderRadius: Theme.radii.s,
       paddingHorizontal: Theme.spacing.s,
       paddingVertical: Theme.spacing.xs,
+    },
+    setlistLineup: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: Theme.spacing.xs,
+      marginTop: Theme.spacing.xs,
     },
     badges: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
     footer: {

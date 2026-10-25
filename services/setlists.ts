@@ -25,6 +25,7 @@ import { ValidationError } from "@/services/errors"
 import { estimateDurationSec } from "@/libs/songUtils"
 import { cleanBlocks, MAX_SONG_NOTE } from "@/libs/setlistBlocks"
 import { clampGoalMinutes, MAX_BREAK_MINUTES, MAX_GOAL_MINUTES } from "@/libs/setlistDuration"
+import { cleanLineup } from "@/libs/bandRoles"
 
 const mapSetlist = (data: Record<string, unknown>, id: string): Setlist => {
   const songs = Array.isArray(data.songs)
@@ -38,6 +39,9 @@ const mapSetlist = (data: Record<string, unknown>, id: string): Setlist => {
             key: String(song.key ?? ""),
             order: typeof song.order === "number" ? song.order : index,
             note: String(song.note ?? ""),
+            // Absent on every entry written before #88; an unknown role heals
+            // away here (rules cannot iterate a map, the `attendance` precedent).
+            lineup: cleanLineup(song.lineup),
           }
         })
         .filter((entry) => entry.songId.length > 0)
@@ -123,6 +127,8 @@ export const buildSetlistSongs = (
   songKeys: Record<string, string> = {},
   /** The band's note for this entry, keyed by song id (defaults to none). */
   songNotes: Record<string, string> = {},
+  /** Who plays what on this song, keyed by song id (defaults to nobody). */
+  songLineups: Record<string, Record<string, string>> = {},
 ): SetlistSong[] =>
   songIds
     .map((songId, order) => {
@@ -136,6 +142,7 @@ export const buildSetlistSongs = (
         // Keyed by id, like the play key, so a reorder carries the note with
         // its song rather than with whatever row it used to sit in.
         note: songNotes[songId] ?? "",
+        lineup: cleanLineup(songLineups[songId]),
       }
     })
     .filter((entry) => library.has(entry.songId))
@@ -147,6 +154,19 @@ export const setlistSongKeys = (songs: readonly SetlistSong[]): Record<string, s
 /** Current note map of a setlist, ready to feed `buildSetlistSongs`. */
 export const setlistSongNotes = (songs: readonly SetlistSong[]): Record<string, string> =>
   Object.fromEntries(songs.map((entry) => [entry.songId, entry.note]))
+
+/**
+ * Current line-up map of a setlist, ready to feed `buildSetlistSongs`. Entries
+ * nobody plays are left out so a stale empty map never travels with a write.
+ */
+export const setlistSongLineups = (
+  songs: readonly SetlistSong[],
+): Record<string, Record<string, string>> =>
+  Object.fromEntries(
+    songs
+      .map((entry) => [entry.songId, entry.lineup] as const)
+      .filter(([, lineup]) => Object.keys(lineup).length > 0),
+  )
 
 /** Sum of known song durations, falling back to a lyric-length estimate. */
 export const estimateSetlistDuration = (songs: SetlistSong[], library: Map<string, Song>): number =>
@@ -190,6 +210,13 @@ const normalizeInput = (input: SetlistInput): SetlistInput => {
         )
         .filter(([, note]) => note.length > 0),
     ),
+    // Healed the same way every other stored map is (unknown roles dropped,
+    // blank uids skipped) and an empty line-up is dropped rather than stored.
+    songLineups: Object.fromEntries(
+      Object.entries(input.songLineups)
+        .map(([songId, lineup]) => [songId, cleanLineup(lineup)] as const)
+        .filter(([, lineup]) => Object.keys(lineup).length > 0),
+    ),
     songKeys,
   }
 }
@@ -208,6 +235,7 @@ export const createSetlist = async (
     library,
     normalized.songKeys,
     normalized.songNotes,
+    normalized.songLineups,
   )
   const reference = doc(collection(firestore, paths.setlists(organizationId)))
   const now = serverTimestamp()
@@ -259,6 +287,7 @@ export const updateSetlist = async (
     library,
     normalized.songKeys,
     normalized.songNotes,
+    normalized.songLineups,
   )
 
   await updateDoc(doc(firestore, paths.setlist(organizationId, setlistId)), {
@@ -450,6 +479,33 @@ export const updateSetlistSongKey = async (
   if (!setlist) throw new ValidationError("That setlist no longer exists.")
   const songs = setlist.songs.map((entry) =>
     entry.songId === songId ? { ...entry, key: key.trim() } : entry,
+  )
+  await updateDoc(doc(firestore, paths.setlist(organizationId, setlistId)), {
+    songs,
+    updatedAt: serverTimestamp(),
+  })
+}
+
+/**
+ * Writes who plays what on **one song** of a setlist (roadmap #88).
+ *
+ * A focused write like the play key's: the line-up sheet taps member after
+ * member, and routing every tap through `updateSetlist` would log an "updated
+ * the setlist" event per tap and rewrite the whole document each time. The
+ * entry keeps its key, note and position — only its `lineup` changes — and the
+ * map is healed before it lands (rules cannot iterate it).
+ */
+export const updateSetlistSongLineup = async (
+  organizationId: string,
+  setlistId: string,
+  songId: string,
+  lineup: Record<string, string>,
+): Promise<void> => {
+  const setlist = await fetchSetlist(organizationId, setlistId)
+  if (!setlist) throw new ValidationError("That setlist no longer exists.")
+  const clean = cleanLineup(lineup)
+  const songs = setlist.songs.map((entry) =>
+    entry.songId === songId ? { ...entry, lineup: clean } : entry,
   )
   await updateDoc(doc(firestore, paths.setlist(organizationId, setlistId)), {
     songs,

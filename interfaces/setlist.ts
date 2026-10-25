@@ -14,6 +14,14 @@ export interface SetlistSong {
    * something different in two lists. Empty string when unset.
    */
   note: string
+  /**
+   * Who plays what on this song (roadmap #88): **member uid → role id**, with
+   * one role per member and any number of members per role. Keyed by uid so a
+   * reorder carries it with its song, and stored on the entry rather than on the
+   * song — the line-up is the night's, not the songbook's. Empty on documents
+   * written before this shipped, so no migration exists.
+   */
+  lineup: Record<string, string>
 }
 
 /**
@@ -91,6 +99,14 @@ export interface SetlistInput {
    * `blocks`.
    */
   songNotes: Record<string, string>
+  /**
+   * Line-up per song id (roadmap #88), mirrored the same way: reordering the
+   * list never moves a member to another song. Required, exactly like
+   * `songNotes` and `blocks` — the running-order editor rewrites the document
+   * with an object that only means "the order changed", and an optional left
+   * out of it would wipe the band's line-ups on the next reorder.
+   */
+  songLineups: Record<string, Record<string, string>>
   /**
    * Key each song will be played in, keyed by song id. Falls back to the song's
    * own key when missing.

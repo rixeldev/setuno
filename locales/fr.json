@@ -376,7 +376,14 @@
     "rejectDescription": "Elle pourra redemander plus tard.",
     "requestApproved": "{{name}} a été invité dans le groupe.",
     "requestRejected": "La demande de {{name}} a été refusée.",
-    "couldNotReview": "Nous n'avons pas pu examiner cette demande."
+    "couldNotReview": "Nous n'avons pas pu examiner cette demande.",
+    "noInstruments": "Aucun instrument",
+    "editInstruments": "Modifier ce que {{name}} joue",
+    "instrumentsTitle": "Ce que {{name}} joue",
+    "instrumentsDescription": "Choisissez toutes les places qu'il peut tenir dans ce groupe.",
+    "instrumentsSaved": "Instruments mis à jour pour {{name}}",
+    "couldNotSaveInstruments": "Impossible d'enregistrer les instruments",
+    "instrumentsNoneHint": "Aucune place sélectionnée — touchez-en une ci-dessus."
   },
   "discover": {
     "title": "Trouvez votre groupe",
@@ -1295,7 +1302,16 @@
     "songNoteTitle": "Note pour {{title}}",
     "noteLabel": "Note",
     "noteHint": "Tout le groupe la voit en lisant cette liste.",
-    "notePlaceholder": "accorder Eb, commence seul…"
+    "notePlaceholder": "accorder Eb, commence seul…",
+    "lineupSubtitle": "Qui joue ce morceau",
+    "lineupNotPlaying": "Ne joue pas",
+    "lineupPickRole": "Choisissez le rôle de {{name}}",
+    "lineupTheirRole": "Sa place",
+    "lineupBack": "Tous les membres",
+    "lineupClear": "Effacer la formation",
+    "lineupClearHint": "Personne ne joue ce morceau",
+    "lineupEdit": "Formation",
+    "lineupPair": "{{role}} : {{name}}"
   },
   "shares": {
     "title": "Partager",
@@ -2060,5 +2076,35 @@
     "stop": "Arrêter",
     "again": "Enregistrer un autre",
     "bpm": "Environ {{bpm}} BPM"
+  },
+  "bandRoles": {
+    "leadVocal": "Voix principale",
+    "backingVocal": "Chœurs",
+    "choir": "Chorale",
+    "guitar": "Guitare",
+    "bass": "Basse",
+    "ukulele": "Ukulélé",
+    "violin": "Violon",
+    "cello": "Violoncelle",
+    "banjo": "Banjo",
+    "mandolin": "Mandoline",
+    "piano": "Piano",
+    "keys": "Claviers",
+    "organ": "Orgue",
+    "accordion": "Accordéon",
+    "drums": "Batterie",
+    "percussion": "Percussions",
+    "cajon": "Cajón",
+    "saxophone": "Saxophone",
+    "trumpet": "Trompette",
+    "trombone": "Trombone",
+    "clarinet": "Clarinette",
+    "flute": "Flûte",
+    "harmonica": "Harmonica",
+    "dj": "DJ",
+    "mc": "Maître de cérémonie",
+    "director": "Direction musicale",
+    "sound": "Son",
+    "lighting": "Lumières"
   }
 }

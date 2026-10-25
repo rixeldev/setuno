@@ -643,6 +643,10 @@ export const remapSetlistForImport = (
     songIds,
     songKeys,
     songNotes,
+    // Line-ups are **not** carried by a backup (roadmap #88): a line-up names
+    // member uids, and those mean nothing after a restore into another band —
+    // the same reason `attendance` and `liveShare` are left out (#38).
+    songLineups: {},
     targetMinutes: list.targetMinutes,
     breakMinutes: list.breakMinutes,
     blocks: cleanBlocks(

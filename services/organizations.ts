@@ -38,6 +38,7 @@ import {
 import { logActivity } from "@/services/activity"
 import { ValidationError } from "@/services/errors"
 import { normalizeRole } from "@/libs/membership"
+import { sanitizeRoleIds } from "@/libs/bandRoles"
 import { directoryName } from "@/libs/joinRequests"
 
 const mapOrganization = (data: Record<string, unknown>, id: string): Organization =>
@@ -59,6 +60,9 @@ const mapMember = (data: Record<string, unknown>, id: string): OrganizationMembe
     email: String(data.email ?? ""),
     photoURL: (data.photoURL as string | null) ?? null,
     role: normalizeRole(data.role),
+    // Absent on every document written before #88, and unknown ids heal away
+    // here (the `mapSong` precedent), so no migration exists.
+    instruments: sanitizeRoleIds(data.instruments),
     joinedAt: data.joinedAt as OrganizationMember["joinedAt"],
     invitedBy: (data.invitedBy as string | null) ?? null,
   }) as OrganizationMember
@@ -387,6 +391,42 @@ export const updateMemberRole = async (
     actorName: actor.name,
     targetType: "member",
     targetId: memberUid,
+  })
+}
+
+/**
+ * Writes what a member plays in this band (roadmap #88).
+ *
+ * The roles are **healed here** (unknown ids dropped, duplicates collapsed,
+ * catalogue order, capped) because `firestore.rules` cannot iterate a list; the
+ * rules only pin that it *is* a list of a sane size. A member keeps their own
+ * entry and an admin may edit anyone's, which is exactly what the two update
+ * branches of the members rule allow.
+ */
+export const updateMemberInstruments = async (
+  organizationId: string,
+  member: Pick<OrganizationMember, "uid" | "displayName">,
+  instruments: readonly string[],
+  actor: { id: string; name: string },
+): Promise<void> => {
+  const uid = requireUserId()
+  const next = sanitizeRoleIds(instruments)
+  await updateDoc(doc(firestore, paths.member(organizationId, member.uid)), {
+    instruments: next,
+  })
+
+  // A member filling in their own profile is not band news; an admin casting
+  // somebody is.
+  if (member.uid === uid) return
+
+  void logActivity({
+    organizationId,
+    type: "member_instruments_changed",
+    message: `${actor.name} updated what ${member.displayName || "a member"} plays`,
+    actorId: uid,
+    actorName: actor.name,
+    targetType: "member",
+    targetId: member.uid,
   })
 }
 

@@ -104,6 +104,7 @@ const member = (displayName: string, role: string = "member"): OrganizationMembe
   role: role as OrganizationMember["role"],
   joinedAt: TIMESTAMP,
   invitedBy: null,
+  instruments: [],
 })
 
 const draft = (id: string, title: string, artist = ""): BandBackupSong => ({
@@ -160,7 +161,7 @@ describe("buildBandBackup / parseBandBackup", () => {
       setlists: [
         setlist("l1", "Friday", {
           songs: [
-            { songId: "s1", title: "Wonderwall", artist: "Oasis", key: "G", order: 0, note: "tune Eb" },
+            { songId: "s1", title: "Wonderwall", artist: "Oasis", key: "G", order: 0, note: "tune Eb", lineup: {} },
           ],
           targetMinutes: 90,
           template: true,
@@ -195,8 +196,8 @@ describe("buildBandBackup / parseBandBackup", () => {
       setlists: [
         setlist("l1", "Set", {
           songs: [
-            { songId: "b", title: "B", artist: "", key: "", order: 1, note: "" },
-            { songId: "a", title: "A", artist: "", key: "", order: 0, note: "" },
+            { songId: "b", title: "B", artist: "", key: "", order: 1, note: "", lineup: {} },
+            { songId: "a", title: "A", artist: "", key: "", order: 0, note: "", lineup: {} },
           ],
         }),
       ],

@@ -13,11 +13,12 @@ import { Dialog } from "@/components/ui/Dialog"
 import { EmptyState } from "@/components/ui/States"
 import { Input, SearchInput } from "@/components/ui/Input"
 import { useToast } from "@/components/ui/Toast"
-import { CloseIcon, DotsIcon, EditIcon, MusicIcon, NoteIcon, PlusIcon, SparklesIcon } from "@/components/ui/Icons"
+import { CloseIcon, DotsIcon, EditIcon, MusicIcon, NoteIcon, PlusIcon, SparklesIcon, UsersIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { SetlistKeyDialog } from "@/components/setlists/SetlistKeyDialog"
 import { SetlistBlockDialog } from "@/components/setlists/SetlistBlockDialog"
 import { SetlistNoteDialog } from "@/components/setlists/SetlistNoteDialog"
+import { SetlistLineupSheet } from "@/components/setlists/SetlistLineupSheet"
 import { PrintSheet } from "@/components/songs/PrintSheet"
 import { ShareSheet } from "@/components/shares/ShareSheet"
 import { useAuth } from "@/hooks/useAuth"
@@ -29,10 +30,12 @@ import {
   duplicateSetlist,
   saveSetlistAsTemplate,
   setlistSongKeys,
+  setlistSongLineups,
   setlistSongNotes,
   setSetlistTemplate,
   updateSetlist,
   updateSetlistSongKey,
+  updateSetlistSongLineup,
 } from "@/services/setlists"
 import { toFriendlyError } from "@/services/errors"
 import { filterSongs, EMPTY_FILTERS, songDurationSec } from "@/libs/songSearch"
@@ -56,6 +59,7 @@ import {
   setlistGoal,
 } from "@/libs/setlistDuration"
 import { cleanBlockName, insertBlock, listRows, removeBlock, removeEntry, renameBlock } from "@/libs/setlistBlocks"
+import { resolveLineup, lineupSummary } from "@/libs/bandRoles"
 import {
   ASSISTANT_DEFAULT_MINUTES,
   buildRepertoireDraft,
@@ -69,6 +73,7 @@ interface OrderPatch {
   songIds?: string[]
   songKeys?: Record<string, string>
   songNotes?: Record<string, string>
+  songLineups?: Record<string, Record<string, string>>
   blocks?: SetlistBlock[]
 }
 
@@ -93,7 +98,7 @@ export default function SetlistDetail() {
 
   const { profile } = useAuth()
   const { organizationId, isAdmin } = useOrganization()
-  const { setlists, songs, songLibrary, performances, songUsage } = useOrgData()
+  const { setlists, songs, songLibrary, performances, songUsage, members } = useOrgData()
   // Keys are stored in letters; the reader settings decide how they are spelled.
   const notation = usePreferences().chordNotation ?? "letters"
 
@@ -143,6 +148,8 @@ export default function SetlistDetail() {
     title: string
     note: string
   } | null>(null)
+  // Entry whose line-up is being set ("who plays this song").
+  const [lineupTarget, setLineupTarget] = useState<{ songId: string; title: string } | null>(null)
 
   const setlist = useMemo(
     () => setlists.find((entry) => entry.id === setlistId) ?? null,
@@ -174,9 +181,9 @@ export default function SetlistDetail() {
     () =>
       (setlist?.songs ?? []).flatMap((entry) => {
         const song = songLibrary.get(entry.songId)
-        return song ? [{ song, key: entry.key }] : []
+        return song ? [{ song, key: entry.key, lineup: lineupSummary(resolveLineup(entry.lineup, members), t) }] : []
       }),
-    [setlist?.songs, songLibrary],
+    [setlist?.songs, songLibrary, members, t],
   )
   // Shows that have this setlist attached, newest first (reverse of the link
   // the performance form creates).
@@ -193,6 +200,10 @@ export default function SetlistDetail() {
             .sort((a, b) => b.date.localeCompare(a.date)),
     [performances, setlistId],
   )
+  // The line-up feature only surfaces when this list belongs to an event: a
+  // running order is just a running order until it is attached to a show.
+  const belongsToEvent = relatedShows.length > 0
+
   const actor = {
     id: profile?.uid ?? "",
     name: profile?.displayName || "An admin",
@@ -220,6 +231,7 @@ export default function SetlistDetail() {
           songIds: patch.songIds ?? setlist.songs.map((entry) => entry.songId),
           songKeys: patch.songKeys ?? setlistSongKeys(setlist.songs),
           songNotes: patch.songNotes ?? setlistSongNotes(setlist.songs),
+          songLineups: patch.songLineups ?? setlistSongLineups(setlist.songs),
           blocks: patch.blocks ?? setlist.blocks,
           targetMinutes: setlist.targetMinutes,
           breakMinutes: setlist.breakMinutes,
@@ -679,6 +691,19 @@ export default function SetlistDetail() {
                           </AppText>
                         </View>
                       ) : null}
+                       {belongsToEvent && resolveLineup(entry.lineup, members).length > 0 ? (
+                         <View style={styles.lineupLine}>
+                           <UsersIcon size={12} color={Theme.colors.accent} />
+                           <AppText
+                             variant="caption"
+                             tone="muted"
+                             numberOfLines={2}
+                             style={styles.flex}
+                           >
+                             {lineupSummary(resolveLineup(entry.lineup, members), t)}
+                           </AppText>
+                         </View>
+                       ) : null}
                     </View>
                   </Pressable>
 
@@ -746,6 +771,28 @@ export default function SetlistDetail() {
                           </AppText>
                         }
                       />
+                      {belongsToEvent ? (
+                        <IconButton
+                          label={t("setlists.lineupEdit")}
+                          size={30}
+                          onPress={() =>
+                            setLineupTarget({
+                              songId: entry.songId,
+                              title: entry.title,
+                            })
+                          }
+                          icon={
+                            <UsersIcon
+                              size={15}
+                              color={
+                                Object.keys(entry.lineup).length > 0
+                                  ? Theme.colors.accent
+                                  : Theme.colors.textMuted
+                              }
+                            />
+                          }
+                        />
+                      ) : null}
                       <IconButton
                         label={t("setlists.editNote")}
                         size={30}
@@ -1144,6 +1191,22 @@ export default function SetlistDetail() {
         onClose={() => setNoteTarget(null)}
         onSubmit={submitNote}
       />
+      <SetlistLineupSheet
+        visible={lineupTarget !== null}
+        songTitle={lineupTarget?.title ?? ""}
+        members={members}
+        lineup={
+          lineupTarget ?
+            (setlist?.songs.find((entry) => entry.songId === lineupTarget.songId)?.lineup ?? {})
+          : {}
+        }
+        onChange={(next) => {
+          if (!lineupTarget) return
+          const target = lineupTarget
+          void updateSetlistSongLineup(organizationId ?? "", setlist!.id, target.songId, next)
+        }}
+        onClose={() => setLineupTarget(null)}
+      />
     </ScreenContainer>
   )
 }
@@ -1200,6 +1263,12 @@ const createStyles = () =>
       paddingVertical: 3,
     },
     noteLine: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      marginTop: 2,
+    },
+    lineupLine: {
       flexDirection: "row",
       alignItems: "center",
       gap: 4,

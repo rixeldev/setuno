@@ -17,7 +17,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges"
-import { createSetlist, setlistSongKeys, setlistSongNotes, updateSetlist } from "@/services/setlists"
+import { createSetlist, setlistSongKeys, setlistSongLineups, setlistSongNotes, updateSetlist } from "@/services/setlists"
 import { toFriendlyError } from "@/services/errors"
 import { logFunnelEvent } from "@/services/telemetry"
 import { parseIsoDate, validateRequired } from "@/libs/validation"
@@ -119,11 +119,12 @@ export function SetlistForm({ setlist, onSaved, draftName, draftSongIds }: Setli
       // "9999" both land as a sensible number instead of an error to fix.
       targetMinutes: parseGoalMinutes(targetMinutes, MAX_GOAL_MINUTES),
       breakMinutes: parseGoalMinutes(breakMinutes, MAX_BREAK_MINUTES),
-      // The form never reorders anything, so the dividers and per-song notes
-      // travel through untouched — leaving either out would wipe them the next
-      // time somebody renamed this list.
+      // The form never reorders anything, so the dividers, the per-song notes
+      // and the line-ups travel through untouched — leaving any of them out
+      // would wipe it the next time somebody renamed this list.
       blocks: setlist?.blocks ?? [],
       songNotes: setlist ? setlistSongNotes(setlist.songs) : {},
+      songLineups: setlist ? setlistSongLineups(setlist.songs) : {},
       songKeys: setlist ? setlistSongKeys(setlist.songs) : undefined,
     }
 

@@ -376,7 +376,14 @@
     "rejectDescription": "A pessoa pode pedir de novo mais tarde.",
     "requestApproved": "{{name}} foi convidado para a banda.",
     "requestRejected": "O pedido de {{name}} foi recusado.",
-    "couldNotReview": "Não foi possível revisar esse pedido."
+    "couldNotReview": "Não foi possível revisar esse pedido.",
+    "noInstruments": "Sem instrumentos",
+    "editInstruments": "Editar o que {{name}} toca",
+    "instrumentsTitle": "O que {{name}} toca",
+    "instrumentsDescription": "Escolha todas as funções que pode assumir nesta banda.",
+    "instrumentsSaved": "Instrumentos atualizados para {{name}}",
+    "couldNotSaveInstruments": "Não foi possível salvar os instrumentos",
+    "instrumentsNoneHint": "Nenhuma função selecionada — toque uma acima."
   },
   "discover": {
     "title": "Encontre sua banda",
@@ -1295,7 +1302,16 @@
     "songNoteTitle": "Nota para {{title}}",
     "noteLabel": "Nota",
     "noteHint": "Todos na banda veem isso ao ler esta lista.",
-    "notePlaceholder": "afinar Eb, começa solo…"
+    "notePlaceholder": "afinar Eb, começa solo…",
+    "lineupSubtitle": "Quem toca esta música",
+    "lineupNotPlaying": "Não toca",
+    "lineupPickRole": "Escolha a função de {{name}}",
+    "lineupTheirRole": "Função habitual",
+    "lineupBack": "Todos os membros",
+    "lineupClear": "Limpar a formação",
+    "lineupClearHint": "Ninguém toca esta música",
+    "lineupEdit": "Formação",
+    "lineupPair": "{{role}}: {{name}}"
   },
   "shares": {
     "title": "Compartilhar",
@@ -2060,5 +2076,35 @@
     "stop": "Parar",
     "again": "Gravar outra",
     "bpm": "Uns {{bpm}} BPM"
+  },
+  "bandRoles": {
+    "leadVocal": "Voz principal",
+    "backingVocal": "Vocais de apoio",
+    "choir": "Coral",
+    "guitar": "Guitarra",
+    "bass": "Baixo",
+    "ukulele": "Ukulele",
+    "violin": "Violino",
+    "cello": "Violoncelo",
+    "banjo": "Banjo",
+    "mandolin": "Bandolim",
+    "piano": "Piano",
+    "keys": "Teclados",
+    "organ": "Órgão",
+    "accordion": "Acordeão",
+    "drums": "Bateria",
+    "percussion": "Percussão",
+    "cajon": "Cajón",
+    "saxophone": "Saxofone",
+    "trumpet": "Trompete",
+    "trombone": "Trombone",
+    "clarinet": "Clarinete",
+    "flute": "Flauta",
+    "harmonica": "Gaita",
+    "dj": "DJ",
+    "mc": "Mestre de cerimônias",
+    "director": "Direção musical",
+    "sound": "Som",
+    "lighting": "Iluminação"
   }
 }

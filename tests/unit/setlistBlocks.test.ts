@@ -19,6 +19,7 @@ const song = (songId: string, order: number, note = ""): SetlistSong => ({
   key: "G",
   order,
   note,
+  lineup: {},
 })
 
 const block = (id: string, name: string, afterSongId: string | null): SetlistBlock => ({

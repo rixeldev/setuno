@@ -376,7 +376,14 @@
     "rejectDescription": "They can ask again later.",
     "requestApproved": "{{name}} was invited to the band.",
     "requestRejected": "{{name}}'s request was rejected.",
-    "couldNotReview": "We couldn't review that request."
+    "couldNotReview": "We couldn't review that request.",
+    "noInstruments": "No instruments set",
+    "editInstruments": "Edit what {{name}} plays",
+    "instrumentsTitle": "What {{name}} plays",
+    "instrumentsDescription": "Pick every chair they can take in this band.",
+    "instrumentsSaved": "Instruments updated for {{name}}",
+    "couldNotSaveInstruments": "Could not save instruments",
+    "instrumentsNoneHint": "No chair selected — tap one above."
   },
   "discover": {
     "title": "Find your band",
@@ -1295,7 +1302,16 @@
     "songNoteTitle": "Note for {{title}}",
     "noteLabel": "Note",
     "noteHint": "Everyone in the band sees it while reading this list.",
-    "notePlaceholder": "tune Eb, starts alone…"
+    "notePlaceholder": "tune Eb, starts alone…",
+    "lineupSubtitle": "Who plays this song",
+    "lineupNotPlaying": "Not playing",
+    "lineupPickRole": "Pick a role for {{name}}",
+    "lineupTheirRole": "Their chair",
+    "lineupBack": "All members",
+    "lineupClear": "Clear the line-up",
+    "lineupClearHint": "Nobody plays this song",
+    "lineupEdit": "Line-up",
+    "lineupPair": "{{role}}: {{name}}"
   },
   "shares": {
     "title": "Share",
@@ -2060,5 +2076,35 @@
     "stop": "Stop",
     "again": "Record another one",
     "bpm": "About {{bpm}} BPM"
+  },
+  "bandRoles": {
+    "leadVocal": "Lead vocal",
+    "backingVocal": "Backing vocals",
+    "choir": "Choir",
+    "guitar": "Guitar",
+    "bass": "Bass",
+    "ukulele": "Ukulele",
+    "violin": "Violin",
+    "cello": "Cello",
+    "banjo": "Banjo",
+    "mandolin": "Mandolin",
+    "piano": "Piano",
+    "keys": "Keys",
+    "organ": "Organ",
+    "accordion": "Accordion",
+    "drums": "Drums",
+    "percussion": "Percussion",
+    "cajon": "Cajón",
+    "saxophone": "Saxophone",
+    "trumpet": "Trumpet",
+    "trombone": "Trombone",
+    "clarinet": "Clarinet",
+    "flute": "Flute",
+    "harmonica": "Harmonica",
+    "dj": "DJ",
+    "mc": "MC",
+    "director": "Musical director",
+    "sound": "Sound",
+    "lighting": "Lighting"
   }
 }

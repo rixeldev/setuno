@@ -49,6 +49,7 @@ const entry = (songId: string, overrides: Partial<SetlistSong> = {}): SetlistSon
   key: "C",
   order: 0,
   note: "",
+  lineup: {},
   ...overrides,
 })
 

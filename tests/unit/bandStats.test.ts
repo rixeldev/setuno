@@ -24,6 +24,7 @@ const entry = (songId: string, order = 0): SetlistSong => ({
   key: "C",
   order,
   note: "",
+  lineup: {},
 })
 
 const list = (id: string, songIds: string[], overrides: Partial<Setlist> = {}): Setlist => ({
@@ -114,7 +115,8 @@ const member = (uid: string, displayName: string): OrganizationMember => ({
   photoURL: null,
   role: "member",
   joinedAt: stampAt(2026, 1, 1),
-  invitedBy: null,
+    invitedBy: null,
+    instruments: [],
 })
 
 describe("buildBandStats", () => {

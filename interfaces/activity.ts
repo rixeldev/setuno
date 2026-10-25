@@ -6,6 +6,7 @@ export type ActivityType =
   | "member_added"
   | "member_removed"
   | "member_role_changed"
+  | "member_instruments_changed"
   | "invitation_sent"
   | "invitation_accepted"
   | "invitation_revoked"

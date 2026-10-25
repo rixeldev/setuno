@@ -37,6 +37,8 @@ export interface SetlistPrintSong {
   song: Song
   /** Key the band plays this song in, taken from the setlist entry. */
   key?: string
+  /** Who plays this song (roadmap #88), taken from the setlist entry. */
+  lineup?: string
 }
 
 const ESCAPES: Record<string, string> = {
@@ -121,6 +123,7 @@ const songBlock = (
   key: string,
   options: SongPrintOptions,
   position?: number,
+  lineup?: string,
 ): string => {
   const printedKey = key.trim().length > 0 ? key : song.key
   const sections = printSections(song.sections, printSemitones(song, key), options)
@@ -137,7 +140,11 @@ const songBlock = (
   ${position === undefined ? "" : `<p class="index">${position}</p>`}<h2>${escapeHtml(song.title)}</h2>${
     song.artist.trim().length > 0 ? `\n  <p class="artist">${escapeHtml(song.artist)}</p>` : ""
   }
-  <p class="meta-row">${metaRow(song, printedKey, options)}</p>
+  <p class="meta-row">${metaRow(song, printedKey, options)}</p>${
+    lineup && lineup.trim().length > 0 ?
+      `\n  <p class="lineup">${escapeHtml(lineup)}</p>`
+    : ""
+  }
 ${sectionsHtml}
 </article>`
 }
@@ -174,6 +181,7 @@ const documentHtml = (
   .index { margin: 0 0 2pt; font-weight: 700; color: #666; }
   .meta-row { margin: 0 0 8pt; color: #666; }
   .meta + .meta::before { content: " · "; }
+  .lineup { margin: 0 0 8pt; color: #444; }
   section { break-inside: avoid; margin-bottom: 6pt; }
   .line {
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
@@ -214,7 +222,7 @@ export const setlistPrintHtml = (
   options: SongPrintOptions,
 ): string => {
   const blocks = songs.map((entry, index) =>
-    songBlock(entry.song, entry.key ?? entry.song.key, options, index + 1),
+    songBlock(entry.song, entry.key ?? entry.song.key, options, index + 1, entry.lineup),
   )
   return documentHtml(title, blocks.join("\n"), options.scale, options.includeChords)
 }

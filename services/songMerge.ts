@@ -105,7 +105,13 @@ export const mergeSongs = async (
   for (const setlist of setlists) {
     const plan = repointSetlist(setlist, loserId, masterId)
     if (!plan.changed) continue
-    const rebuilt = buildSetlistSongs(plan.songIds, library, plan.songKeys, plan.songNotes)
+    const rebuilt = buildSetlistSongs(
+      plan.songIds,
+      library,
+      plan.songKeys,
+      plan.songNotes,
+      plan.songLineups,
+    )
     batch.update(doc(firestore, paths.setlist(organizationId, setlist.id)), {
       songs: rebuilt,
       blocks: plan.blocks,

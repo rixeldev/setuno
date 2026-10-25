@@ -581,13 +581,17 @@ service cloud.firestore {
             && request.resource.data.uid == memberUid
             && request.resource.data.role in ['admin', 'member', 'guest']
             && request.resource.data.diff(resource.data).affectedKeys()
-                 .hasOnly(['role', 'displayName', 'photoURL', 'email'])
+                 .hasOnly(['role', 'displayName', 'photoURL', 'email', 'instruments'])
+            && request.resource.data.get('instruments', []) is list
+            && request.resource.data.get('instruments', []).size() <= 8
           ) || (
             isSelf(memberUid)
             && request.resource.data.uid == resource.data.uid
             && request.resource.data.role == resource.data.role
             && request.resource.data.diff(resource.data).affectedKeys()
-                 .hasOnly(['displayName', 'photoURL', 'email'])
+                 .hasOnly(['displayName', 'photoURL', 'email', 'instruments'])
+            && request.resource.data.get('instruments', []) is list
+            && request.resource.data.get('instruments', []).size() <= 8
           );
 
         // Nobody may remove themselves (an admin could lock the owner out) —

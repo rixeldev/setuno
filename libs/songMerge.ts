@@ -37,6 +37,8 @@ export interface SetlistRepoint {
   songIds: string[]
   songKeys: Record<string, string>
   songNotes: Record<string, string>
+  /** Who plays what, per song id (#88) — carried with the song it belongs to. */
+  songLineups: Record<string, Record<string, string>>
   blocks: SetlistBlock[]
   /** False when the list never mentioned the loser: nothing to write. */
   changed: boolean
@@ -61,6 +63,11 @@ export const repointSetlist = (
   const songIds: string[] = []
   const songKeys: Record<string, string> = {}
   const songNotes: Record<string, string> = {}
+  // The line-ups travel with the entry they were written for: a merge must not
+  // lose the band's answer to "who plays this one" (roadmap #88).
+  const songLineups: Record<string, Record<string, string>> = {}
+  const hasLineup = (lineup: Record<string, string> | undefined): boolean =>
+    lineup !== undefined && Object.keys(lineup).length > 0
   const slots = new Map<string, number>()
   let changed = false
 
@@ -71,6 +78,7 @@ export const repointSetlist = (
       songIds.push(id)
       if (entry.key) songKeys[id] = entry.key
       if (entry.note) songNotes[id] = entry.note
+      if (hasLineup(entry.lineup)) songLineups[id] = entry.lineup
       if (id !== entry.songId) changed = true
       continue
     }
@@ -84,6 +92,9 @@ export const repointSetlist = (
       else delete songKeys[id]
       if (entry.note) songNotes[id] = entry.note
       else delete songNotes[id]
+      // The kept song's own line-up wins; when it has none, the slot keeps the
+      // one the loser carried rather than dropping the band's cast.
+      if (hasLineup(entry.lineup)) songLineups[id] = entry.lineup
     }
   }
 
@@ -93,7 +104,7 @@ export const repointSetlist = (
     return { ...block, afterSongId: masterId }
   })
 
-  return { songIds, songKeys, songNotes, blocks, changed }
+  return { songIds, songKeys, songNotes, songLineups, blocks, changed }
 }
 
 /** True when a list would actually change under `repointSetlist`. */

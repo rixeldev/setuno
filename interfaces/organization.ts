@@ -24,6 +24,14 @@ export interface OrganizationMember {
   email: string
   photoURL: string | null
   role: OrganizationRole
+  /**
+   * What this member plays in **this** band (roadmap #88): ids from
+   * `libs/bandRoles.ts` — instruments and jobs ("guitar", "lead vocal", the
+   * sound desk). Band-scoped on purpose: the same account can be the drummer in
+   * one band and the singer in another. Absent on every document written before
+   * this shipped, so it reads `[]` and no migration exists.
+   */
+  instruments: string[]
   joinedAt: TimestampLike
   /** Invited by this uid when the member joined through an invitation. */
   invitedBy: string | null

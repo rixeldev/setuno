@@ -13,13 +13,14 @@ import { Dialog } from "@/components/ui/Dialog"
 import { Input } from "@/components/ui/Input"
 import { EmptyState, ErrorState, SkeletonList } from "@/components/ui/States"
 import { useToast } from "@/components/ui/Toast"
-import { DotsIcon, EmailIcon, GroupIcon, PlusIcon } from "@/components/ui/Icons"
+import { DotsIcon, EmailIcon, GroupIcon, GuitarIcon, PlusIcon } from "@/components/ui/Icons"
 import { ModalScreen } from "@/components/app/ModalScreen"
+import { MemberInstrumentsDialog } from "@/components/members/MemberInstrumentsDialog"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import { useJoinRequestQueue } from "@/hooks/useJoinRequests"
-import { addMemberByEmail, removeMember, revokeInvitation, updateMemberRole } from "@/services/organizations"
+import { addMemberByEmail, removeMember, revokeInvitation, updateMemberInstruments, updateMemberRole } from "@/services/organizations"
 import { approveJoinRequest, rejectJoinRequest } from "@/services/joinRequests"
 import { toFriendlyError } from "@/services/errors"
 import { validateEmail } from "@/libs/validation"
@@ -72,6 +73,11 @@ export default function MembersScreen() {
   // Visibility is separate from the entity so the sheet/dialog keep the member
   // information while they fade out (no fallback text flashing for a frame).
   const [menuOpen, setMenuOpen] = useState(false)
+  // Instruments (roadmap #88): which member's chairs are being set and the
+  // draft the dialog edits before saving.
+  const [instrumentsMember, setInstrumentsMember] =
+    useState<OrganizationMember | null>(null)
+  const [instrumentsDraft, setInstrumentsDraft] = useState<string[]>([])
   const [removeOpen, setRemoveOpen] = useState(false)
 
   const actor = { id: profile?.uid ?? "", name: profile?.displayName || "An admin" }
@@ -125,6 +131,26 @@ export default function MembersScreen() {
       )
     } catch (err) {
       toast.showError(toFriendlyError(err, t("members.couldNotChangeRole")))
+    }
+  }
+
+  const openInstruments = (member: OrganizationMember): void => {
+    setInstrumentsMember(member)
+    setInstrumentsDraft(member.instruments)
+  }
+
+  const saveInstruments = async (): Promise<void> => {
+    if (!instrumentsMember) return
+    const member = instrumentsMember
+    setBusy(true)
+    try {
+      await updateMemberInstruments(organizationId ?? "", member, instrumentsDraft, actor)
+      toast.showSuccess(t("members.instrumentsSaved", { name: member.displayName }))
+      setInstrumentsMember(null)
+    } catch (err) {
+      toast.showError(toFriendlyError(err, t("members.couldNotSaveInstruments")))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -258,17 +284,37 @@ export default function MembersScreen() {
                   ) : null}
                 </View>
 
-                {canManage(member) ? (
-                  <IconButton
-                    label={t("members.actions", { name: member.displayName })}
-                    size={32}
-                    onPress={() => {
-                      setMenuMember(member)
-                      setMenuOpen(true)
-                    }}
-                    icon={<DotsIcon size={16} color={Theme.colors.textMuted} />}
-                  />
+                {member.instruments.length > 0 ? (
+                  <AppText variant="caption" tone="muted" numberOfLines={1}>
+                    {member.instruments.map((id) => t(`bandRoles.${id}`)).join(" · ")}
+                  </AppText>
+                ) : isAdmin || member.uid === profile?.uid ? (
+                  <AppText variant="caption" tone="faint" numberOfLines={1}>
+                    {t("members.noInstruments")}
+                  </AppText>
                 ) : null}
+
+                <View style={styles.rowActions}>
+                  {isAdmin || member.uid === profile?.uid ? (
+                    <IconButton
+                      label={t("members.editInstruments", { name: member.displayName })}
+                      size={32}
+                      onPress={() => openInstruments(member)}
+                      icon={<GuitarIcon size={16} color={Theme.colors.textMuted} />}
+                    />
+                  ) : null}
+                  {canManage(member) ? (
+                    <IconButton
+                      label={t("members.actions", { name: member.displayName })}
+                      size={32}
+                      onPress={() => {
+                        setMenuMember(member)
+                        setMenuOpen(true)
+                      }}
+                      icon={<DotsIcon size={16} color={Theme.colors.textMuted} />}
+                    />
+                  ) : null}
+                </View>
               </View>
             ))}
           </Card>
@@ -484,6 +530,15 @@ export default function MembersScreen() {
         confirmLoading={busy}
         onConfirm={() => void reject()}
       />
+      <MemberInstrumentsDialog
+        visible={instrumentsMember !== null}
+        member={instrumentsMember}
+        selected={instrumentsDraft}
+        onChange={setInstrumentsDraft}
+        onClose={() => setInstrumentsMember(null)}
+        onSave={() => void saveInstruments()}
+        busy={busy}
+      />
     </ModalScreen>
   )
 }
@@ -504,4 +559,5 @@ const createStyles = () =>
     nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
     requestButtons: { gap: Theme.spacing.xs },
     roleRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+    rowActions: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.xs },
   })

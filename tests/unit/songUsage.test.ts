@@ -13,6 +13,7 @@ const entry = (songId: string, order = 0): SetlistSong => ({
   key: "C",
   order,
   note: "",
+  lineup: {},
 })
 
 const setlist = (id: string, songs: SetlistSong[]): Setlist => ({

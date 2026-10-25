@@ -18,6 +18,7 @@ const member = (uid: string, displayName = uid): OrganizationMember => ({
   role: "member",
   joinedAt: { seconds: 0, nanoseconds: 0, toDate: () => new Date(0) },
   invitedBy: "",
+  instruments: [],
 })
 
 const stamp = (seconds: number) => ({ seconds, nanoseconds: 0, toDate: () => new Date(seconds * 1000) })
