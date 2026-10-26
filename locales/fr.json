@@ -383,7 +383,10 @@
     "instrumentsDescription": "Choisissez toutes les places qu'il peut tenir dans ce groupe.",
     "instrumentsSaved": "Instruments mis à jour pour {{name}}",
     "couldNotSaveInstruments": "Impossible d'enregistrer les instruments",
-    "instrumentsNoneHint": "Aucune place sélectionnée — touchez-en une ci-dessus."
+    "instrumentsNoneHint": "Aucune place sélectionnée — touchez-en une ci-dessus.",
+    "rolesA11y": "Instruments : {{roles}}",
+    "moreRoles": "+{{count}}",
+    "moreRolesA11y": "{{count}} de plus"
   },
   "discover": {
     "title": "Trouvez votre groupe",

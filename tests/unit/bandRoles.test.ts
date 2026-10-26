@@ -7,16 +7,19 @@ import type { OrganizationMember } from "@/interfaces"
 import {
   BAND_ROLES,
   MAX_MEMBER_ROLES,
+  MAX_ROLE_CHIPS,
   MAX_SONG_LINEUP,
   bandRoleLabel,
   cleanLineup,
   isBandRole,
   lineupSummary,
+  memberRoleA11y,
   memberRolesLabel,
   resolveLineup,
   roleLabels,
   rolesForMember,
   sanitizeRoleIds,
+  visibleRoleIds,
 } from "@/libs/bandRoles"
 
 const member = (uid: string, displayName: string, instruments: string[] = []): OrganizationMember =>
@@ -110,6 +113,36 @@ describe("roleLabels / memberRolesLabel", () => {
 
   it("says nothing for a member with no roles", () => {
     expect(memberRolesLabel(member("a", "Julia"), t)).toBe("")
+  })
+
+  it("spells the whole list out for a screen reader", () => {
+    expect(memberRoleA11y(["guitar", "triangle", "backingVocal"], t)).toBe(
+      "bandRoles.backingVocal, bandRoles.guitar",
+    )
+  })
+})
+
+describe("visibleRoleIds", () => {
+  it("shows the first catalogue roles and counts the rest", () => {
+    expect(visibleRoleIds(["drums", "guitar", "leadVocal", "bass"])).toEqual({
+      shown: ["leadVocal", "guitar"],
+      hidden: 2,
+    })
+  })
+
+  it("hides nothing when the list fits", () => {
+    expect(visibleRoleIds(["guitar"])).toEqual({ shown: ["guitar"], hidden: 0 })
+  })
+
+  it("never claims a role it could not name", () => {
+    expect(visibleRoleIds(["triangle", "guitar"])).toEqual({ shown: ["guitar"], hidden: 0 })
+    expect(visibleRoleIds(undefined)).toEqual({ shown: [], hidden: 0 })
+  })
+
+  it("takes its limit from the caller, including zero", () => {
+    expect(visibleRoleIds(["guitar", "bass"], 1)).toEqual({ shown: ["guitar"], hidden: 1 })
+    expect(visibleRoleIds(["guitar"], 0)).toEqual({ shown: [], hidden: 1 })
+    expect(MAX_ROLE_CHIPS).toBe(2)
   })
 })
 

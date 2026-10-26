@@ -383,7 +383,10 @@
     "instrumentsDescription": "Escolha todas as funções que pode assumir nesta banda.",
     "instrumentsSaved": "Instrumentos atualizados para {{name}}",
     "couldNotSaveInstruments": "Não foi possível salvar os instrumentos",
-    "instrumentsNoneHint": "Nenhuma função selecionada — toque uma acima."
+    "instrumentsNoneHint": "Nenhuma função selecionada — toque uma acima.",
+    "rolesA11y": "Instrumentos: {{roles}}",
+    "moreRoles": "+{{count}}",
+    "moreRolesA11y": "{{count}} mais"
   },
   "discover": {
     "title": "Encontre sua banda",

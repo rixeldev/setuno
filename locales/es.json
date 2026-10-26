@@ -1889,7 +1889,10 @@
     "instrumentsDescription": "Elige todas las sillas que puede ocupar en esta banda.",
     "instrumentsSaved": "Instrumentos actualizados para {{name}}",
     "couldNotSaveInstruments": "No se pudieron guardar los instrumentos",
-    "instrumentsNoneHint": "Sin silla seleccionada — toca una arriba."
+    "instrumentsNoneHint": "Sin silla seleccionada — toca una arriba.",
+    "rolesA11y": "Instrumentos: {{roles}}",
+    "moreRoles": "+{{count}}",
+    "moreRolesA11y": "{{count}} más"
   },
   "discover": {
     "title": "Encuentra tu banda",

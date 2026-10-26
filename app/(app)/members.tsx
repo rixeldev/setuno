@@ -16,6 +16,7 @@ import { useToast } from "@/components/ui/Toast"
 import { DotsIcon, EmailIcon, GroupIcon, GuitarIcon, PlusIcon } from "@/components/ui/Icons"
 import { ModalScreen } from "@/components/app/ModalScreen"
 import { MemberInstrumentsDialog } from "@/components/members/MemberInstrumentsDialog"
+import { MemberRoleChips } from "@/components/members/MemberRoleChips"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
@@ -282,32 +283,21 @@ export default function MembersScreen() {
                       {member.email}
                     </AppText>
                   ) : null}
+                  <MemberRoleChips instruments={member.instruments} />
+                  {member.instruments.length === 0 && (isAdmin || member.uid === profile?.uid) ? (
+                    <AppText variant="caption" tone="faint" numberOfLines={1}>
+                      {t("members.noInstruments")}
+                    </AppText>
+                  ) : null}
                 </View>
-
-                {member.instruments.length > 0 ? (
-                  <View style={styles.instrumentChips}>
-                    {member.instruments.map((id) => (
-                      <Chip
-                        key={id}
-                        label={t(`bandRoles.${id}`)}
-                        size="sm"
-                        disabled
-                      />
-                    ))}
-                  </View>
-                ) : isAdmin || member.uid === profile?.uid ? (
-                  <AppText variant="caption" tone="faint" numberOfLines={1}>
-                    {t("members.noInstruments")}
-                  </AppText>
-                ) : null}
 
                 <View style={styles.rowActions}>
                   {isAdmin || member.uid === profile?.uid ? (
                     <IconButton
                       label={t("members.editInstruments", { name: member.displayName })}
-                       size={28}
+                      size={28}
                       onPress={() => openInstruments(member)}
-                       icon={<GuitarIcon size={14} color={Theme.colors.textMuted} />}
+                      icon={<GuitarIcon size={14} color={Theme.colors.textMuted} />}
                     />
                   ) : null}
                   {canManage(member) ? (
@@ -567,5 +557,4 @@ const createStyles = () =>
     requestButtons: { gap: Theme.spacing.xs },
     roleRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
     rowActions: { flexDirection: "row", alignItems: "center", gap: Theme.spacing.xs },
-    instrumentChips: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 2 },
   })

@@ -99,9 +99,42 @@ export const sanitizeRoleIds = (value: unknown): string[] => {
 export const roleLabels = (ids: readonly string[], t: Translate): string[] =>
   ids.map((id) => bandRoleLabel(id, t)).filter((label) => label.length > 0)
 
+/**
+ * Every role a member declared, spelled out for a screen reader.
+ *
+ * A comma, not the row's middot: punctuation is read aloud, and the separator
+ * that looks right on screen ("Guitarra · Coros") sounds like a stall.
+ */
+export const memberRoleA11y = (ids: unknown, t: Translate): string =>
+  roleLabels(sanitizeRoleIds(ids), t).join(", ")
+
 /** A member's declared roles as one readable line ("Guitarra · Coros"). */
 export const memberRolesLabel = (member: OrganizationMember, t: Translate): string =>
   roleLabels(sanitizeRoleIds(member.instruments), t).join(" · ")
+
+/**
+ * How many role chips a roster row prints before collapsing the rest into a
+ * "+N" pill. Two is what fits beside a 40 pt avatar without crowding the name,
+ * the band role and the email — the row is a list, not a profile.
+ */
+export const MAX_ROLE_CHIPS = 2
+
+/**
+ * The chips a compact row shows: the healed, catalogue-ordered roles cut down to
+ * `max`, plus how many were left out so the caller can print "+N".
+ *
+ * The count is what survives, never the dropped labels: a row that hides a role
+ * still says a role exists, so nothing looks like it was never set.
+ */
+export const visibleRoleIds = (
+  ids: unknown,
+  max: number = MAX_ROLE_CHIPS,
+): { shown: string[]; hidden: number } => {
+  const healed = sanitizeRoleIds(ids)
+  const limit = Math.max(0, Math.floor(max))
+  const shown = healed.slice(0, limit)
+  return { shown, hidden: healed.length - shown.length }
+}
 
 /**
  * One song's line-up: **member uid → role id**. A member is named once (one

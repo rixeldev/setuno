@@ -383,7 +383,10 @@
     "instrumentsDescription": "Pick every chair they can take in this band.",
     "instrumentsSaved": "Instruments updated for {{name}}",
     "couldNotSaveInstruments": "Could not save instruments",
-    "instrumentsNoneHint": "No chair selected — tap one above."
+    "instrumentsNoneHint": "No chair selected — tap one above.",
+    "rolesA11y": "Instruments: {{roles}}",
+    "moreRoles": "+{{count}}",
+    "moreRolesA11y": "{{count}} more"
   },
   "discover": {
     "title": "Find your band",
