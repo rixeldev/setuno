@@ -67,6 +67,7 @@ import { AnnotationsBlock } from "@/components/annotations/AnnotationsBlock"
 import { useToast } from "@/components/ui/Toast"
 import { useAuth } from "@/hooks/useAuth"
 import { useResponsive } from "@/hooks/useResponsive"
+import { readerColumnCount } from "@/libs/readerLayout"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
 import {
@@ -148,7 +149,7 @@ export default function SongScreen() {
   const router = useRouter()
   const toast = useToast()
   const copyDeepLink = useCopyDeepLink()
-  const { gutter, isMobile } = useResponsive()
+  const { gutter, width, contentMaxWidth, usesSidebar } = useResponsive()
   const params = useLocalSearchParams<{ id?: string; setlist?: string; tour?: string }>()
   const songId = params.id ?? null
   // Set by the setlist screen when the song is part of a list: only then does
@@ -156,9 +157,14 @@ export default function SongScreen() {
   const setlistId = params.setlist ?? null
   // Wide screens read the song in two columns (#9): phones keep one, tablets
   // and desktop (and a phone in landscape) split it down the middle. Stage mode
-  // reuses the same value, so landscape never breaks the immersive layout.
-  const readerColumns = isMobile ? 1 : 2
-
+  // reuses the same value, so landscape never breaks the immersive layout. The
+  // split only happens when each column can hold a real line, so small tablets
+  // in landscape stay single-column instead of squeezing two cramped ones.
+  const readerBodyWidth = Math.min(
+    contentMaxWidth,
+    width - gutter * 2 - (usesSidebar ? Theme.layout.sidebarWidth : 0),
+  )
+  const readerColumns = readerColumnCount(readerBodyWidth)
   const { profile } = useAuth()
   const { organizationId, role, isAdmin } = useOrganization()
    const { songLibrary, songs, setlists, suggestions, performances, loading, songUsage, members } = useOrgData()
@@ -917,8 +923,11 @@ export default function SongScreen() {
   // Stage mode: only the song, the exit control and the current key.
   if (immersive) {
     return (
-      <View style={[styles.host, { paddingHorizontal: gutter }]} {...pinchHandlers}>
+      <View style={styles.host} {...pinchHandlers}>
         <AppBackground />
+        {/* The song is capped to a readable width and centred, so stage mode
+            never stretches the lyrics across a wide viewport (web included). */}
+        <View style={[styles.stageFrame, { paddingHorizontal: gutter, maxWidth: contentMaxWidth }]}>
         <Animated.View
           style={[styles.immersiveBar, { transform: [{ translateY: stageBarY }] }]}
         >
@@ -1021,6 +1030,7 @@ export default function SongScreen() {
             {lyrics}
           </Pressable>
         </ScrollView>
+        </View>
 
         {step ? (
           <SongNavArrows previousId={step.previousId} nextId={step.nextId} onNavigate={openSong} />
@@ -1587,7 +1597,13 @@ const createStyles = () =>
       paddingVertical: 4,
     },
     immersiveScroll: { flex: 1 },
-    // One slim row: title + key on the left, the three stage actions on the
+    // Stage mode is capped to a readable width and centred, so the lyrics never
+    // stretch across a wide viewport (web included) and the bar stays above them.
+    stageFrame: {
+      flex: 1,
+      width: "100%",
+      alignSelf: "center",
+    },    // One slim row: title + key on the left, the three stage actions on the
     // right. Nothing else competes with the song on a small display.
     immersiveBar: {
       flexDirection: "row",
