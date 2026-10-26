@@ -69,8 +69,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {focused ? null : <SidebarNav />}
         <View style={styles.desktopContent}>
           <SyncBanner />
-          {children}
-          {onDashboard ? <BannerAdSlot /> : null}
+          {/* The body takes the remaining height so the ad (below) is pinned to
+              the bottom of the viewport instead of floating after the content. */}
+          <View style={styles.desktopBody}>{children}</View>
+          {onDashboard ? <BannerAdSlot fullWidth /> : null}
         </View>
         <CommandPaletteHost />
         {pushDialog}
@@ -114,7 +116,7 @@ const createStyles = () =>
       flexDirection: "row",
       ...Platform.select({ web: { minHeight: "100vh" as never }, default: {} }),
     },
-    desktopContent: { flex: 1, minWidth: 0 },
-    mobile: { flex: 1 },
+    desktopContent: { flex: 1, minWidth: 0, flexDirection: "column" },
+    desktopBody: { flex: 1, minHeight: 0 },    mobile: { flex: 1 },
     mobileContent: { flex: 1 },
   })

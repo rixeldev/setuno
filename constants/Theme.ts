@@ -127,7 +127,11 @@ export const Theme = {
   },
   /** Minimum comfortable touch target (accessibility). */
   hitSlop: { top: 8, bottom: 8, left: 8, right: 8 },
-  shadows: {
+  /** Layout constants shared by the responsive shell. */
+  layout: {
+    /** Width of the sidebar navigation (web + landscape tablets). */
+    sidebarWidth: 268,
+  },  shadows: {
     sm: {
       boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.24)",
       elevation: 3,

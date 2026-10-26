@@ -342,8 +342,7 @@ export function BottomBar() {
 const createStyles = () =>
   StyleSheet.create({
     sidebar: {
-      width: 268,
-      height: "100%",
+      width: Theme.layout.sidebarWidth,      height: "100%",
       backgroundColor: Theme.colors.chrome,
       borderRightWidth: 1,
       borderRightColor: Theme.colors.border,
