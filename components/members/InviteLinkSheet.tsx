@@ -11,7 +11,7 @@ import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
 import { Button } from "@/components/ui/Button"
 import { Badge, Chip } from "@/components/ui/Card"
 import { Dialog } from "@/components/ui/Dialog"
-import { CopyIcon, ShareIcon } from "@/components/ui/Icons"
+import { CopyIcon, RefreshIcon, ShareIcon } from "@/components/ui/Icons"
 import { useToast } from "@/components/ui/Toast"
 import { formatDate } from "@/libs/format"
 import {
@@ -51,8 +51,9 @@ type Phase = "form" | "creating" | "ready" | "failed"
  *
  * Creation is idempotent per band, so opening it twice hands out the same URL
  * rather than a second one; "Change settings" reopens the form and rewrites the
- * same link in place. Closing always resets: state and `visible` are never
- * synced from an effect.
+ * same link in place, while "Generate a new link" rotates the token on purpose
+ * (a link forwarded one chat too far cannot be un-forwarded). Closing always
+ * resets: state and `visible` are never synced from an effect.
  */
 export function InviteLinkSheet({
   visible,
@@ -70,7 +71,9 @@ export function InviteLinkSheet({
   const [link, setLink] = useState<InviteLinkInfo | null>(null)
   const [message, setMessage] = useState("")
   const [confirmRevoke, setConfirmRevoke] = useState(false)
+  const [confirmRotate, setConfirmRotate] = useState(false)
   const [revoking, setRevoking] = useState(false)
+  const [rotating, setRotating] = useState(false)
 
   const baseUrl = resolveShareBaseUrl()
   const url = link && baseUrl ? buildInviteUrl(baseUrl, link.token) : null
@@ -146,6 +149,31 @@ export function InviteLinkSheet({
     }
   }
 
+  /**
+   * Replace the token with a fresh one, keeping the role and the expiry the
+   * sheet is already showing. The old URL dies server-side, so a link that went
+   * to the wrong chat stops working the moment this succeeds.
+   */
+  const rotate = async (): Promise<void> => {
+    if (!link || !baseUrl) return
+    setRotating(true)
+    try {
+      const next = await createInviteLink({
+        organizationId,
+        role: link.role,
+        expiresInDays: days,
+        rotate: true,
+      })
+      setLink(next)
+      setConfirmRotate(false)
+      toast.showSuccess(t("inviteLink.rotated"))
+    } catch (error) {
+      toast.showError(toFriendlyError(error, t("inviteLink.createFailed")))
+    } finally {
+      setRotating(false)
+    }
+  }
+
   const close = (): void => {
     setPhase("form")
     setLink(null)
@@ -153,6 +181,7 @@ export function InviteLinkSheet({
     setRole("member")
     setDays(DEFAULT_INVITE_LINK_EXPIRY_DAYS)
     setConfirmRevoke(false)
+    setConfirmRotate(false)
     onClose()
   }
 
@@ -207,6 +236,12 @@ export function InviteLinkSheet({
                 style={styles.action}
               />
             </View>
+            <Button
+              label={t("inviteLink.rotate")}
+              variant="ghost"
+              icon={<RefreshIcon size={16} color={Theme.colors.textMuted} />}
+              onPress={() => setConfirmRotate(true)}
+            />
             <Button
               label={t("inviteLink.edit")}
               variant="ghost"
@@ -278,6 +313,17 @@ export function InviteLinkSheet({
         tone="danger"
         confirmLoading={revoking}
         onConfirm={() => void revoke()}
+      />
+
+      <Dialog
+        visible={confirmRotate}
+        onClose={() => setConfirmRotate(false)}
+        title={t("inviteLink.rotateTitle")}
+        description={t("inviteLink.rotateDescription")}
+        confirmLabel={t("inviteLink.rotate")}
+        tone="danger"
+        confirmLoading={rotating}
+        onConfirm={() => void rotate()}
       />
     </>
   )

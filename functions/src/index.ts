@@ -30,6 +30,7 @@ import {
   isInviteRole,
   isInviteToken,
   readInviteExpiryChoice,
+  readRotateFlag,
   sanitizeInviteRole,
   type InviteRole,
 } from "./inviteLinks"
@@ -662,6 +663,11 @@ const timestampMillis = (value: unknown): number | null => {
  * band: a live link keeps its token while its role and deadline are rewritten,
  * so "share it again" never hands out a second URL. Expired links and
  * duplicates from before this contract are deleted in the same batch.
+ *
+ * `rotate: true` is the one thing that does change the URL: the current link
+ * (and any twin) is deleted and a fresh token is minted with the same role and
+ * deadline, because a link that has been forwarded one chat too far cannot be
+ * un-forwarded. Its `uses` counter starts at zero — it is a different link.
  */
 export const createInviteLink = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to invite your band")
@@ -680,6 +686,7 @@ export const createInviteLink = onCall(async (request) => {
   if (expiresInDays === undefined) {
     throw new HttpsError("invalid-argument", "Unsupported expiry")
   }
+  const rotate = readRotateFlag(data.rotate)
 
   const db = getFirestore()
   const organizationRef = db.doc(`organizations/${organizationId}`)
@@ -702,11 +709,13 @@ export const createInviteLink = onCall(async (request) => {
     .collection("inviteLinks")
     .where("organizationId", "==", organizationId)
     .get()
-  // One live link per band (lowest token, so every admin agrees on which one).
+  // One live link per band (lowest token, so every admin agrees on which one) —
+  // unless the caller asked to rotate, in which case every existing document is
+  // replaced by the new one below.
   const live = existing.docs
     .filter((entry) => !inviteLinkIsDead(entry.data().expiresAt, nowMs))
     .sort((a, b) => (a.id < b.id ? -1 : 1))
-  const kept = live[0]
+  const kept = rotate ? undefined : live[0]
 
   const batch = db.batch()
   let token: string
@@ -747,7 +756,13 @@ export const createInviteLink = onCall(async (request) => {
   }
   await batch.commit()
 
-  logger.info("createInviteLink minted a link", { organizationId, role, expiresInDays, reused: Boolean(kept) })
+  logger.info("createInviteLink minted a link", {
+    organizationId,
+    role,
+    expiresInDays,
+    reused: Boolean(kept),
+    rotated: rotate,
+  })
   return { token, expiresAt: expiresMs, role, uses, reused: Boolean(kept) }
 })
 

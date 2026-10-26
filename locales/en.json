@@ -1366,7 +1366,11 @@
     "revokeTitle": "Revoke this link?",
     "revokeDescription": "Nobody will be able to join {{band}} with it again. The people who already joined stay.",
     "revoked": "Link revoked",
-    "revokeFailed": "Could not revoke the link"
+    "revokeFailed": "Could not revoke the link",
+    "rotate": "Generate a new link",
+    "rotateTitle": "Generate a new link?",
+    "rotateDescription": "The current link stops working right away — including for anyone who has not finished joining. The new one keeps the same role and expiry.",
+    "rotated": "New link created"
   },
   "join": {
     "title": "Join the band",

@@ -1218,7 +1218,11 @@
     "revokeTitle": "¿Anular este enlace?",
     "revokeDescription": "Nadie más podrá entrar en {{band}} con él. Quienes ya entraron se quedan.",
     "revoked": "Enlace anulado",
-    "revokeFailed": "No se pudo anular el enlace"
+    "revokeFailed": "No se pudo anular el enlace",
+    "rotate": "Generar un enlace nuevo",
+    "rotateTitle": "¿Generar un enlace nuevo?",
+    "rotateDescription": "El enlace actual deja de funcionar en ese mismo momento, también para quien no haya terminado de entrar. El nuevo mantiene el rol y el vencimiento.",
+    "rotated": "Enlace nuevo creado"
   },
   "join": {
     "title": "Unirse a la banda",

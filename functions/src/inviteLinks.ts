@@ -130,3 +130,11 @@ export const inviteMemberEmail = (email: unknown): string =>
 /** The band's name as the preview and the mirror show it. */
 export const inviteBandName = (name: unknown): string =>
   typeof name === "string" ? name.trim().slice(0, INVITE_BAND_NAME_MAX) : ""
+
+/**
+ * Whether the caller asked for a **new** token instead of the band's current
+ * one. Only a literal `true` rotates: an absent flag keeps the link in place
+ * (creating is idempotent), and anything else — the string `"true"`, a stray
+ * `1` — must never destroy a URL the band is already handing out.
+ */
+export const readRotateFlag = (value: unknown): boolean => value === true

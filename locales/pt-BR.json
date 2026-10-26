@@ -1366,7 +1366,11 @@
     "revokeTitle": "Revogar este link?",
     "revokeDescription": "Ninguém mais poderá entrar em {{band}} com ele. Quem já entrou continua.",
     "revoked": "Link revogado",
-    "revokeFailed": "Não foi possível revogar o link"
+    "revokeFailed": "Não foi possível revogar o link",
+    "rotate": "Gerar um link novo",
+    "rotateTitle": "Gerar um link novo?",
+    "rotateDescription": "O link atual deixa de funcionar na hora — inclusive para quem ainda não terminou de entrar. O novo mantém o papel e a validade.",
+    "rotated": "Link novo criado"
   },
   "join": {
     "title": "Entrar na banda",

@@ -1366,7 +1366,11 @@
     "revokeTitle": "Révoquer ce lien ?",
     "revokeDescription": "Personne ne pourra plus rejoindre {{band}} avec ce lien. Les personnes déjà entrées restent.",
     "revoked": "Lien révoqué",
-    "revokeFailed": "Impossible de révoquer le lien"
+    "revokeFailed": "Impossible de révoquer le lien",
+    "rotate": "Générer un nouveau lien",
+    "rotateTitle": "Générer un nouveau lien ?",
+    "rotateDescription": "Le lien actuel cesse de fonctionner immédiatement, y compris pour ceux qui n'ont pas terminé d'entrer. Le nouveau garde le même rôle et la même expiration.",
+    "rotated": "Nouveau lien créé"
   },
   "join": {
     "title": "Rejoindre le groupe",

@@ -14,6 +14,7 @@ import {
   inviteMemberName,
   isInviteToken,
   readInviteExpiryChoice,
+  readRotateFlag,
   sanitizeInviteRole,
 } from "../../functions/src/inviteLinks"
 import {
@@ -65,6 +66,23 @@ describe("invite link choices", () => {
     expect(readInviteExpiryChoice(-7)).toBeUndefined()
     expect(readInviteExpiryChoice("7")).toBeUndefined()
     expect(readInviteExpiryChoice(Number.NaN)).toBeUndefined()
+  })
+})
+
+describe("rotating a link", () => {
+  it("rotates only on a literal true", () => {
+    expect(readRotateFlag(true)).toBe(true)
+  })
+
+  it("keeps the link in place for anything else", () => {
+    // Creating is idempotent: a truthy stray must never destroy a URL the band
+    // is already handing out.
+    expect(readRotateFlag(undefined)).toBe(false)
+    expect(readRotateFlag(null)).toBe(false)
+    expect(readRotateFlag(false)).toBe(false)
+    expect(readRotateFlag("true")).toBe(false)
+    expect(readRotateFlag(1)).toBe(false)
+    expect(readRotateFlag({ rotate: true })).toBe(false)
   })
 })
 

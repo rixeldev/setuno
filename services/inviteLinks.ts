@@ -9,6 +9,12 @@ export interface CreateInviteLinkInput {
   role: InviteRole
   /** `null` = never expires; otherwise one of `INVITE_LINK_EXPIRY_DAYS`. */
   expiresInDays: number | null
+  /**
+   * Mint a **new** token instead of handing back the band's current link. The
+   * old URL dies in the same batch (anyone holding it can no longer join), and
+   * the new link's `uses` counter starts at zero.
+   */
+  rotate?: boolean
 }
 
 export interface InviteLinkInfo {
