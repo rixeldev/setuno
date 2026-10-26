@@ -2,19 +2,20 @@
  * Deep links and App Links (roadmap #76). Pure — no React Native imports, so
  * the unit suite can check it in node.
  *
- * The app answers on three **public URL shapes**, all served by the web
- * deploy:
+ * The app answers on four **public URL shapes**, all served by the web deploy:
  *
  *   /song/<id>      a song in the band
  *   /setlist/<id>   a setlist in the band
  *   /share/<token>  the public snapshot #56 mints
+ *   /join/<token>   the invitation link #89 mints
  *
  * The first two are the app's own screens under stable, public names: a member
  * sends `/song/abc` to a bandmate and the link opens the app when it is
  * installed (Android App Links / iOS Universal Links), or the web app when it
  * is not. The names never move with the app's internal routing, which is why
  * they are not the app's own `/songs/<id>` route — but that route is what the
- * shape resolves to.
+ * shape resolves to. `/share` and `/join` are public pages the app already
+ * serves under those exact names.
  *
  * The hosts and the claimed paths live in `app-links.json` (the single source
  * of truth read by `app.config.js` and `scripts/generate-app-links.mjs`); the
@@ -22,7 +23,7 @@
  */
 
 /** The public link shapes, in the order the app lists them. */
-export const DEEP_LINK_PATHS = ["song", "setlist", "share"] as const
+export const DEEP_LINK_PATHS = ["song", "setlist", "share", "join"] as const
 
 export type DeepLinkShape = (typeof DEEP_LINK_PATHS)[number]
 
@@ -31,6 +32,7 @@ const ROUTE_BY_SHAPE: Record<DeepLinkShape, string> = {
   song: "songs",
   setlist: "setlists",
   share: "share",
+  join: "join",
 }
 
 const isShape = (value: string): value is DeepLinkShape =>
@@ -49,13 +51,14 @@ export const buildSetlistLink = (baseUrl: string, setlistId: string): string =>
 
 /**
  * The app route a public deep link resolves to: `/song/abc` → `/songs/abc`,
- * `/setlist/abc` → `/setlists/abc`, `/share/tok` → `/share/tok`.
+ * `/setlist/abc` → `/setlists/abc`, `/share/tok` → `/share/tok`,
+ * `/join/tok` → `/join/tok`.
  *
  * `null` for anything else — a foreign path, a shape without an id, or a path
  * that only looks like one (`/songbook/abc` is not a song).
  */
 export const deepLinkRoute = (path: string): string | null => {
-  const match = /^\/(song|setlist|share)\/([^/?#]+)/.exec(path)
+  const match = /^\/(song|setlist|share|join)\/([^/?#]+)/.exec(path)
   if (!match) return null
   const shape = match[1] ?? ""
   const id = match[2] ?? ""

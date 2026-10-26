@@ -54,6 +54,7 @@ describe("deep links", () => {
     expect(deepLinkRoute("/song/abc")).toBe("/songs/abc")
     expect(deepLinkRoute("/setlist/abc")).toBe("/setlists/abc")
     expect(deepLinkRoute("/share/tok-1")).toBe("/share/tok-1")
+    expect(deepLinkRoute("/join/tok-1")).toBe("/join/tok-1")
   })
 
   it("ignores a path that only looks like a shape", () => {

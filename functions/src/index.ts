@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto"
 import { initializeApp } from "firebase-admin/app"
 import { getAuth } from "firebase-admin/auth"
-import { Timestamp, type Firestore, getFirestore } from "firebase-admin/firestore"
+import { FieldValue, Timestamp, type Firestore, getFirestore } from "firebase-admin/firestore"
 import { logger } from "firebase-functions/v2"
 import {
   onDocumentCreated,
@@ -20,6 +20,19 @@ import {
   collectAccountExport,
   deleteAccountData,
 } from "./accountData"
+import {
+  INVITE_LINK_USES_MAX,
+  inviteBandName,
+  inviteLinkExpiryAt,
+  inviteLinkIsDead,
+  inviteMemberEmail,
+  inviteMemberName,
+  isInviteRole,
+  isInviteToken,
+  readInviteExpiryChoice,
+  sanitizeInviteRole,
+  type InviteRole,
+} from "./inviteLinks"
 import {
   SHARE_EXPIRY_DAYS,
   SHARE_PAYLOAD_BYTES_MAX,
@@ -623,6 +636,312 @@ export const revokeShare = onCall(async (request) => {
   }
   await ref.delete()
   return { revoked: true }
+})
+
+// ------------------------------------------------------- invite links (#89)
+//
+// Roadmap #89: a band invites people by link and QR instead of asking for an
+// email address. `inviteLinks/{token}` is written only through the Admin SDK —
+// no security rule exists for it at all — so minting, previewing and redeeming
+// all pass through these four callables. The ordinary emailed invitation keeps
+// working untouched; this is a second door into the same membership, and
+// `redeemInviteLink` writes exactly the documents `acceptInvitation` writes.
+
+/** 16 random bytes as base64url — 22 path-safe characters, 128 bits of entropy. */
+const INVITE_TOKEN_BYTES = 16
+
+/** Firestore stamps read back as `Timestamp`; the callables speak epoch ms. */
+const timestampMillis = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  const holder = value as { toMillis?: () => number } | null | undefined
+  return holder && typeof holder.toMillis === "function" ? holder.toMillis() : null
+}
+
+/**
+ * Mint (or refresh) the band's invitation link. Admin-only, and idempotent per
+ * band: a live link keeps its token while its role and deadline are rewritten,
+ * so "share it again" never hands out a second URL. Expired links and
+ * duplicates from before this contract are deleted in the same batch.
+ */
+export const createInviteLink = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to invite your band")
+  const uid = request.auth.uid
+  const data = readCallInput(request.data)
+
+  const organizationId = typeof data.organizationId === "string" ? data.organizationId : ""
+  if (organizationId.length === 0 || organizationId.length > 128) {
+    throw new HttpsError("invalid-argument", "A band is required")
+  }
+  if (!isInviteRole(data.role)) {
+    throw new HttpsError("invalid-argument", "Unsupported role")
+  }
+  const role: InviteRole = data.role
+  const expiresInDays = readInviteExpiryChoice(data.expiresInDays)
+  if (expiresInDays === undefined) {
+    throw new HttpsError("invalid-argument", "Unsupported expiry")
+  }
+
+  const db = getFirestore()
+  const organizationRef = db.doc(`organizations/${organizationId}`)
+  const memberRef = db.doc(`organizations/${organizationId}/members/${uid}`)
+  const organizationSnap = await organizationRef.get()
+  if (!organizationSnap.exists) throw new HttpsError("not-found", "That band no longer exists")
+  const memberSnap = await memberRef.get()
+  if (memberSnap.data()?.role !== "admin") {
+    throw new HttpsError("permission-denied", "Only an admin can create an invitation link")
+  }
+
+  const now = Timestamp.now()
+  const nowMs = now.toMillis()
+  const expiresMs = inviteLinkExpiryAt(expiresInDays, nowMs)
+  const expiresAt = expiresMs === null ? null : Timestamp.fromMillis(expiresMs)
+  const organizationName = inviteBandName(organizationSnap.data()?.name)
+  const createdByName = inviteMemberName(memberSnap.data()?.displayName, request.auth.token.email)
+
+  const existing = await db
+    .collection("inviteLinks")
+    .where("organizationId", "==", organizationId)
+    .get()
+  // One live link per band (lowest token, so every admin agrees on which one).
+  const live = existing.docs
+    .filter((entry) => !inviteLinkIsDead(entry.data().expiresAt, nowMs))
+    .sort((a, b) => (a.id < b.id ? -1 : 1))
+  const kept = live[0]
+
+  const batch = db.batch()
+  let token: string
+  let uses = 0
+  if (kept) {
+    const stored = kept.data().uses
+    uses = typeof stored === "number" && Number.isFinite(stored) ? stored : 0
+    token = kept.id
+    // The role and the deadline move; the `uses` counter does not — it counts
+    // people who joined through this URL, and rewriting the rules does not
+    // un-join them.
+    batch.update(kept.ref, {
+      organizationName,
+      role,
+      createdBy: uid,
+      createdByName,
+      expiresAt,
+      updatedAt: now,
+    })
+  } else {
+    token = randomBytes(INVITE_TOKEN_BYTES).toString("base64url")
+    batch.set(db.doc(`inviteLinks/${token}`), {
+      token,
+      organizationId,
+      organizationName,
+      role,
+      createdBy: uid,
+      createdByName,
+      createdAt: now,
+      updatedAt: now,
+      expiresAt,
+      uses: 0,
+      lastUsedAt: null,
+    })
+  }
+  for (const extra of existing.docs) {
+    if (!kept || extra.id !== kept.id) batch.delete(extra.ref)
+  }
+  await batch.commit()
+
+  logger.info("createInviteLink minted a link", { organizationId, role, expiresInDays, reused: Boolean(kept) })
+  return { token, expiresAt: expiresMs, role, uses, reused: Boolean(kept) }
+})
+
+/**
+ * Kill the band's link for good: the document is deleted, so the preview and
+ * the redeem both find nothing. Admins of the band may revoke it (the link is
+ * the band's, not the person's). A missing token answers `revoked: true`, so a
+ * second tap stays a no-op.
+ */
+export const revokeInviteLink = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to revoke a link")
+  const uid = request.auth.uid
+  const data = readCallInput(request.data)
+  if (!isInviteToken(data.token)) {
+    throw new HttpsError("invalid-argument", "token is required")
+  }
+
+  const db = getFirestore()
+  const ref = db.doc(`inviteLinks/${data.token}`)
+  const snapshot = await ref.get()
+  if (!snapshot.exists) return { revoked: true }
+
+  const link = snapshot.data() ?? {}
+  const organizationId = typeof link.organizationId === "string" ? link.organizationId : ""
+  const member = await db.doc(`organizations/${organizationId}/members/${uid}`).get()
+  if (member.data()?.role !== "admin") {
+    throw new HttpsError("permission-denied", "Only an admin can revoke this link")
+  }
+  await ref.delete()
+  return { revoked: true }
+})
+
+/**
+ * What the public join page shows before anybody signs in: the band's name,
+ * the role the link grants, when it dies and how many people came through it.
+ * Anonymous by design — the page has to be readable by a visitor who is not
+ * signed in yet — and a link that is missing, expired or points at a band that
+ * no longer exists collapses into one honest `gone` answer.
+ */
+export const previewInviteLink = onCall(async (request) => {
+  const data = readCallInput(request.data)
+  const gone = {
+    state: "gone" as const,
+    organizationId: "",
+    organizationName: "",
+    role: "member" as InviteRole,
+    createdByName: "",
+    expiresAt: null,
+    uses: 0,
+    alreadyMember: false,
+  }
+  if (!isInviteToken(data.token)) return gone
+
+  const db = getFirestore()
+  const snapshot = await db.doc(`inviteLinks/${data.token}`).get()
+  if (!snapshot.exists) return gone
+  const link = snapshot.data() ?? {}
+  if (inviteLinkIsDead(link.expiresAt, Date.now())) return gone
+
+  const organizationId = typeof link.organizationId === "string" ? link.organizationId : ""
+  if (organizationId.length === 0) return gone
+  // The band can be deleted while a link lives on: the redeem would refuse it,
+  // so the page must say the same thing instead of naming a band that is gone.
+  const organization = await db.doc(`organizations/${organizationId}`).get()
+  if (!organization.exists) return gone
+
+  let alreadyMember = false
+  if (request.auth) {
+    const member = await db.doc(`organizations/${organizationId}/members/${request.auth.uid}`).get()
+    alreadyMember = member.exists
+  }
+
+  return {
+    state: "ready" as const,
+    organizationId,
+    organizationName: inviteBandName(organization.data()?.name) || inviteBandName(link.organizationName),
+    role: sanitizeInviteRole(link.role),
+    createdByName: typeof link.createdByName === "string" ? link.createdByName : "",
+    expiresAt: timestampMillis(link.expiresAt),
+    uses: typeof link.uses === "number" ? link.uses : 0,
+    alreadyMember,
+  }
+})
+
+/**
+ * Redeem a link: create the membership plus the caller's band index entry,
+ * exactly as `acceptInvitation` does for an emailed invitation — but with the
+ * Admin SDK, because no invitation document (and so no email) exists here.
+ *
+ * Multi-use and idempotent: somebody who already belongs to the band gets
+ * `alreadyMember: true` and keeps the role they have (walking your own link is
+ * not a promotion), while the `uses` counter moves once per new member. The
+ * transaction reads everything before it writes, so two people scanning at the
+ * same moment cannot overwrite each other's membership.
+ */
+export const redeemInviteLink = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to join the band")
+  const uid = request.auth.uid
+  const data = readCallInput(request.data)
+  if (!isInviteToken(data.token)) {
+    throw new HttpsError("invalid-argument", "token is required")
+  }
+  const token = data.token
+  const db = getFirestore()
+  const now = Timestamp.now()
+  // The profile can be a moment younger than the account (a fresh sign-up
+  // arriving straight through this link), so the Auth token is the fallback.
+  const displayName = inviteMemberName(request.auth.token.name, request.auth.token.email)
+  const email = inviteMemberEmail(request.auth.token.email)
+  const photoURL = typeof request.auth.token.picture === "string" ? request.auth.token.picture : null
+
+  const outcome = await db.runTransaction(async (transaction) => {
+    const linkRef = db.doc(`inviteLinks/${token}`)
+    const linkSnap = await transaction.get(linkRef)
+    if (!linkSnap.exists) {
+      throw new HttpsError("not-found", "This invitation link is no longer valid")
+    }
+    const link = linkSnap.data() ?? {}
+    if (inviteLinkIsDead(link.expiresAt, now.toMillis())) {
+      throw new HttpsError("failed-precondition", "This invitation link has expired")
+    }
+    const organizationId = typeof link.organizationId === "string" ? link.organizationId : ""
+    if (organizationId.length === 0) {
+      throw new HttpsError("not-found", "This invitation link is no longer valid")
+    }
+
+    const memberRef = db.doc(`organizations/${organizationId}/members/${uid}`)
+    const organizationRef = db.doc(`organizations/${organizationId}`)
+    const memberSnap = await transaction.get(memberRef)
+    const organizationSnap = await transaction.get(organizationRef)
+    if (!organizationSnap.exists) throw new HttpsError("not-found", "That band no longer exists")
+
+    const organizationName =
+      inviteBandName(organizationSnap.data()?.name) || inviteBandName(link.organizationName)
+    if (memberSnap.exists) {
+      return {
+        organizationId,
+        organizationName,
+        role: sanitizeInviteRole(memberSnap.data()?.role),
+        alreadyMember: true,
+      }
+    }
+
+    const uses = typeof link.uses === "number" && Number.isFinite(link.uses) ? link.uses : 0
+    if (uses >= INVITE_LINK_USES_MAX) {
+      throw new HttpsError("resource-exhausted", "This invitation link is no longer valid")
+    }
+
+    const role = sanitizeInviteRole(link.role)
+    const invitedBy =
+      typeof link.createdBy === "string" && link.createdBy.length > 0 ? link.createdBy : null
+    transaction.set(memberRef, {
+      uid,
+      displayName,
+      email,
+      photoURL,
+      role,
+      joinedAt: now,
+      invitedBy,
+      instruments: [],
+    })
+    // The caller's private band index, the same shape `acceptInvitation`
+    // writes: the app's band list listens here, so the new band appears
+    // without a restart.
+    transaction.set(db.doc(`users/${uid}/organizations/${organizationId}`), {
+      name: organizationName,
+      role,
+      logoURL: null,
+      joinedAt: now,
+    })
+    transaction.update(linkRef, { uses: uses + 1, lastUsedAt: now })
+    return { organizationId, organizationName, role, alreadyMember: false }
+  })
+
+  // The feed line `acceptInvitation` logs, best-effort: the membership already
+  // exists, so a failed log must never fail the redemption.
+  if (!outcome.alreadyMember) {
+    try {
+      await db.collection(`organizations/${outcome.organizationId}/activity`).add({
+        organizationId: outcome.organizationId,
+        type: "invitation_accepted",
+        message: `${displayName || email} joined the band`,
+        actorId: uid,
+        actorName: displayName || email,
+        targetType: "member",
+        targetId: uid,
+        createdAt: FieldValue.serverTimestamp(),
+      })
+    } catch (error) {
+      logger.warn("redeemInviteLink could not log the join", error)
+    }
+  }
+
+  return outcome
 })
 
 // ------------------------------------------------------- account data (#68)

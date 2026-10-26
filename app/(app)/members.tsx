@@ -15,6 +15,7 @@ import { EmptyState, ErrorState, SkeletonList } from "@/components/ui/States"
 import { useToast } from "@/components/ui/Toast"
 import { DotsIcon, EmailIcon, GroupIcon, GuitarIcon, PlusIcon } from "@/components/ui/Icons"
 import { ModalScreen } from "@/components/app/ModalScreen"
+import { InviteLinkSheet } from "@/components/members/InviteLinkSheet"
 import { MemberInstrumentsDialog } from "@/components/members/MemberInstrumentsDialog"
 import { MemberRoleChips } from "@/components/members/MemberRoleChips"
 import { useAuth } from "@/hooks/useAuth"
@@ -24,6 +25,7 @@ import { useJoinRequestQueue } from "@/hooks/useJoinRequests"
 import { addMemberByEmail, removeMember, revokeInvitation, updateMemberInstruments, updateMemberRole } from "@/services/organizations"
 import { approveJoinRequest, rejectJoinRequest } from "@/services/joinRequests"
 import { toFriendlyError } from "@/services/errors"
+import { INVITE_ROLE_LABEL_KEYS, INVITE_ROLES } from "@/libs/inviteLink"
 import { validateEmail } from "@/libs/validation"
 import type { JoinRequest, OrganizationMember, OrganizationRole } from "@/interfaces"
 
@@ -33,16 +35,6 @@ const ROLE_MOVE_LABELS: Record<OrganizationRole, string> = {
   member: "members.makeMember",
   guest: "members.makeGuest",
 }
-
-/** What each role means, spelled on its invitation chip. */
-const INVITE_ROLE_LABELS: Record<OrganizationRole, string> = {
-  admin: "members.adminCanEdit",
-  member: "members.memberCanSuggest",
-  guest: "members.guestCanView",
-}
-
-/** Invitations can be minted for every role; the default stays a plain member. */
-const INVITE_ROLES: readonly OrganizationRole[] = ["member", "admin", "guest"]
 
 /**
  * Members and invitations (docs §7, §18): one tidy surface per group. Role and
@@ -61,6 +53,8 @@ export default function MembersScreen() {
   const [inviteRole, setInviteRole] = useState<OrganizationRole>("member")
   const [emailError, setEmailError] = useState<string | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
+  // Invitation links (roadmap #89): the sheet that mints the band's link.
+  const [linkOpen, setLinkOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [menuMember, setMenuMember] = useState<OrganizationMember | null>(null)
   const [pendingRemoval, setPendingRemoval] = useState<OrganizationMember | null>(null)
@@ -471,14 +465,31 @@ export default function MembersScreen() {
           {INVITE_ROLES.map((entry) => (
             <Chip
               key={entry}
-              label={t(INVITE_ROLE_LABELS[entry])}
+              label={t(INVITE_ROLE_LABEL_KEYS[entry])}
               tone="primary"
               selected={inviteRole === entry}
               onPress={() => setInviteRole(entry)}
             />
           ))}
         </View>
+        {/* The second door (roadmap #89): nobody has to dig up an address. */}
+        <Button
+          label={t("members.inviteByLink")}
+          variant="ghost"
+          full
+          onPress={() => {
+            setInviteOpen(false)
+            setLinkOpen(true)
+          }}
+        />
       </Dialog>
+
+      <InviteLinkSheet
+        visible={linkOpen}
+        onClose={() => setLinkOpen(false)}
+        organizationId={organizationId ?? ""}
+        organizationName={organization?.name ?? ""}
+      />
 
       <Dialog
         visible={removeOpen}
@@ -508,7 +519,7 @@ export default function MembersScreen() {
           {INVITE_ROLES.map((entry) => (
             <Chip
               key={entry}
-              label={t(INVITE_ROLE_LABELS[entry])}
+              label={t(INVITE_ROLE_LABEL_KEYS[entry])}
               tone="primary"
               selected={approveRole === entry}
               onPress={() => setApproveRole(entry)}

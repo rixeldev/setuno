@@ -14,6 +14,7 @@ import { usePushRegistration } from "@/hooks/usePushRegistration"
 import { usePushPrompt } from "@/hooks/usePushPrompt"
 import { PushPromptDialog } from "@/components/app/PushPromptDialog"
 import { useHomeWidget } from "@/hooks/useHomeWidget"
+import { usePendingJoin } from "@/hooks/usePendingJoin"
 import { isFocusRoute } from "@/libs/navigation"
 
 /**
@@ -50,6 +51,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // The Android home-screen widget follows the band's next gig (roadmap #78).
   // The push happens here, where the band data is already subscribed.
   useHomeWidget()
+
+  // An invitation link the visitor could not redeem while signed out finishes
+  // here, once, as soon as there is a profile to write the membership with.
+  usePendingJoin()
 
   // Floating UI (the toast) anchors above the measured bottom chrome; release
   // it while the bar is hidden and when the shell goes away.
