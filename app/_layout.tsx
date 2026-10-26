@@ -23,6 +23,7 @@ import { hydrateLanguage } from "@/services/i18next"
 import { hydratePreferences } from "@/services/prefs"
 import { hydrateRecentChords } from "@/services/recentChords"
 import { hydrateSongbookState } from "@/services/songbookState"
+import { useTabletOrientation } from "@/hooks/useTabletOrientation"
 import { initializeAds } from "@/services/ads"
 import { startAppCheck } from "@/services/appCheck"
 import { startSyncWatcher } from "@/services/sync"
@@ -42,6 +43,7 @@ try {
  * Auth and organization state live here so every screen can rely on them.
  */
 export default function Layout() {
+  useTabletOrientation()
   const [preferencesReady, setPreferencesReady] = useState(false)
   const [fontsLoaded, fontError] = useFonts({
     Onest: Onest_400Regular,
