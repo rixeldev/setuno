@@ -106,7 +106,16 @@ export function SheetOptionRow({
 
 const createStyles = () =>
   StyleSheet.create({
+    /**
+     * The sheet caps at 92% of the screen and clips its children. Without a
+     * shrink here the padded column keeps its natural height, overflows past
+     * the cap and the inner `ScrollView` never gets a bounded height to scroll
+     * in — the last rows simply disappear. `minHeight: 0` lets a flex child
+     * shrink below its content on Android too.
+     */
     content: {
+      flexShrink: 1,
+      minHeight: 0,
       paddingHorizontal: Theme.spacing.xl,
       paddingTop: Theme.spacing.l,
       paddingBottom: Theme.spacing.xxl,
@@ -114,7 +123,7 @@ const createStyles = () =>
     },
     header: { gap: 2 },
     /** Shrinks to the sheet's 92% cap and then scrolls its content. */
-    optionsScroll: { flexShrink: 1 },
+    optionsScroll: { flexShrink: 1, minHeight: 0 },
     options: { gap: Theme.spacing.s },
     option: {
       flexDirection: "row",

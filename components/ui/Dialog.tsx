@@ -205,10 +205,16 @@ const createStyles = () =>
     },
     headerText: { flex: 1, gap: 6 },
     close: { padding: 4 },
-    body: { maxHeight: 460 },
+    /**
+     * `flexShrink` is what keeps the body scrollable on a short screen: the
+     * dialog caps at 88% of the viewport, and a body that could not shrink
+     * below its `maxHeight` pushed the actions (and the last rows) off-screen
+     * instead of scrolling — the instruments picker's reported bug.
+     */
+    body: { maxHeight: 460, flexShrink: 1, minHeight: 0 },
     bodyContent: { paddingBottom: Theme.spacing.s, gap: Theme.spacing.m },
     /** Body for dialogs whose children own the scrolling (lists). */
-    bodyStatic: { gap: Theme.spacing.m, flexShrink: 1 },
+    bodyStatic: { gap: Theme.spacing.m, flexShrink: 1, minHeight: 0 },
     actions: { flexDirection: "row", flexWrap: "wrap", gap: Theme.spacing.m },
     // Buttons share the row when they fit (~two per line) and take the full
     // width when they do not, so labels are never squeezed into an ellipsis.
