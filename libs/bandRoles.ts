@@ -226,3 +226,62 @@ export const rolesForMember = (member: OrganizationMember | null): string[] => {
   const rest = BAND_ROLES.map((role) => role.id).filter((id) => !declared.includes(id))
   return [...declared, ...rest]
 }
+
+/**
+ * Fills a song's cast from the roster (the quick "everyone plays their usual
+ * chair" answer): every member who declared an instrument and is **not cast
+ * yet** takes their first declared role.
+ *
+ * Existing casts always win — a chair the leader already placed is a decision,
+ * not a default — and a member with no declared instrument is left out rather
+ * than guessed at. Like every other write of a line-up, the result is healed by
+ * {@link cleanLineup} and capped at {@link MAX_SONG_LINEUP}.
+ */
+export const autoLineup = (
+  members: readonly OrganizationMember[],
+  current: Record<string, string>,
+): Record<string, string> => {
+  const healed = cleanLineup(current)
+  const roster = new Set(members.map((member) => member.uid))
+  // A cast left over from somebody who is no longer in the band can never be
+  // rendered again (`resolveLineup` has no name to show), so filling the cast
+  // is also the moment it is swept.
+  const lineup: Record<string, string> = {}
+  for (const [uid, roleId] of Object.entries(healed)) {
+    if (roster.has(uid)) lineup[uid] = roleId
+  }
+  for (const member of members) {
+    if (member.uid.trim().length === 0 || lineup[member.uid]) continue
+    const [first] = sanitizeRoleIds(member.instruments)
+    if (!first) continue
+    lineup[member.uid] = first
+    if (Object.keys(lineup).length >= MAX_SONG_LINEUP) break
+  }
+  return lineup
+}
+
+/**
+ * The bandmates the song's cast leaves out — the soft warning the line-up sheet
+ * prints ("not on this song: …"), never a block.
+ *
+ * Guests are excluded: a substitute reads the night, but they are not a chair
+ * the band is expected to have filled. The order is the roster's own (name,
+ * then uid) so the line cannot shuffle between renders.
+ */
+export const missingFromLineup = (
+  members: readonly OrganizationMember[],
+  lineup: Record<string, string>,
+): OrganizationMember[] => {
+  const cast = cleanLineup(lineup)
+  return members
+    .filter((member) => member.role !== "guest")
+    .filter((member) => member.uid.trim().length > 0 && !cast[member.uid])
+    .slice()
+    .sort((first, second) => {
+      const left = (first.displayName || first.email).toLowerCase()
+      const right = (second.displayName || second.email).toLowerCase()
+      if (left < right) return -1
+      if (left > right) return 1
+      return first.uid < second.uid ? -1 : first.uid > second.uid ? 1 : 0
+    })
+}

@@ -9,12 +9,14 @@ import {
   MAX_MEMBER_ROLES,
   MAX_ROLE_CHIPS,
   MAX_SONG_LINEUP,
+  autoLineup,
   bandRoleLabel,
   cleanLineup,
   isBandRole,
   lineupSummary,
   memberRoleA11y,
   memberRolesLabel,
+  missingFromLineup,
   resolveLineup,
   roleLabels,
   rolesForMember,
@@ -22,13 +24,18 @@ import {
   visibleRoleIds,
 } from "@/libs/bandRoles"
 
-const member = (uid: string, displayName: string, instruments: string[] = []): OrganizationMember =>
+const member = (
+  uid: string,
+  displayName: string,
+  instruments: string[] = [],
+  role = "member",
+): OrganizationMember =>
   ({
     uid,
     displayName,
     email: `${uid}@band.test`,
     photoURL: null,
-    role: "member",
+    role,
     instruments,
   }) as unknown as OrganizationMember
 
@@ -227,5 +234,75 @@ describe("rolesForMember", () => {
 
   it("offers the whole catalogue to a member who declared nothing", () => {
     expect(rolesForMember(null)).toEqual(BAND_ROLES.map((role) => role.id))
+  })
+})
+
+describe("autoLineup", () => {
+  const roster = [
+    member("ana", "Ana", ["leadVocal", "guitar"]),
+    member("manu", "Manuel", ["guitar"]),
+    member("zoe", "Zoe"),
+  ]
+
+  it("casts every member who declared an instrument with their first one", () => {
+    expect(autoLineup(roster, {})).toEqual({ ana: "leadVocal", manu: "guitar" })
+  })
+
+  it("leaves a member with nothing declared out instead of guessing", () => {
+    expect(autoLineup(roster, {}).zoe).toBeUndefined()
+  })
+
+  it("never overwrites a chair the leader already placed", () => {
+    expect(autoLineup(roster, { ana: "drums" })).toEqual({ ana: "drums", manu: "guitar" })
+  })
+
+  it("heals the cast it starts from", () => {
+    expect(autoLineup(roster, { manu: "triangle", ghost: "bass" })).toEqual({
+      manu: "guitar",
+      ana: "leadVocal",
+    })
+  })
+
+  it("is stable: running it twice changes nothing", () => {
+    const once = autoLineup(roster, {})
+    expect(autoLineup(roster, once)).toEqual(once)
+  })
+
+  it("ignores blank uids and members whose only ids are unknown", () => {
+    expect(autoLineup([member("", "Nobody", ["guitar"]), member("x", "X", ["triangle"])], {})).toEqual(
+      {},
+    )
+  })
+})
+
+describe("missingFromLineup", () => {
+  const roster = [
+    member("zoe", "Zoe"),
+    member("ana", "Ana"),
+    member("manu", "Manuel"),
+    member("gus", "Gus", [], "guest"),
+  ]
+
+  it("names the bandmates the song leaves out, by name", () => {
+    expect(missingFromLineup(roster, { ana: "leadVocal" }).map((entry) => entry.uid)).toEqual([
+      "manu",
+      "zoe",
+    ])
+  })
+
+  it("never warns about a guest", () => {
+    expect(missingFromLineup(roster, {}).some((entry) => entry.uid === "gus")).toBe(false)
+  })
+
+  it("drops a cast entry whose role healed away", () => {
+    expect(missingFromLineup(roster, { ana: "triangle" }).map((entry) => entry.uid)).toEqual([
+      "ana",
+      "manu",
+      "zoe",
+    ])
+  })
+
+  it("says nothing when everyone is cast", () => {
+    expect(missingFromLineup(roster, { zoe: "drums", ana: "bass", manu: "guitar" })).toEqual([])
   })
 })

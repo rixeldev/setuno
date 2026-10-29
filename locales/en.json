@@ -1315,7 +1315,10 @@
     "lineupClear": "Clear the line-up",
     "lineupClearHint": "Nobody plays this song",
     "lineupEdit": "Line-up",
-    "lineupPair": "{{role}}: {{name}}"
+    "lineupPair": "{{role}}: {{name}}",
+    "lineupAuto": "Fill from the roster",
+    "lineupAutoHint": "Everyone's usual chair, for whoever is uncast",
+    "lineupMissing": "Not cast yet: {{names}}"
   },
   "shares": {
     "title": "Share",
@@ -1466,7 +1469,8 @@
     "breakSubtitle": "How long?",
     "breakMinutes_one": "{{count}} min",
     "breakMinutes_other": "{{count}} min",
-    "markA11y": "Mark how this song went"
+    "markA11y": "Mark how this song went",
+    "noteA11y": "Write a night note"
   },
   "showLog": {
     "markTitle": "How did it go?",
@@ -1608,6 +1612,22 @@
     "reportNoteTitle": "Note",
     "reportNotePlaceholder": "e.g. cut short, key change…",
     "couldNotSaveLog": "We couldn't save the show log.",
+    "commentsTitle": "Comments",
+    "commentsEmpty": "Talk about the night — the call time, the load-in, who is driving.",
+    "showNotesTitle": "Night notes",
+    "showNoteAdd": "Add note",
+    "showNoteEmpty": "No notes from this show yet.",
+    "showNoteGeneral": "About the night",
+    "showNoteTitle": "Night note",
+    "showNoteDescription": "What happened, while it is fresh.",
+    "showNoteFor": "During {{title}}",
+    "showNotePlaceholder": "PA died on the solo, the bride asked for this one…",
+    "showNoteSaved": "Note saved.",
+    "showNoteDeleteAction": "Delete note",
+    "showNoteDeleteTitle": "Delete this note?",
+    "showNoteDeleteDescription": "It disappears from the show report for everyone.",
+    "couldNotSaveNotes": "We couldn't save the note.",
+    "couldNotDeleteNotes": "We couldn't delete that note.",
     "attendance": "Attendance",
     "rsvpGoing": "Going",
     "rsvpMaybe": "Maybe",

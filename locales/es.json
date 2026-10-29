@@ -1167,7 +1167,10 @@
     "lineupClear": "Quitar la formación",
     "lineupClearHint": "Nadie toca esta canción",
     "lineupEdit": "Formación",
-    "lineupPair": "{{role}}: {{name}}"
+    "lineupPair": "{{role}}: {{name}}",
+    "lineupAuto": "Rellenar desde el grupo",
+    "lineupAutoHint": "El puesto habitual de cada uno, solo para quien falta",
+    "lineupMissing": "Sin asignar: {{names}}"
   },
   "shares": {
     "title": "Compartir",
@@ -1318,7 +1321,8 @@
     "breakSubtitle": "¿Cuánto?",
     "breakMinutes_one": "{{count}} min",
     "breakMinutes_other": "{{count}} min",
-    "markA11y": "Marcar cómo fue esta canción"
+    "markA11y": "Marcar cómo fue esta canción",
+    "noteA11y": "Escribir una nota del show"
   },
   "showLog": {
     "markTitle": "¿Cómo salió?",
@@ -1460,6 +1464,22 @@
     "reportNoteTitle": "Nota",
     "reportNotePlaceholder": "p. ej. a cortar, cambio de tono…",
     "couldNotSaveLog": "No pudimos guardar el registro del show.",
+    "commentsTitle": "Comentarios",
+    "commentsEmpty": "Hablad del show — la hora de llegada, la carga, quién conduce.",
+    "showNotesTitle": "Notas del show",
+    "showNoteAdd": "Añadir nota",
+    "showNoteEmpty": "Todavía no hay notas de este show.",
+    "showNoteGeneral": "Sobre la noche",
+    "showNoteTitle": "Nota del show",
+    "showNoteDescription": "Lo que pasó, mientras está fresco.",
+    "showNoteFor": "Durante {{title}}",
+    "showNotePlaceholder": "Se cayó la mesa en el solo, la novia pidió esta…",
+    "showNoteSaved": "Nota guardada.",
+    "showNoteDeleteAction": "Borrar nota",
+    "showNoteDeleteTitle": "¿Borrar esta nota?",
+    "showNoteDeleteDescription": "Desaparece del informe del show para todos.",
+    "couldNotSaveNotes": "No pudimos guardar la nota.",
+    "couldNotDeleteNotes": "No pudimos borrar esa nota.",
     "attendance": "Asistencia",
     "rsvpGoing": "Voy",
     "rsvpMaybe": "Quizás",

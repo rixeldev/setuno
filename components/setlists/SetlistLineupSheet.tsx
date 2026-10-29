@@ -1,8 +1,18 @@
 import React, { useState } from "react"
+import { StyleSheet } from "react-native"
 import { useTranslation } from "react-i18next"
 
+import { Theme } from "@/constants/Theme"
+import { useThemedStyles } from "@/hooks/useThemedStyles"
+import { AppText } from "@/components/ui/AppText"
 import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
-import { bandRoleLabel, rolesForMember } from "@/libs/bandRoles"
+import {
+  autoLineup,
+  bandRoleLabel,
+  missingFromLineup,
+  rolesForMember,
+  sanitizeRoleIds,
+} from "@/libs/bandRoles"
 import type { OrganizationMember } from "@/interfaces"
 
 interface SetlistLineupSheetProps {
@@ -41,11 +51,17 @@ export function SetlistLineupSheet({
   onClose,
 }: SetlistLineupSheetProps) {
   const { t } = useTranslation()
+  const styles = useThemedStyles(createStyles)
   // Who is being cast right now; `null` is the roster step. Seeded by the press
   // that opens it and cleared by the close, never synced from an effect.
   const [picking, setPicking] = useState<string | null>(null)
 
   const member = picking ? (members.find((entry) => entry.uid === picking) ?? null) : null
+  // The soft warning the roster step prints: who the song currently leaves out.
+  const missing = missingFromLineup(members, lineup)
+  // "Everyone plays their usual chair" only means something once somebody
+  // declared one — a control that would change nothing is not rendered.
+  const canAuto = members.some((entry) => sanitizeRoleIds(entry.instruments).length > 0)
 
   const close = (): void => {
     setPicking(null)
@@ -102,6 +118,13 @@ export function SetlistLineupSheet({
         </>
       ) : (
         <>
+          {canAuto ? (
+            <SheetOptionRow
+              label={t("setlists.lineupAuto")}
+              hint={t("setlists.lineupAutoHint")}
+              onPress={() => onChange(autoLineup(members, lineup))}
+            />
+          ) : null}
           {members.map((entry) => (
             <SheetOptionRow
               key={entry.uid}
@@ -118,8 +141,22 @@ export function SetlistLineupSheet({
               onPress={() => onChange({})}
             />
           ) : null}
+          {missing.length > 0 ? (
+            <AppText variant="caption" tone="faint" style={styles.missing}>
+              {t("setlists.lineupMissing", {
+                names: missing
+                  .map((entry) => entry.displayName || entry.email)
+                  .join(", "),
+              })}
+            </AppText>
+          ) : null}
         </>
       )}
     </BottomSheet>
   )
 }
+
+const createStyles = () =>
+  StyleSheet.create({
+    missing: { paddingHorizontal: Theme.spacing.xs, paddingTop: Theme.spacing.xs },
+  })

@@ -1315,7 +1315,10 @@
     "lineupClear": "Effacer la formation",
     "lineupClearHint": "Personne ne joue ce morceau",
     "lineupEdit": "Formation",
-    "lineupPair": "{{role}} : {{name}}"
+    "lineupPair": "{{role}} : {{name}}",
+    "lineupAuto": "Remplir depuis le groupe",
+    "lineupAutoHint": "Le poste habituel de chacun, pour ceux qui manquent",
+    "lineupMissing": "Pas encore attribué : {{names}}"
   },
   "shares": {
     "title": "Partager",
@@ -1466,7 +1469,8 @@
     "breakSubtitle": "Combien de temps ?",
     "breakMinutes_one": "{{count}} min",
     "breakMinutes_other": "{{count}} min",
-    "markA11y": "Noter comment s'est passé ce morceau"
+    "markA11y": "Noter comment s'est passé ce morceau",
+    "noteA11y": "Écrire une note du concert"
   },
   "showLog": {
     "markTitle": "Comment ça s'est passé ?",
@@ -1608,6 +1612,22 @@
     "reportNoteTitle": "Note",
     "reportNotePlaceholder": "ex. : raccourci, changement de tonalité…",
     "couldNotSaveLog": "Impossible d'enregistrer le journal du concert.",
+    "commentsTitle": "Commentaires",
+    "commentsEmpty": "Parlez de la soirée — l'heure, le chargement, qui conduit.",
+    "showNotesTitle": "Notes du concert",
+    "showNoteAdd": "Ajouter une note",
+    "showNoteEmpty": "Pas encore de note pour ce concert.",
+    "showNoteGeneral": "À propos de la soirée",
+    "showNoteTitle": "Note du concert",
+    "showNoteDescription": "Ce qui s'est passé, à chaud.",
+    "showNoteFor": "Pendant {{title}}",
+    "showNotePlaceholder": "La sono a lâché sur le solo, la mariée a demandé celle-là…",
+    "showNoteSaved": "Note enregistrée.",
+    "showNoteDeleteAction": "Supprimer la note",
+    "showNoteDeleteTitle": "Supprimer cette note ?",
+    "showNoteDeleteDescription": "Elle disparaît du rapport du concert pour tout le monde.",
+    "couldNotSaveNotes": "Impossible d'enregistrer la note.",
+    "couldNotDeleteNotes": "Impossible de supprimer cette note.",
     "attendance": "Présence",
     "rsvpGoing": "Je viens",
     "rsvpMaybe": "Peut-être",

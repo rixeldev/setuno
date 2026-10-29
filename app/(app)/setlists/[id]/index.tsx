@@ -19,6 +19,7 @@ import { SetlistKeyDialog } from "@/components/setlists/SetlistKeyDialog"
 import { SetlistBlockDialog } from "@/components/setlists/SetlistBlockDialog"
 import { SetlistNoteDialog } from "@/components/setlists/SetlistNoteDialog"
 import { SetlistLineupSheet } from "@/components/setlists/SetlistLineupSheet"
+import { SetlistLineup } from "@/components/setlists/SetlistLineup"
 import { PrintSheet } from "@/components/songs/PrintSheet"
 import { ShareSheet } from "@/components/shares/ShareSheet"
 import { useAuth } from "@/hooks/useAuth"
@@ -691,19 +692,9 @@ export default function SetlistDetail() {
                           </AppText>
                         </View>
                       ) : null}
-                       {belongsToEvent && resolveLineup(entry.lineup, members).length > 0 ? (
-                         <View style={styles.lineupLine}>
-                           <UsersIcon size={12} color={Theme.colors.accent} />
-                           <AppText
-                             variant="caption"
-                             tone="muted"
-                             numberOfLines={2}
-                             style={styles.flex}
-                           >
-                             {lineupSummary(resolveLineup(entry.lineup, members), t)}
-                           </AppText>
-                         </View>
-                       ) : null}
+                      {belongsToEvent && resolveLineup(entry.lineup, members).length > 0 ? (
+                        <SetlistLineup entries={resolveLineup(entry.lineup, members)} />
+                      ) : null}
                     </View>
                   </Pressable>
 
