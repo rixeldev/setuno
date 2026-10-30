@@ -166,12 +166,26 @@ export function SidebarNav() {
   const { t } = useTranslation()
   const router = useRouter()
   const pathname = usePathname()
+  const insets = useSafeAreaInsets()
   const { pendingSuggestions, unreadActivityCount } = useOrgData()
   const { role } = useOrganization()
   const { signOut, profile } = useAuth()
+  const items = visibleNavItems(SIDEBAR_NAV, role)
 
   return (
-    <View style={styles.sidebar}>
+    <View
+      style={[
+        styles.sidebar,
+        // The rail keeps its own chrome under the system bars (a dark strip
+        // behind the status bar reads as part of the navigation), while its
+        // content stays clear of them.
+        {
+          paddingTop: insets.top + Theme.spacing.l,
+          paddingBottom: insets.bottom + Theme.spacing.l,
+          paddingLeft: insets.left + Theme.spacing.m,
+        },
+      ]}
+    >
       <View style={styles.sidebarTop}>
         <View style={styles.brand}>
           <Image
@@ -188,42 +202,49 @@ export function SidebarNav() {
       <ScrollView style={styles.nav} contentContainerStyle={styles.navContent}>
         {/* Guests (roadmap #59) never see the collaboration entries: the
             rules deny the whole surface, so the door is withheld. */}
-        {visibleNavItems(SIDEBAR_NAV, role).map((item) => {
+        {items.map((item, index) => {
           const active = isNavActive(item.href, pathname)
           const badge = navBadge(item, pendingSuggestions.length, unreadActivityCount)
           const Icon = item.icon
+          const heading = item.group && item.group !== items[index - 1]?.group ? item.group : null
           return (
-            <Pressable
-              key={item.href}
-              accessibilityRole="link"
-              accessibilityLabel={t(item.label)}
-              accessibilityState={{ selected: active }}
-              onPress={() => router.push(item.href as never)}
-              style={({ pressed }) => [
-                styles.navItem,
-                active && styles.navItemActive,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Icon
-                size={18}
-                color={active ? Theme.colors.primary : Theme.colors.textMuted}
-              />
-              <AppText
-                variant="body"
-                tone={active ? "primary" : "muted"}
-                style={styles.navLabel}
-              >
-                {t(item.label)}
-              </AppText>
-              {badge > 0 ? (
-                <View style={styles.badge}>
-                  <AppText variant="caption" tone="inverse">
-                    {badge}
-                  </AppText>
-                </View>
+            <React.Fragment key={item.href}>
+              {heading ? (
+                <AppText variant="label" tone="faint" style={styles.navGroup}>
+                  {t(heading)}
+                </AppText>
               ) : null}
-            </Pressable>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={t(item.label)}
+                accessibilityState={{ selected: active }}
+                onPress={() => router.push(item.href as never)}
+                style={({ pressed }) => [
+                  styles.navItem,
+                  active && styles.navItemActive,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Icon
+                  size={18}
+                  color={active ? Theme.colors.primary : Theme.colors.textMuted}
+                />
+                <AppText
+                  variant="body"
+                  tone={active ? "primary" : "muted"}
+                  style={styles.navLabel}
+                >
+                  {t(item.label)}
+                </AppText>
+                {badge > 0 ? (
+                  <View style={styles.badge}>
+                    <AppText variant="caption" tone="inverse">
+                      {badge}
+                    </AppText>
+                  </View>
+                ) : null}
+              </Pressable>
+            </React.Fragment>
           )
         })}
       </ScrollView>
@@ -342,12 +363,12 @@ export function BottomBar() {
 const createStyles = () =>
   StyleSheet.create({
     sidebar: {
-      width: Theme.layout.sidebarWidth,      height: "100%",
+      width: Theme.layout.sidebarWidth,
+      height: "100%",
       backgroundColor: Theme.colors.chrome,
       borderRightWidth: 1,
       borderRightColor: Theme.colors.border,
-      paddingHorizontal: Theme.spacing.m,
-      paddingVertical: Theme.spacing.l,
+      paddingRight: Theme.spacing.m,
       gap: Theme.spacing.l,
     },
     sidebarTop: { gap: Theme.spacing.m },
@@ -360,14 +381,21 @@ const createStyles = () =>
     // The launcher icon doubles as the brand mark, like on the auth screens.
     brandLogo: { width: 26, height: 26, borderRadius: Theme.radii.s },
     nav: { flex: 1 },
-    navContent: { gap: 2, paddingBottom: Theme.spacing.l },
+    navContent: { paddingBottom: Theme.spacing.l },
+    // Section heading inside the rail ("Music", "Band", "Tools", "Account").
+    navGroup: {
+      paddingHorizontal: Theme.spacing.m,
+      paddingTop: Theme.spacing.m,
+      paddingBottom: Theme.spacing.xs,
+    },
     navItem: {
       flexDirection: "row",
       alignItems: "center",
       gap: Theme.spacing.m,
       paddingHorizontal: Theme.spacing.m,
-      paddingVertical: Theme.spacing.m,
+      paddingVertical: 10,
       borderRadius: Theme.radii.m,
+      marginBottom: 2,
     },
     navItemActive: { backgroundColor: Theme.colors.primarySoft },
     navLabel: { flex: 1 },
@@ -451,13 +479,15 @@ const createStyles = () =>
     bottomBar: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-around",
+      justifyContent: "center",
       paddingTop: Theme.spacing.s,
       backgroundColor: Theme.colors.chrome,
       borderTopWidth: 1,
       borderTopColor: Theme.colors.border,
     },
-    tab: { flex: 1, alignItems: "center", gap: 3, paddingVertical: 4 },
+    // On a portrait tablet the bar is wider than any phone, so the tabs keep a
+    // comfortable width and centre themselves instead of drifting apart.
+    tab: { flex: 1, maxWidth: 120, alignItems: "center", gap: 3, paddingVertical: 4 },
     // Round focus bubble behind the icon. The transparent background is always
     // defined on purpose: adding a background only when the tab activates made
     // Android paint it as a square, so the rounded drawable is created up front.

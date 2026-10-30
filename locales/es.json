@@ -96,6 +96,10 @@
   "nav": {
     "home": "Inicio",
     "dashboard": "Panel",
+    "groupMusic": "Música",
+    "groupBand": "Banda",
+    "groupTools": "Herramientas",
+    "groupAccount": "Cuenta",
     "songs": "Canciones",
     "setlists": "Listas",
     "performances": "Eventos",

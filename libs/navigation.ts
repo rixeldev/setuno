@@ -36,22 +36,35 @@ export interface NavItem {
   memberOnly?: boolean
   /** Shows the pending suggestion counter. */
   badge?: "suggestions" | "activity"
+  /**
+   * i18n key of the sidebar section this entry belongs to. Entries are rendered
+   * in order, and the sidebar prints a heading whenever the group changes — a
+   * flat list of twelve destinations reads like a wall.
+   */
+  group?: string
 }
 
 /** Desktop / web sidebar navigation (docs §18). */
 export const SIDEBAR_NAV: NavItem[] = [
-  { href: "/", label: "nav.dashboard", icon: GridIcon, badge: "activity" },
-  { href: "/songs", label: "nav.songs", icon: MusicIcon },
-  { href: "/setlists", label: "nav.setlists", icon: ListIcon },
-  { href: "/performances", label: "nav.performances", icon: CalendarIcon },
-  { href: "/calendar", label: "nav.calendar", icon: CalendarIcon, secondary: true },
-  { href: "/suggestions", label: "nav.suggestions", icon: ChatIcon, badge: "suggestions", memberOnly: true },
-  { href: "/members", label: "nav.members", icon: UsersIcon },
-  { href: "/collections", label: "nav.collections", icon: LibraryIcon },
-  { href: "/stats", label: "nav.stats", icon: StatsIcon },
-  { href: "/tuner", label: "nav.tuner", icon: TunerIcon },
-  { href: "/chords", label: "nav.chords", icon: GuitarIcon },
-  { href: "/settings", label: "nav.settings", icon: SettingsIcon },
+  { href: "/", label: "nav.dashboard", icon: GridIcon, badge: "activity", group: "nav.groupMusic" },
+  { href: "/songs", label: "nav.songs", icon: MusicIcon, group: "nav.groupMusic" },
+  { href: "/setlists", label: "nav.setlists", icon: ListIcon, group: "nav.groupMusic" },
+  { href: "/performances", label: "nav.performances", icon: CalendarIcon, group: "nav.groupMusic" },
+  { href: "/calendar", label: "nav.calendar", icon: CalendarIcon, secondary: true, group: "nav.groupMusic" },
+  {
+    href: "/suggestions",
+    label: "nav.suggestions",
+    icon: ChatIcon,
+    badge: "suggestions",
+    memberOnly: true,
+    group: "nav.groupBand",
+  },
+  { href: "/members", label: "nav.members", icon: UsersIcon, group: "nav.groupBand" },
+  { href: "/collections", label: "nav.collections", icon: LibraryIcon, group: "nav.groupBand" },
+  { href: "/stats", label: "nav.stats", icon: StatsIcon, group: "nav.groupTools" },
+  { href: "/tuner", label: "nav.tuner", icon: TunerIcon, group: "nav.groupTools" },
+  { href: "/chords", label: "nav.chords", icon: GuitarIcon, group: "nav.groupTools" },
+  { href: "/settings", label: "nav.settings", icon: SettingsIcon, group: "nav.groupAccount" },
 ]
 
 /** Mobile bottom bar (docs §18): four primary destinations plus More. */

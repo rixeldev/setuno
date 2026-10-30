@@ -96,6 +96,10 @@
   "nav": {
     "home": "Accueil",
     "dashboard": "Tableau de bord",
+    "groupMusic": "Musique",
+    "groupBand": "Groupe",
+    "groupTools": "Outils",
+    "groupAccount": "Compte",
     "songs": "Morceaux",
     "setlists": "Listes de morceaux",
     "performances": "Événements",
