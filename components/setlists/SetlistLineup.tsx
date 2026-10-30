@@ -12,76 +12,106 @@ import type { LineupEntry } from "@/libs/bandRoles"
 interface SetlistLineupProps {
   /** The cast already resolved against the live roster (`resolveLineup`). */
   entries: readonly LineupEntry[]
+  /**
+   * Where the strip sits: the running order's card (surface) or the reader's
+   * page (background). The ring between two faces is painted in that colour,
+   * so the overlap reads as one stack instead of two bordered circles.
+   */
+  onPage?: boolean
 }
 
+/** Faces before the stack collapses into a "+N" bubble. */
+const MAX_FACES = 4
+
 /**
- * One song's cast in the running order (roadmap #88): a chip per player with
- * their avatar, name and the chair they take **on this song**.
+ * One song's cast in the running order (roadmap #88), as a compact strip: the
+ * players' faces stacked on the left and the chairs they take on the right.
  *
- * It replaced a single wrapped caption ("Voz principal: Julia · Guitarra:
- * Manuel") because that line was the hardest thing on the row to read: the
- * roles and the names ran together, and on a phone the second member was
- * usually cut off. A chip keeps one person in one place, and the wrap gives
- * every additional player its own space instead of squeezing the row.
- *
- * The chips are presentational: the song row around them owns the tap that
- * opens the reader. Each chip carries the same "role: name" pair the reader and
- * the printed sheet use, so a screen reader hears one player at a time.
+ * The first version printed a chip per player — avatar, name and role — and a
+ * song with four players grew the row by three lines. The row is about the
+ * *song*; the cast is context. So the faces are overlapped into one 24 pt
+ * stack (the pattern every calendar and chat list uses for "who is in"), the
+ * roles collapse into a single ellipsised caption, and the names stay in the
+ * accessibility label: a bandmate recognises the faces, a screen reader hears
+ * every "role: name" pair exactly as the reader and the printed sheet do.
  */
-export function SetlistLineup({ entries }: SetlistLineupProps) {
+export function SetlistLineup({ entries, onPage = false }: SetlistLineupProps) {
   const { t } = useTranslation()
   const styles = useThemedStyles(createStyles)
+  const ring = onPage ? Theme.colors.background : Theme.colors.surface
 
   const visible = entries.filter((entry) => bandRoleLabel(entry.role, t).length > 0)
   if (visible.length === 0) return null
 
+  const faces = visible.slice(0, MAX_FACES)
+  const hidden = visible.length - faces.length
+  const roles = visible.map((entry) => bandRoleLabel(entry.role, t)).join(" · ")
+  const label = visible
+    .map((entry) =>
+      t("setlists.lineupPair", { role: bandRoleLabel(entry.role, t), name: entry.name }),
+    )
+    .join(", ")
+
   return (
-    <View style={styles.wrap}>
-      {visible.map((entry) => {
-        const role = bandRoleLabel(entry.role, t)
-        return (
+    <View
+      accessible
+      accessibilityLabel={label}
+      style={styles.row}
+    >
+      <View style={styles.stack}>
+        {faces.map((entry, index) => (
           <View
             key={entry.uid}
-            accessible
-            accessibilityLabel={t("setlists.lineupPair", { role, name: entry.name })}
-            style={styles.chip}
+            style={[styles.face, { borderColor: ring, backgroundColor: ring }, index > 0 && styles.overlap]}
           >
-            <Avatar name={entry.name} photoURL={entry.photoURL} size={20} />
-            <View style={styles.chipText}>
-              <AppText variant="caption" numberOfLines={1}>
-                {entry.name}
-              </AppText>
-              <AppText variant="caption" tone="faint" numberOfLines={1}>
-                {role}
-              </AppText>
-            </View>
+            <Avatar name={entry.name} photoURL={entry.photoURL} size={22} maxInitials={1} />
           </View>
-        )
-      })}
+        ))}
+        {hidden > 0 ? (
+          <View
+            style={[
+              styles.face,
+              styles.more,
+              { borderColor: ring, backgroundColor: ring },
+              styles.overlap,
+            ]}
+          >
+            <AppText variant="caption" tone="muted" style={styles.moreText}>
+              {`+${hidden}`}
+            </AppText>
+          </View>
+        ) : null}
+      </View>
+      <AppText variant="caption" tone="muted" numberOfLines={1} style={styles.roles}>
+        {roles}
+      </AppText>
     </View>
   )
 }
 
 const createStyles = () =>
   StyleSheet.create({
-    wrap: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: Theme.spacing.xs,
-      marginTop: Theme.spacing.xs,
-    },
-    chip: {
+    row: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
-      maxWidth: "100%",
-      paddingLeft: 3,
-      paddingRight: Theme.spacing.s,
-      paddingVertical: 3,
-      borderRadius: Theme.radii.pill,
-      backgroundColor: Theme.colors.background2,
-      borderWidth: 1,
-      borderColor: Theme.colors.borderSoft,
+      gap: Theme.spacing.s,
+      marginTop: 6,
     },
-    chipText: { flexShrink: 1, minWidth: 0 },
+    stack: { flexDirection: "row", alignItems: "center", flexShrink: 0 },
+    // A ring in the surrounding colour, so two overlapping faces stay separate
+    // without a shadow or a second colour. The colour itself comes from the
+    // surface the strip sits on (see `onPage`).
+    face: {
+      borderRadius: Theme.radii.pill,
+      borderWidth: 2,
+    },
+    overlap: { marginLeft: -8 },
+    more: {
+      width: 26,
+      height: 26,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    moreText: { fontSize: 10 },
+    roles: { flex: 1, minWidth: 0 },
   })

@@ -619,6 +619,9 @@ export default function SetlistDetail() {
             const seconds = song
               ? (song.durationSec ?? estimateDurationSec(song.sections))
               : null
+            // Resolved once per row: the cast is context for a list that belongs
+            // to an event, and an empty map never opens a strip.
+            const cast = belongsToEvent ? resolveLineup(entry.lineup, members) : []
             return (
               <React.Fragment key={`${entry.songId}-${order}`}>
                 {editing ? (
@@ -692,8 +695,8 @@ export default function SetlistDetail() {
                           </AppText>
                         </View>
                       ) : null}
-                      {belongsToEvent && resolveLineup(entry.lineup, members).length > 0 ? (
-                        <SetlistLineup entries={resolveLineup(entry.lineup, members)} />
+                      {cast.length > 0 ? (
+                        <SetlistLineup entries={cast} />
                       ) : null}
                     </View>
                   </Pressable>
