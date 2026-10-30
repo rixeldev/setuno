@@ -34,6 +34,10 @@ const LABEL_KEYS: Record<SongLinkProvider, string> = {
  * The song's external references (roadmap #16): one button per provider that
  * opens the link in the platform browser/app. Nothing is embedded, so no
  * service terms are bent — the reader just hands off to the right app.
+ *
+ * Kept deliberately small: these are references, not the song. The row sits
+ * under the lyrics as a segmented strip, so three services take one line of a
+ * phone instead of three full-width buttons competing with the music.
  */
 export function SongLinks({ links }: SongLinksProps) {
   const styles = useThemedStyles(createStyles)
@@ -55,11 +59,11 @@ export function SongLinks({ links }: SongLinksProps) {
             onPress={() => void Linking.openURL(url).catch(() => undefined)}
             style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
           >
-            <Icon size={16} color={Theme.colors.accent} />
+            <Icon size={13} color={Theme.colors.accent} />
             <AppText variant="caption" tone="accent" numberOfLines={1}>
               {label}
             </AppText>
-            <OpenExternalIcon size={13} color={Theme.colors.textMuted} />
+            <OpenExternalIcon size={11} color={Theme.colors.textFaint} />
           </Pressable>
         )
       })}
@@ -72,14 +76,14 @@ const createStyles = () =>
     row: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: Theme.spacing.s,
+      gap: 6,
     },
     chip: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
-      paddingHorizontal: Theme.spacing.m,
-      paddingVertical: 8,
+      gap: 5,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
       borderRadius: Theme.radii.pill,
       borderWidth: 1,
       borderColor: Theme.colors.borderSoft,

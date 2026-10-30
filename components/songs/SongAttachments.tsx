@@ -13,9 +13,13 @@ interface SongAttachmentsProps {
 }
 
 /**
- * The song's attachments in the reader (roadmap #40): one chip per PDF or
- * link that opens in the platform's viewer/browser — same hand-off contract
- * as `SongLinks`, nothing embedded, so no service terms are bent. Renders
+ * The song's attachments in the reader (roadmap #40): one row per PDF or link
+ * that opens in the platform's viewer/browser — same hand-off contract as
+ * `SongLinks`, nothing embedded, so no service terms are bent.
+ *
+ * A row, not a chip: an attachment is a document with a name and sometimes a
+ * note ("chart in Bb", "rehearsal take"), so it reads like a file in a list
+ * instead of a pill that truncates the one thing that identifies it. Renders
  * nothing when the song carries none (every document written before #40).
  */
 export function SongAttachments({ attachments }: SongAttachmentsProps) {
@@ -26,24 +30,37 @@ export function SongAttachments({ attachments }: SongAttachmentsProps) {
   if (entries.length === 0) return null
 
   return (
-    <View style={styles.row}>
-      {entries.map((entry) => (
+    <View style={styles.list}>
+      {entries.map((entry, index) => (
         <Pressable
           key={entry.id}
           accessibilityRole="link"
           accessibilityLabel={t("attachments.openA11y", { name: entry.name })}
           onPress={() => void Linking.openURL(entry.url).catch(() => undefined)}
-          style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.row,
+            index > 0 && styles.divider,
+            pressed && styles.pressed,
+          ]}
         >
-          {entry.kind === "file" ? (
-            <FilePdfIcon size={16} color={Theme.colors.accent} />
-          ) : (
-            <LinkIcon size={16} color={Theme.colors.accent} />
-          )}
-          <AppText variant="caption" tone="accent" numberOfLines={1} style={styles.name}>
-            {entry.name}
-          </AppText>
-          <OpenExternalIcon size={13} color={Theme.colors.textMuted} />
+          <View style={styles.iconWrap}>
+            {entry.kind === "file" ? (
+              <FilePdfIcon size={16} color={Theme.colors.accent} />
+            ) : (
+              <LinkIcon size={16} color={Theme.colors.accent} />
+            )}
+          </View>
+          <View style={styles.body}>
+            <AppText variant="caption" numberOfLines={1}>
+              {entry.name}
+            </AppText>
+            {entry.note ? (
+              <AppText variant="caption" tone="faint" numberOfLines={1}>
+                {entry.note}
+              </AppText>
+            ) : null}
+          </View>
+          <OpenExternalIcon size={13} color={Theme.colors.textFaint} />
         </Pressable>
       ))}
     </View>
@@ -52,25 +69,32 @@ export function SongAttachments({ attachments }: SongAttachmentsProps) {
 
 const createStyles = () =>
   StyleSheet.create({
-    row: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: Theme.spacing.s,
-    },
-    chip: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      paddingHorizontal: Theme.spacing.m,
-      paddingVertical: 8,
-      borderRadius: Theme.radii.pill,
+    list: {
+      borderRadius: Theme.radii.m,
       borderWidth: 1,
       borderColor: Theme.colors.borderSoft,
       backgroundColor: Theme.colors.surface,
-      maxWidth: "100%",
+      overflow: "hidden",
     },
-    name: {
-      flexShrink: 1,
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Theme.spacing.m,
+      paddingHorizontal: Theme.spacing.m,
+      paddingVertical: 10,
     },
+    divider: {
+      borderTopWidth: 1,
+      borderTopColor: Theme.colors.borderSoft,
+    },
+    iconWrap: {
+      width: 28,
+      height: 28,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: Theme.radii.s,
+      backgroundColor: Theme.colors.accentSoft,
+    },
+    body: { flex: 1, minWidth: 0 },
     pressed: { opacity: 0.7 },
   })

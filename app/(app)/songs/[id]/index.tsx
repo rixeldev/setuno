@@ -42,7 +42,6 @@ import {
   SuggestIcon,
   SwapIcon,
   TrashIcon,
-  UsersIcon,
 } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { AppBackground } from "@/components/app/AppBackground"
@@ -51,6 +50,8 @@ import { TourHint } from "@/components/onboarding/TourHint"
 import { SongContent } from "@/components/songs/SongContent"
 import { SongLinks } from "@/components/songs/SongLinks"
 import { SongAttachments } from "@/components/songs/SongAttachments"
+import { SongMeta } from "@/components/songs/SongMeta"
+import { SetlistLineup } from "@/components/setlists/SetlistLineup"
 import { ChordShapeSheet } from "@/components/songs/ChordShapeSheet"
 import { SongControls } from "@/components/songs/SongControls"
 import { AutoscrollBar } from "@/components/songs/AutoscrollBar"
@@ -123,11 +124,12 @@ import { READER_TOUR } from "@/libs/onboarding"
 import { toDate } from "@/interfaces/timestamp"
 import type { ShowLogEntry, ShowNote, UserPreferences } from "@/interfaces"
 import { songLyricsText, sectionLabelFor } from "@/libs/songUtils"
+import { songLinkEntries } from "@/libs/songLinks"
 import { serializeChordPro } from "@/libs/chordpro"
 import { exportTextFile } from "@/libs/exportFile"
 import { songPrintHtml } from "@/libs/songPrint"
 import { setlistStep } from "@/libs/setlistNavigation"
-import { resolveLineup, lineupSummary } from "@/libs/bandRoles"
+import { resolveLineup } from "@/libs/bandRoles"
 import { canCollaborate } from "@/libs/membership"
 import { FUNNEL_EVENTS } from "@/libs/telemetry"
 import * as Clipboard from "expo-clipboard"
@@ -235,9 +237,9 @@ export default function SongScreen() {
   // Who plays this song in the list it was opened from (roadmap #88). Context,
   // like the note: the same song can be cast differently in another list.
   const entryLineup = contextSetlist?.songs.find((entry) => entry.songId === song?.id)?.lineup ?? {}
-  const entryLineupSummary = Object.keys(entryLineup).length > 0
-    ? lineupSummary(resolveLineup(entryLineup, members), t)
-    : ""
+  // Resolved against the live roster, so a member who left drops out instead of
+  // leaving an empty chair on screen.
+  const entryCast = Object.keys(entryLineup).length > 0 ? resolveLineup(entryLineup, members) : []
 
 
   // Live show (#7): the running order with durations, this song's place in it
@@ -1069,6 +1071,9 @@ export default function SongScreen() {
     song.genre || null,
   ].filter((value): value is string => Boolean(value))
   const hasNotes = song.notes.trim().length > 0
+  const resourceLinks = songLinkEntries(song.links)
+  const resourceAttachments = song.attachments ?? []
+  const hasResources = resourceLinks.length > 0 || resourceAttachments.length > 0
 
   return (
     <View style={styles.host} {...pinchHandlers}>
@@ -1149,21 +1154,9 @@ export default function SongScreen() {
               </AppText>
             </View>
           ) : null}
-           {entryLineupSummary ? (
-             <View style={styles.setlistLineup}>
-               <UsersIcon size={14} color={Theme.colors.accent} />
-               <AppText variant="caption" tone="muted" style={styles.flex} numberOfLines={2}>
-                 {entryLineupSummary}
-               </AppText>
-             </View>
-           ) : null}
+          {entryCast.length > 0 ? <SetlistLineup entries={entryCast} onPage /> : null}
 
-
-          {details.length > 0 ? (
-            <AppText variant="caption" tone="faint">
-              {details.join("  ·  ")}
-            </AppText>
-          ) : null}
+          <SongMeta facts={details} />
 
           {hasNotes ? (
             <Pressable
@@ -1185,10 +1178,6 @@ export default function SongScreen() {
             </Pressable>
           ) : null}
 
-          <SongLinks links={song.links} />
-
-          <SongAttachments attachments={song.attachments} />
-
           {lyrics}
 
           {currentAnnotations ? (
@@ -1198,6 +1187,30 @@ export default function SongScreen() {
               songTitle={song.title}
               onOpen={openAnnotations}
             />
+          ) : null}
+
+          {/* References sit *under* the music: the chords are why the reader
+              opened the song, and a wall of service buttons above them pushed
+              the first verse off a phone. */}
+          {hasResources ? (
+            <View style={styles.resources}>
+              {resourceAttachments.length > 0 ? (
+                <View style={styles.resourceBlock}>
+                  <AppText variant="label" tone="faint">
+                    {t("attachments.title")}
+                  </AppText>
+                  <SongAttachments attachments={resourceAttachments} />
+                </View>
+              ) : null}
+              {resourceLinks.length > 0 ? (
+                <View style={styles.resourceBlock}>
+                  <AppText variant="label" tone="faint">
+                    {t("songs.links")}
+                  </AppText>
+                  <SongLinks links={song.links} />
+                </View>
+              ) : null}
+            </View>
           ) : null}
 
           {/* Guests (roadmap #59) read the songbook; the rules deny them
@@ -1212,34 +1225,39 @@ export default function SongScreen() {
           ) : null}
 
           <View style={styles.footer}>
-            {song.tags.length > 0 ? (
-              <View style={styles.badges}>
-                {song.tags.map((tag) => (
-                  <Badge key={tag} label={tag} />
-                ))}
-              </View>
-            ) : null}
+            <View style={styles.footerInfo}>
+              {song.tags.length > 0 ? (
+                <View style={styles.badges}>
+                  {song.tags.map((tag) => (
+                    <Badge key={tag} label={tag} />
+                  ))}
+                </View>
+              ) : null}
 
-            {/* Derived from completed events (roadmap #34): "played N times ·
-                last played X events ago", straight from the setlists those
-                events already carry. */}
-            {usage ? (
-              <AppText variant="caption" tone="muted">
-                {`${t("songs.played", { count: usage.timesPlayed })} · ${
-                  usage.eventsAgo === 0
-                    ? t("songs.lastPlayedLatest")
-                    : t("songs.lastPlayedAgo", { count: usage.eventsAgo })
-                }`}
+              {/* Derived from completed events (roadmap #34): "played N times ·
+                  last played X events ago", straight from the setlists those
+                  events already carry. */}
+              {usage ? (
+                <AppText variant="caption" tone="muted">
+                  {`${t("songs.played", { count: usage.timesPlayed })} · ${
+                    usage.eventsAgo === 0
+                      ? t("songs.lastPlayedLatest")
+                      : t("songs.lastPlayedAgo", { count: usage.eventsAgo })
+                  }`}
+                </AppText>
+              ) : null}
+
+              <AppText variant="caption" tone="faint">
+                {t("songs.addedUpdated", {
+                  name: song.createdByName || t("songs.anAdmin"),
+                  when: formatRelativeTime(toDate(song.updatedAt)),
+                })}
               </AppText>
-            ) : null}
+            </View>
 
-            <AppText variant="caption" tone="faint">
-              {t("songs.addedUpdated", {
-                name: song.createdByName || t("songs.anAdmin"),
-                when: formatRelativeTime(toDate(song.updatedAt)),
-              })}
-            </AppText>
-
+            {/* A toolbar of small tiles instead of eleven text links: at the
+                end of a song the eye wants one place where the actions live,
+                and a tile reads as a control even before it is tapped. */}
             <View style={styles.footerActions}>
               <Pressable
                 onPress={toggleFavorite}
@@ -1251,11 +1269,16 @@ export default function SongScreen() {
                 style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
               >
                 {isFavorite(song.id) ? (
-                  <StarFilledIcon size={15} color={Theme.colors.primary} />
+                  <StarFilledIcon size={18} color={Theme.colors.primary} />
                 ) : (
-                  <StarIcon size={15} color={Theme.colors.textMuted} />
+                  <StarIcon size={18} color={Theme.colors.textMuted} />
                 )}
-                <AppText variant="caption" tone={isFavorite(song.id) ? "primary" : "muted"}>
+                <AppText
+                  variant="caption"
+                  tone={isFavorite(song.id) ? "primary" : "muted"}
+                  numberOfLines={2}
+                  style={styles.footerLinkText}
+                >
                   {t("songs.favorite")}
                 </AppText>
               </Pressable>
@@ -1266,8 +1289,8 @@ export default function SongScreen() {
                 accessibilityLabel={t("songs.addToCollectionA11y", { title: song.title })}
                 style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
               >
-                <LibraryIcon size={15} color={Theme.colors.textMuted} />
-                <AppText variant="caption" tone="muted">
+                <LibraryIcon size={18} color={Theme.colors.textMuted} />
+                <AppText variant="caption" tone="muted" numberOfLines={2} style={styles.footerLinkText}>
                   {t("songs.addToCollection")}
                 </AppText>
               </Pressable>
@@ -1278,8 +1301,8 @@ export default function SongScreen() {
                 accessibilityLabel={t("songs.copyA11y")}
                 style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
               >
-                <CopyIcon size={15} color={Theme.colors.textMuted} />
-                <AppText variant="caption" tone="muted">
+                <CopyIcon size={18} color={Theme.colors.textMuted} />
+                <AppText variant="caption" tone="muted" numberOfLines={2} style={styles.footerLinkText}>
                   {t("songs.copyLyrics")}
                 </AppText>
               </Pressable>
@@ -1290,8 +1313,8 @@ export default function SongScreen() {
                 accessibilityLabel={t("songs.exportChordProA11y")}
                 style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
               >
-                <ExportIcon size={15} color={Theme.colors.textMuted} />
-                <AppText variant="caption" tone="muted">
+                <ExportIcon size={18} color={Theme.colors.textMuted} />
+                <AppText variant="caption" tone="muted" numberOfLines={2} style={styles.footerLinkText}>
                   {t("songs.exportChordPro")}
                 </AppText>
               </Pressable>
@@ -1302,8 +1325,8 @@ export default function SongScreen() {
                 accessibilityLabel={t("songs.printA11y")}
                 style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
               >
-                <PrintIcon size={15} color={Theme.colors.textMuted} />
-                <AppText variant="caption" tone="muted">
+                <PrintIcon size={18} color={Theme.colors.textMuted} />
+                <AppText variant="caption" tone="muted" numberOfLines={2} style={styles.footerLinkText}>
                   {t("songs.print")}
                 </AppText>
               </Pressable>
@@ -1314,8 +1337,8 @@ export default function SongScreen() {
                 accessibilityLabel={t("shares.shareA11y", { title: song.title })}
                 style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
               >
-                <ShareIcon size={15} color={Theme.colors.textMuted} />
-                <AppText variant="caption" tone="muted">
+                <ShareIcon size={18} color={Theme.colors.textMuted} />
+                <AppText variant="caption" tone="muted" numberOfLines={2} style={styles.footerLinkText}>
                   {t("shares.title")}
                 </AppText>
               </Pressable>
@@ -1328,8 +1351,8 @@ export default function SongScreen() {
                 accessibilityLabel={t("deepLinks.copyA11y", { title: song.title })}
                 style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
               >
-                <LinkIcon size={15} color={Theme.colors.textMuted} />
-                <AppText variant="caption" tone="muted">
+                <LinkIcon size={18} color={Theme.colors.textMuted} />
+                <AppText variant="caption" tone="muted" numberOfLines={2} style={styles.footerLinkText}>
                   {t("deepLinks.copyLink")}
                 </AppText>
               </Pressable>
@@ -1344,8 +1367,8 @@ export default function SongScreen() {
                     accessibilityLabel={t("songs.historyA11y", { title: song.title })}
                     style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
                   >
-                    <ClockIcon size={15} color={Theme.colors.textMuted} />
-                    <AppText variant="caption" tone="muted">
+                    <ClockIcon size={18} color={Theme.colors.textMuted} />
+                    <AppText variant="caption" tone="muted" numberOfLines={2} style={styles.footerLinkText}>
                       {t("songs.history")}
                     </AppText>
                   </Pressable>
@@ -1363,8 +1386,8 @@ export default function SongScreen() {
                       pressed && styles.pressed,
                     ]}
                   >
-                    <CopyIcon size={15} color={Theme.colors.textMuted} />
-                    <AppText variant="caption" tone="muted">
+                    <CopyIcon size={18} color={Theme.colors.textMuted} />
+                    <AppText variant="caption" tone="muted" numberOfLines={2} style={styles.footerLinkText}>
                       {t("songs.duplicate")}
                     </AppText>
                   </Pressable>
@@ -1375,8 +1398,8 @@ export default function SongScreen() {
                     accessibilityLabel={t("songs.mergeA11y")}
                     style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
                   >
-                    <SwapIcon size={15} color={Theme.colors.textMuted} />
-                    <AppText variant="caption" tone="muted">
+                    <SwapIcon size={18} color={Theme.colors.textMuted} />
+                    <AppText variant="caption" tone="muted" numberOfLines={2} style={styles.footerLinkText}>
                       {t("songs.mergeWith")}
                     </AppText>
                   </Pressable>
@@ -1387,8 +1410,8 @@ export default function SongScreen() {
                     accessibilityLabel={t("songs.moveToTrash")}
                     style={({ pressed }) => [styles.footerLink, pressed && styles.pressed]}
                   >
-                    <TrashIcon size={15} color={Theme.colors.danger} />
-                    <AppText variant="caption" tone="danger">
+                    <TrashIcon size={18} color={Theme.colors.danger} />
+                    <AppText variant="caption" tone="danger" numberOfLines={2} style={styles.footerLinkText}>
                       {t("songs.moveToTrash")}
                     </AppText>
                   </Pressable>
@@ -1596,12 +1619,8 @@ const createStyles = () =>
       paddingHorizontal: Theme.spacing.s,
       paddingVertical: Theme.spacing.xs,
     },
-    setlistLineup: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: Theme.spacing.xs,
-      marginTop: Theme.spacing.xs,
-    },
+    resources: { gap: Theme.spacing.l },
+    resourceBlock: { gap: Theme.spacing.s },
     badges: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
     footer: {
       gap: Theme.spacing.m,
@@ -1609,13 +1628,22 @@ const createStyles = () =>
       borderTopWidth: 1,
       borderTopColor: Theme.colors.borderSoft,
     },
-    footerActions: { flexDirection: "row", flexWrap: "wrap", gap: Theme.spacing.xl },
+    footerInfo: { gap: 6 },
+    footerActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     footerLink: {
-      flexDirection: "row",
+      flexGrow: 1,
+      flexBasis: 70,
       alignItems: "center",
+      justifyContent: "center",
       gap: 6,
-      paddingVertical: 4,
+      paddingVertical: 10,
+      paddingHorizontal: 6,
+      borderRadius: Theme.radii.m,
+      borderWidth: 1,
+      borderColor: Theme.colors.borderSoft,
+      backgroundColor: Theme.colors.surface,
     },
+    footerLinkText: { textAlign: "center" },
     immersiveScroll: { flex: 1 },
     // Stage mode is capped to a readable width and centred, so the lyrics never
     // stretch across a wide viewport (web included) and the bar stays above them.
