@@ -10,7 +10,7 @@ import {
 } from "@/libs/bandBackup"
 import { exportTextFile } from "@/libs/exportFile"
 import { logActivity } from "@/services/activity"
-import { createPerformance, saveShowLog } from "@/services/performances"
+import { createPerformance, saveShowLog, saveShowNotes } from "@/services/performances"
 import { createSetlist, setSetlistTemplate } from "@/services/setlists"
 import { createSong } from "@/services/songs"
 
@@ -147,6 +147,20 @@ export const executeImportPlan = async (
       { announce: false },
     )
     if (show.showLog.length > 0) await saveShowLog(organizationId, newId, show.showLog)
+    // Night notes (#90) ride the same restore, with their song references
+    // re-anchored through the id map so the report still names the song; an
+    // unmapped id keeps its old value and simply reads as a note about the
+    // night, exactly like a show-log entry whose song is gone.
+    if (show.showNotes.length > 0) {
+      await saveShowNotes(
+        organizationId,
+        newId,
+        show.showNotes.map((note) => ({
+          ...note,
+          songId: songIdMap[note.songId] ?? note.songId,
+        })),
+      )
+    }
     done += 1
     onProgress(done, total)
   }

@@ -31,6 +31,23 @@ export interface ShowLogEntry {
 }
 
 /**
+ * One night note (roadmap #90): a quick line written while the show runs, or
+ * afterwards in the post-gig report, stamped with the song on screen and the
+ * time so the report has the context the show log cannot carry on its own
+ * ("PA died here", "the bride asked for this one").
+ */
+export interface ShowNote {
+  id: string
+  /** Song on screen when it was written; `""` for a note about the night. */
+  songId: string
+  /** Epoch ms — client time, so an offline note keeps its place. */
+  at: number
+  body: string
+  authorId: string
+  authorName: string
+}
+
+/**
  * The i18n keys for each mark (roadmap #45). Shared by the live strip and the
  * post-gig report so the two pickers can never spell an outcome differently —
  * the same "declared once" trick as `PERFORMANCE_TYPE_KEYS` below.
@@ -148,6 +165,14 @@ export interface Performance {
    * status tap can never clobber what the show recorded, and vice versa.
    */
   showLog: ShowLogEntry[]
+  /**
+   * Night notes (roadmap #90): a short, timestamped feed of what happened
+   * around the songs. Absent on every older document (reads back as no notes)
+   * and **not** part of `PerformanceInput` below — written only through
+   * `services/performances.ts#saveShowNotes` (its own field-level update), so
+   * the event form and every status tap can never clobber them.
+   */
+  showNotes: ShowNote[]
   /**
    * Who answered the event (roadmap #47): uid → RSVP. Absent on every older
    * document (reads back as no answers) and **not** part of `PerformanceInput`

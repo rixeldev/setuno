@@ -138,6 +138,11 @@ export const paths = {
     `organizations/${orgId}/performances/${id}/tasks`,
   performanceTask: (orgId: string, id: string, taskId: string) =>
     `organizations/${orgId}/performances/${id}/tasks/${taskId}`,
+  /** Discussion thread on one event (roadmap #90). */
+  performanceComments: (orgId: string, id: string) =>
+    `organizations/${orgId}/performances/${id}/comments`,
+  performanceComment: (orgId: string, id: string, commentId: string) =>
+    `organizations/${orgId}/performances/${id}/comments/${commentId}`,
   /** Date polls and one availability doc per voting member (roadmap #48). */
   datePolls: (orgId: string) => `organizations/${orgId}/datePolls`,
   datePoll: (orgId: string, pollId: string) => `organizations/${orgId}/datePolls/${pollId}`,

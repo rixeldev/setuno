@@ -36,6 +36,7 @@ import { exportPerformancesToIcs } from "@/libs/calendarExport"
 import { AttendanceCard } from "@/components/performances/AttendanceCard"
 import { canCollaborate } from "@/libs/membership"
 import { EventTasksCard } from "@/components/performances/EventTasksCard"
+import { EventCommentsCard } from "@/components/performances/EventCommentsCard"
 import { ShareSheet } from "@/components/shares/ShareSheet"
 import { useEventTasks } from "@/hooks/useEventTasks"
 import type { RelativeDayLabels } from "@/libs/format"
@@ -462,6 +463,21 @@ export default function PerformanceDetail() {
         <AppText variant="caption" tone="danger">
           {t("performances.cancelledChip")}
         </AppText>
+      ) : null}
+
+      {/* Roadmap #90: the band talks about the night right on the event. The
+          rules keep the thread to members, so a guest never opens the
+          listener at all (#59). */}
+      {profile && canCollaborate(role) ? (
+        <EventCommentsCard
+          organizationId={organizationId ?? ""}
+          performanceId={performance.id}
+          performanceName={performance.name}
+          currentUid={profile.uid}
+          isAdmin={isAdmin}
+          author={actor}
+          members={members}
+        />
       ) : null}
 
       {/* Anyone can open the post-gig report once a setlist is attached

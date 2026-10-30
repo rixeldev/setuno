@@ -10,11 +10,13 @@ import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
 import {
   CheckCircleIcon,
   PauseIcon,
+  PencilIcon,
   PlayFilledIcon,
   StopwatchIcon,
   TargetIcon,
 } from "@/components/ui/Icons"
 import { ShowOutcomeSheet } from "@/components/performances/ShowOutcomeSheet"
+import { ShowNoteDialog } from "@/components/performances/ShowNoteDialog"
 import {
   useLiveShow,
   startLiveShow,
@@ -23,11 +25,15 @@ import {
   endBreak,
   markShowSong,
 } from "@/hooks/useReaderSession"
+import { useShowNotes } from "@/hooks/useShowNotes"
+import { useToast } from "@/components/ui/Toast"
+import { appendShowNote } from "@/libs/showNotes"
+import { toFriendlyError } from "@/services/errors"
 import { breakRemainingSec, formatClock, liveProgressRatio, scheduleDeltaSec } from "@/libs/liveShow"
 import { showEntryFor } from "@/libs/showLog"
 import { SHOW_OUTCOME_KEYS } from "@/interfaces/performance"
 import type { LiveSetEntry } from "@/libs/liveShow"
-import type { ShowLogEntry } from "@/interfaces/performance"
+import type { ShowLogEntry, ShowNote } from "@/interfaces/performance"
 
 interface LiveShowBarProps {
   /** Setlist being played; must match the one the show was started from. */
@@ -40,6 +46,15 @@ interface LiveShowBarProps {
   estimatedSec: number
   /** The event's stored log, seeded into the session when the show starts. */
   seedLog: readonly ShowLogEntry[]
+  /** The event's stored night notes (roadmap #90); the strip appends to them. */
+  showNotes: readonly ShowNote[]
+  /** Event the set belongs to — where a note written here is stored. */
+  performanceId: string
+  organizationId: string
+  /** A guest reads the night but never writes to it (roadmap #59). */
+  canWrite: boolean
+  /** Who is writing, so the post-gig report can attribute the note. */
+  author: { id: string; name: string }
 }
 
 /** Break lengths offered in the picker, in minutes. */
@@ -58,7 +73,10 @@ const BREAK_MINUTES = [5, 10, 15, 20]
  * row of captions plus its icon actions, painted straight onto the reader's own
  * background with a single hairline under it — break and stop while the show
  * runs, and since #45 a third (mark, tinted by the song's outcome) whose sheet
- * is the only thing that ever opens over it. Everything that used to justify a
+ * is the only thing that ever opens over it. Since #90 a pencil sits beside the
+ * mark: it writes a timestamped **night note** stamped with the song on the
+ * clock, so the post-gig report has the context the log cannot carry. Everything
+ * that used to justify a
  * second row is folded in or dropped: the labelled stats block is now inline
  * captions, and the estimate and remaining time are gone — the delta already
  * tells the band whether it is running late, which is the only thing either of
@@ -79,10 +97,17 @@ export function LiveShowBar({
   index,
   estimatedSec,
   seedLog,
+  showNotes,
+  performanceId,
+  organizationId,
+  canWrite,
+  author,
 }: LiveShowBarProps) {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
   const show = useLiveShow()
+  const toast = useToast()
+  const { notes, save } = useShowNotes(organizationId, performanceId, showNotes)
 
   const running = show.setlistId === setlistId && show.startedAt !== null
   // A break only belongs to the show it was started in.
@@ -100,6 +125,10 @@ export function LiveShowBar({
 
   const [breakOpen, setBreakOpen] = useState(false)
   const [markOpen, setMarkOpen] = useState(false)
+  // Roadmap #90: the quick night note, written without leaving the song.
+  const [noteOpen, setNoteOpen] = useState(false)
+  const [noteDraft, setNoteDraft] = useState("")
+  const [savingNote, setSavingNote] = useState(false)
 
   const breakLeft = breakRemainingSec(showBreak, now)
   const elapsedSec = running && show.startedAt ? (now - show.startedAt) / 1000 : 0
@@ -125,6 +154,35 @@ export function LiveShowBar({
   const pickBreak = (minutes: number): void => {
     startBreak(minutes * 60)
     setBreakOpen(false)
+  }
+
+  // A note written mid-show is stamped with the song on the clock, so the
+  // post-gig report reads "this happened during that one" without the member
+  // having to say which song it was. Before the show starts there is no song to
+  // pin it to and the note is about the night.
+  const writeNote = async (): Promise<void> => {
+    setSavingNote(true)
+    try {
+      await save(
+        appendShowNote(
+          notes,
+          {
+            songId: running ? (entries[index]?.songId ?? "") : "",
+            body: noteDraft,
+            authorId: author.id,
+            authorName: author.name,
+          },
+          Date.now(),
+        ),
+      )
+      setNoteOpen(false)
+      setNoteDraft("")
+      toast.showSuccess(t("performances.showNoteSaved"))
+    } catch (error) {
+      toast.showError(toFriendlyError(error, t("performances.couldNotSaveNotes")))
+    } finally {
+      setSavingNote(false)
+    }
   }
 
   // The delta is the one number the band acts on, so it is the only thing in
@@ -212,7 +270,7 @@ export function LiveShowBar({
           <IconButton
             label={t("liveShow.startBreakA11y")}
             variant="ghost"
-            size={30}
+            size={28}
             disabled={!running}
             onPress={() => setBreakOpen(true)}
             icon={<StopwatchIcon size={15} color={Theme.colors.textMuted} />}
@@ -230,7 +288,7 @@ export function LiveShowBar({
                 : t("liveShow.markA11y")
             }
             variant="ghost"
-            size={30}
+            size={28}
             onPress={() => setMarkOpen(true)}
             icon={
               <TargetIcon
@@ -247,11 +305,26 @@ export function LiveShowBar({
           />
         ) : null}
 
+        {/* Roadmap #90: one tap writes a night note — timestamped and stamped
+            with the song on the clock — without leaving the song. It sits with
+            the marks because that is where the band already is mid-show. A
+            guest reads the night but the rules deny the write, so the door is
+            shut for them (#59). */}
+        {canWrite ? (
+          <IconButton
+            label={t("liveShow.noteA11y")}
+            variant="ghost"
+            size={28}
+            onPress={() => setNoteOpen(true)}
+            icon={<PencilIcon size={15} color={Theme.colors.textMuted} />}
+          />
+        ) : null}
+
         {running ? (
           <IconButton
             label={t("liveShow.stop")}
             variant="ghost"
-            size={30}
+            size={28}
             onPress={stop}
             icon={<PauseIcon size={15} color={Theme.colors.textMuted} />}
           />
@@ -259,7 +332,7 @@ export function LiveShowBar({
           <IconButton
             label={startLabel}
             variant="secondary"
-            size={30}
+            size={28}
             onPress={start}
             icon={<PlayFilledIcon size={15} color={Theme.colors.primary} />}
           />
@@ -272,6 +345,16 @@ export function LiveShowBar({
         songTitle={entries[index]?.title ?? ""}
         outcome={currentEntry?.outcome ?? null}
         onSelect={(outcome) => markShowSong(setlistId, outcome)}
+      />
+
+      <ShowNoteDialog
+        visible={noteOpen}
+        songTitle={running ? (entries[index]?.title ?? "") : ""}
+        value={noteDraft}
+        onChangeText={setNoteDraft}
+        onClose={() => setNoteOpen(false)}
+        onSave={() => void writeNote()}
+        saving={savingNote}
       />
 
       <BottomSheet
@@ -307,7 +390,7 @@ const createStyles = () =>
     row: {
       flexDirection: "row",
       alignItems: "center",
-      gap: Theme.spacing.s,
+      gap: Theme.spacing.xs,
       paddingHorizontal: Theme.spacing.m,
       paddingVertical: Theme.spacing.xs,
     },

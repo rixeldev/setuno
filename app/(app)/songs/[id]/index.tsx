@@ -121,7 +121,7 @@ import {
 } from "@/libs/readerState"
 import { READER_TOUR } from "@/libs/onboarding"
 import { toDate } from "@/interfaces/timestamp"
-import type { ShowLogEntry, UserPreferences } from "@/interfaces"
+import type { ShowLogEntry, ShowNote, UserPreferences } from "@/interfaces"
 import { songLyricsText, sectionLabelFor } from "@/libs/songUtils"
 import { serializeChordPro } from "@/libs/chordpro"
 import { exportTextFile } from "@/libs/exportFile"
@@ -134,6 +134,9 @@ import * as Clipboard from "expo-clipboard"
 
 /** Stable empty log for readers of songs that are not part of any event. */
 const EMPTY_SHOW_LOG: ShowLogEntry[] = []
+
+/** Stable empty feed for events that never had a night note written. */
+const EMPTY_SHOW_NOTES: ShowNote[] = []
 
 /**
  * Song reader / performance view (docs §12).
@@ -247,6 +250,13 @@ export default function SongScreen() {
   const liveEstimated = useMemo(
     () => (eventSetlist ? eventSetlist.estimatedDurationSec || liveTotalSec(liveEntries) : 0),
     [eventSetlist, liveEntries],
+  )
+
+  // Who writes a night note from the strip (roadmap #90): the profile the app
+  // already has, so the report can attribute the line to somebody.
+  const noteAuthor = useMemo(
+    () => ({ id: profile?.uid ?? "", name: profile?.displayName || "An admin" }),
+    [profile],
   )
 
   // Show log (roadmap #45): while a show runs for this setlist, arriving at a
@@ -1000,6 +1010,11 @@ export default function SongScreen() {
             index={liveIndex}
             estimatedSec={liveEstimated}
             seedLog={livePerformance?.showLog ?? EMPTY_SHOW_LOG}
+            showNotes={livePerformance?.showNotes ?? EMPTY_SHOW_NOTES}
+            performanceId={livePerformance?.id ?? ""}
+            organizationId={livePerformance?.organizationId ?? ""}
+            canWrite={canCollaborate(role)}
+            author={noteAuthor}
           />
         ) : null}
         <ScrollView
@@ -1084,6 +1099,11 @@ export default function SongScreen() {
           index={liveIndex}
           estimatedSec={liveEstimated}
           seedLog={livePerformance?.showLog ?? EMPTY_SHOW_LOG}
+          showNotes={livePerformance?.showNotes ?? EMPTY_SHOW_NOTES}
+          performanceId={livePerformance?.id ?? ""}
+          organizationId={livePerformance?.organizationId ?? ""}
+          canWrite={canCollaborate(role)}
+          author={noteAuthor}
         />
       ) : null}
 

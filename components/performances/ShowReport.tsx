@@ -15,11 +15,15 @@ import { EmptyState, Skeleton } from "@/components/ui/States"
 import { useToast } from "@/components/ui/Toast"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { ShowOutcomeSheet } from "@/components/performances/ShowOutcomeSheet"
+import { ShowNotesCard } from "@/components/performances/ShowNotesCard"
 import { PencilIcon, TargetIcon } from "@/components/ui/Icons"
 import { saveShowLog } from "@/services/performances"
+import { useAuth } from "@/hooks/useAuth"
+import { useOrganization } from "@/hooks/useOrganization"
 import { toFriendlyError } from "@/services/errors"
 import { formatDuration, formatDurationLong } from "@/libs/format"
 import { formatClock } from "@/libs/liveShow"
+import { canCollaborate } from "@/libs/membership"
 import { buildShowReport, markShowOutcome, replaceShowNote } from "@/libs/showLog"
 import { SHOW_OUTCOME_KEYS } from "@/interfaces/performance"
 import type { ShowReportRow } from "@/libs/showLog"
@@ -52,10 +56,20 @@ export function ShowReport() {
   const performanceId = params.id ?? null
 
   const { performances, setlists, songLibrary, loading } = useOrgData()
+  const { profile } = useAuth()
+  const { isAdmin, role } = useOrganization()
   const performance = useMemo(
     () => performances.find((entry) => entry.id === performanceId) ?? null,
     [performances, performanceId],
   )
+  const actor = { id: profile?.uid ?? "", name: profile?.displayName || "An admin" }
+  // A note says which song it was about; the report resolves the title from the
+  // library it already has, so a renamed or trashed song still reads.
+  const songTitles = useMemo(() => {
+    const titles = new Map<string, string>()
+    for (const song of songLibrary.values()) titles.set(song.id, song.title)
+    return titles
+  }, [songLibrary])
 
   const storedLog = performance?.showLog ?? EMPTY_LOG
   const [draft, setDraft] = useState<{ id: string; entries: ShowLogEntry[] } | null>(null)
@@ -136,6 +150,16 @@ export function ShowReport() {
           title={t("performances.reportTitle")}
           message={t("performances.reportNoSetlist")}
         />
+        <ShowNotesCard
+          organizationId={performance.organizationId}
+          performanceId={performance.id}
+          storedNotes={performance.showNotes}
+          songTitles={songTitles}
+          currentUid={profile?.uid ?? ""}
+          isAdmin={isAdmin}
+          canWrite={canCollaborate(role)}
+          author={actor}
+        />
       </ScreenContainer>
     )
   }
@@ -167,6 +191,17 @@ export function ShowReport() {
           </AppText>
         ) : null}
       </Card>
+
+      <ShowNotesCard
+        organizationId={performance.organizationId}
+        performanceId={performance.id}
+        storedNotes={performance.showNotes}
+        songTitles={songTitles}
+        currentUid={profile?.uid ?? ""}
+        isAdmin={isAdmin}
+        canWrite={canCollaborate(role)}
+        author={actor}
+      />
 
       {report.groups.map((group) => (
         <Card key={group.id}>

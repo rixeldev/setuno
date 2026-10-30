@@ -60,6 +60,7 @@ const show = (overrides: Partial<Performance> = {}): Performance => ({
   status: "completed",
   type: "gig",
   showLog: [],
+  showNotes: [],
   attendance: {},
   liveShare: null,
   createdBy: "uid-1",

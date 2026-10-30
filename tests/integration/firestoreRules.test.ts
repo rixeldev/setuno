@@ -353,6 +353,207 @@ describe("the show log is a member-writable record (#45)", () => {
   })
 })
 
+describe("night notes are a member-writable record (#90)", () => {
+  const note = (body = "PA died on the solo") => ({
+    id: `note-${body.length}`,
+    songId: songId,
+    at: 1_760_000_000_000,
+    body,
+    authorId: "bob",
+    authorName: "bob",
+  })
+  const pathFor = (id: string) => `organizations/${orgId}/performances/${id}`
+
+  const seedNotedShow = async (): Promise<string> => {
+    const id = createId("show")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(pathFor(id)).set({
+        organizationId: orgId,
+        name: "Sala Sur",
+        date: "2026-10-13",
+        setlists: [],
+        venue: { name: "Sala Sur", address: "", notes: "" },
+        status: "completed",
+        type: "gig",
+      })
+    })
+    return id
+  }
+
+  it("lets a member write the notes and the updatedAt touch alone", async () => {
+    const id = await seedNotedShow()
+    await assertSucceeds(
+      bob().firestore().doc(pathFor(id)).update({ showNotes: [note()], updatedAt: new Date() }),
+    )
+  })
+
+  it("lets an admin write them through the whitelist", async () => {
+    const id = await seedNotedShow()
+    await assertSucceeds(
+      alice().firestore().doc(pathFor(id)).update({ showNotes: [note()], updatedAt: new Date() }),
+    )
+  })
+
+  it("still denies a member touching any other field", async () => {
+    const id = await seedNotedShow()
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(pathFor(id))
+        .update({ showNotes: [note()], name: "Renamed mid-show" }),
+    )
+  })
+
+  it("rejects notes that are not a list", async () => {
+    const id = await seedNotedShow()
+    await assertFails(
+      bob().firestore().doc(pathFor(id)).update({ showNotes: note(), updatedAt: new Date() }),
+    )
+  })
+
+  it("rejects a feed past the entry cap", async () => {
+    const id = await seedNotedShow()
+    const oversized = Array.from({ length: 201 }, (_, index) => note(`note ${index}`))
+    await assertFails(
+      bob().firestore().doc(pathFor(id)).update({ showNotes: oversized, updatedAt: new Date() }),
+    )
+  })
+
+  it("stops a guest writing a note", async () => {
+    const id = await seedNotedShow()
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`organizations/${orgId}/members/roger`).set({
+        uid: "roger",
+        displayName: "roger",
+        email: "roger@example.com",
+        photoURL: "",
+        role: "guest",
+        joinedAt: new Date(),
+        invitedBy: "alice",
+      })
+    })
+    await assertFails(
+      env
+        .authenticatedContext("roger")
+        .firestore()
+        .doc(pathFor(id))
+        .update({ showNotes: [note()], updatedAt: new Date() }),
+    )
+  })
+})
+
+describe("an event's thread is member-only and tombstones its comments (#90)", () => {
+  const pathFor = (id: string) => `organizations/${orgId}/performances/${id}`
+  const threadFor = (id: string) => `${pathFor(id)}/comments`
+
+  const seedEvent = async (): Promise<string> => {
+    const id = createId("show")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(pathFor(id)).set({
+        organizationId: orgId,
+        name: "Sala Sur",
+        date: "2026-10-13",
+        setlists: [],
+        venue: { name: "Sala Sur", address: "", notes: "" },
+        status: "scheduled",
+        type: "gig",
+      })
+    })
+    return id
+  }
+
+  const comment = (authorId: string, over: Record<string, unknown> = {}) => ({
+    body: "Who is driving?",
+    authorId,
+    authorName: authorId,
+    createdAt: new Date(),
+    deletedAt: null,
+    ...over,
+  })
+
+  const seedComment = async (id: string, authorId: string): Promise<string> => {
+    const commentId = createId("comment")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`${threadFor(id)}/${commentId}`).set(comment(authorId))
+    })
+    return commentId
+  }
+
+  it("lets a member post under their own name", async () => {
+    const id = await seedEvent()
+    await assertSucceeds(
+      bob()
+        .firestore()
+        .doc(`${threadFor(id)}/${createId("comment")}`)
+        .set(comment("bob")),
+    )
+  })
+
+  it("denies posting in somebody else's name", async () => {
+    const id = await seedEvent()
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(`${threadFor(id)}/${createId("comment")}`)
+        .set(comment("alice")),
+    )
+  })
+
+  it("pins the body limit as characters", async () => {
+    const id = await seedEvent()
+    const body = "á".repeat(1000)
+    await assertSucceeds(
+      bob()
+        .firestore()
+        .doc(`${threadFor(id)}/${createId("comment")}`)
+        .set(comment("bob", { body })),
+    )
+    await assertFails(
+      bob()
+        .firestore()
+        .doc(`${threadFor(id)}/${createId("comment")}`)
+        .set(comment("bob", { body: `${body}a` })),
+    )
+  })
+
+  it("lets the author tombstone their comment and nothing else", async () => {
+    const id = await seedEvent()
+    const commentId = await seedComment(id, "bob")
+    await assertFails(
+      bob().firestore().doc(`${threadFor(id)}/${commentId}`).update({ body: "Edited" }),
+    )
+    await assertSucceeds(
+      bob().firestore().doc(`${threadFor(id)}/${commentId}`).update({ deletedAt: new Date() }),
+    )
+  })
+
+  it("stops a plain member removing somebody else's comment, and lets an admin", async () => {
+    const id = await seedEvent()
+    const commentId = await seedComment(id, "alice")
+    await assertFails(bob().firestore().doc(`${threadFor(id)}/${commentId}`).delete())
+    await assertSucceeds(alice().firestore().doc(`${threadFor(id)}/${commentId}`).delete())
+  })
+
+  it("keeps the thread closed to guests", async () => {
+    const id = await seedEvent()
+    const commentId = await seedComment(id, "bob")
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`organizations/${orgId}/members/roger`).set({
+        uid: "roger",
+        displayName: "roger",
+        email: "roger@example.com",
+        photoURL: "",
+        role: "guest",
+        joinedAt: new Date(),
+        invitedBy: "alice",
+      })
+    })
+    const db = env.authenticatedContext("roger").firestore()
+    await assertFails(db.doc(`${threadFor(id)}/${commentId}`).get())
+    await assertFails(db.doc(`${threadFor(id)}/${createId("comment")}`).set(comment("roger")))
+  })
+})
+
 describe("event logistics: attendance and tasks (#47)", () => {
   const pathFor = (id: string) => `organizations/${orgId}/performances/${id}`
   const taskPathFor = (id: string) => `${pathFor(id)}/tasks`

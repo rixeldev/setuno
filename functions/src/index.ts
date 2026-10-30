@@ -351,6 +351,40 @@ export const onSuggestionCommentCreated = onDocumentCreated(
   },
 )
 
+/** New `@mention` in an event's thread (roadmap #90): the same parse and the
+ * same push type as a suggestion's comment (#58) — a mention is a mention, and
+ * the event's name rides in the payload's `songTitle` slot so the notification
+ * says where it happened. Members only: the rules keep guests out of this
+ * thread, so a handle they could never read must not ping. */
+export const onEventCommentCreated = onDocumentCreated(
+  "organizations/{organizationId}/performances/{performanceId}/comments/{commentId}",
+  async (event) => {
+    const comment = event.data?.data()
+    if (!comment || comment.deletedAt) return
+    const body = text(comment.body)
+    if (!body) return
+    const db = getFirestore()
+    const roster = await memberRoster(db, event.params.organizationId)
+    const authorId = text(comment.authorId)
+    const mentioned = extractMentionUids(body, roster).filter((uid) => uid !== authorId)
+    if (mentioned.length === 0) return
+    const performance = await db
+      .doc(`organizations/${event.params.organizationId}/performances/${event.params.performanceId}`)
+      .get()
+    await notifyUsers(
+      db,
+      mentioned,
+      "commentMentioned",
+      {
+        actorName: text(comment.authorName),
+        songTitle: text(performance.data()?.name),
+        bandName: await bandNameOf(db, event.params.organizationId),
+      },
+      event.params.organizationId,
+    )
+  },
+)
+
 /** Suggestion assigned (roadmap #58): the new assignee, once, and never the
  * member who claimed it for themselves. The rules pin the assignment to a
  * one-field update on a pending suggestion, so any `assigneeId` change here

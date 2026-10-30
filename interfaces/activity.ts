@@ -27,6 +27,7 @@ export type ActivityType =
   | "performance_created"
   | "performance_updated"
   | "performance_deleted"
+  | "performance_commented"
   /** One band-wide import run (#38) instead of N per-item events. */
   | "bulk_imported"
 

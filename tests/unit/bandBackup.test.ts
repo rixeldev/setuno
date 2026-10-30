@@ -88,6 +88,7 @@ const performance = (id: string, overrides: Partial<Performance> = {}): Performa
   status: "scheduled",
   type: "gig",
   showLog: [],
+  showNotes: [],
   attendance: {},
   liveShare: null,
   createdBy: "uid-1",
@@ -150,6 +151,7 @@ const backupPerformance = (id: string, name: string, date: string): BandBackupPe
   status: "scheduled",
   type: "gig",
   showLog: [],
+  showNotes: [],
 })
 
 describe("buildBandBackup / parseBandBackup", () => {
@@ -513,6 +515,7 @@ describe("remapSetlistForImport / remapPerformanceForImport", () => {
         status: "completed",
         type: "rehearsal",
         showLog: [],
+        showNotes: [],
       },
       { l1: "n9" },
     )

@@ -26,6 +26,7 @@ const performance = (id: string, overrides: Partial<Performance> = {}): Performa
   status: "scheduled",
   type: "gig",
   showLog: [],
+  showNotes: [],
   attendance: {},
   liveShare: null,
   createdBy: "uid-1",
@@ -83,7 +84,7 @@ describe("orderPerformancesAsc", () => {
     expect(orderPerformancesAsc(shows).map((show) => show.id)).toEqual(["old", "soon", "future"])
   })
 
-  it("breaks same-day ties by start time, then id — never by incoming order", () => {
+  it("breaks same-day ties by start time, then id ï¿½ never by incoming order", () => {
     const shows = [
       performance("b", { date: "2026-10-13", startTime: "20:00" }),
       performance("a", { date: "2026-10-13", startTime: "22:00" }),

@@ -789,23 +789,26 @@ service cloud.firestore {
         // Update: admins of this band (full edit) — the whitelist carries the
         // event fields plus `showLog`, the per-song outcome/time record that
         // the post-gig report writes (roadmap #45), `attendance`, the
-        // uid → RSVP map (roadmap #47), and `liveShare`, the public live
-        // setlist's link pointer (roadmap #57).
+        // uid → RSVP map (roadmap #47), `liveShare`, the public live
+        // setlist's link pointer (roadmap #57), and `showNotes`, the
+        // timestamped night notes the reader's strip appends (roadmap #90).
         //
-        // Members get three narrow carve-outs: writing `showLog` alone (plus
+        // Members get four narrow carve-outs: writing `showLog` alone (plus
         // the `updatedAt` touch that always rides a write) — whoever is
         // running the show marks songs from the reader even when they are not
         // an admin — writing `attendance` with **only their own key** changed,
         // one dot-path per member so two answers at once can never clobber
-        // each other, or pointing the event at its live share link (roadmap
+        // each other, pointing the event at its live share link (roadmap
         // #57) — publishing the band's setlist to fans is a band decision,
-        // not an admin job, exactly like #56's link minting. Operational data
-        // about the night, not an edit of the event: every other field stays
-        // admin-only.
+        // not an admin job, exactly like #56's link minting — or writing
+        // `showNotes` alone (#90), because a note is written mid-show by
+        // whoever is on stage. Operational data about the night, not an edit
+        // of the event: every other field stays admin-only.
         //
-        // Rules cannot iterate the list or the map, so the document-level
-        // shapes (list ≤ 500, map ≤ 100) are pinned here and each entry's
-        // contents are sanitized client-side in `libs/showLog.ts` and
+        // Rules cannot iterate the lists or the map, so the document-level
+        // shapes (show log ≤ 500, night notes ≤ 200, RSVP map ≤ 100) are
+        // pinned here and each entry's contents are sanitized client-side in
+        // `libs/showLog.ts`, `libs/showNotes.ts` and
         // `libs/eventLogistics.ts` — the annotations' `markers` precedent
         // exactly.
         allow update: if (isAdmin(organizationId)
@@ -813,11 +816,14 @@ service cloud.firestore {
                           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                             'name', 'date', 'endDate', 'startTime', 'endTime', 'venue', 'notes',
                             'setlists', 'status', 'type', 'updatedAt', 'showLog', 'attendance',
-                            'liveShare'
+                            'liveShare', 'showNotes'
                           ])
                           && (!('showLog' in request.resource.data)
                               || (request.resource.data.showLog is list
                                   && request.resource.data.showLog.size() <= 500))
+                          && (!('showNotes' in request.resource.data)
+                              || (request.resource.data.showNotes is list
+                                  && request.resource.data.showNotes.size() <= 200))
                           && (!('attendance' in request.resource.data)
                               || (request.resource.data.attendance is map
                                   && request.resource.data.attendance.size() <= 100))
@@ -828,6 +834,10 @@ service cloud.firestore {
                     .hasOnly(['showLog', 'updatedAt'])
                    && request.resource.data.showLog is list
                    && request.resource.data.showLog.size() <= 500)
+                  || (request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['showNotes', 'updatedAt'])
+                      && request.resource.data.showNotes is list
+                      && request.resource.data.showNotes.size() <= 200)
                   || (request.resource.data.diff(resource.data).affectedKeys()
                         .hasOnly(['attendance', 'updatedAt'])
                       && request.resource.data.attendance is map
@@ -876,6 +886,38 @@ service cloud.firestore {
             && request.resource.data.createdBy == resource.data.createdBy;
           allow delete: if isAdmin(organizationId)
             || resource.data.createdBy == request.auth.uid;
+        }
+
+        // The event's discussion thread (roadmap #90): the band talks about
+        // the night — call time, load-in, who is driving — right on the event.
+        // Same trust model as a suggestion's thread (#55), which this one
+        // mirrors line for line: members only (a guest reads the event but
+        // never its conversation, #59), one document per comment with the
+        // author's name denormalised, client-time `createdAt` so an offline
+        // comment keeps its place, and removal is a **tombstone** — the single
+        // `deletedAt` transition, by the author or an admin, irreversible — so
+        // the thread keeps its shape for everyone. Hard delete exists for one
+        // caller: `deletePerformance` cascading the thread away.
+        match /comments/{commentId} {
+          allow read: if isMember(organizationId);
+          allow create: if isMember(organizationId)
+            && request.resource.data.keys().hasOnly([
+              'body', 'authorId', 'authorName', 'createdAt', 'deletedAt'
+            ])
+            && request.resource.data.authorId == request.auth.uid
+            && request.resource.data.authorName is string
+            && request.resource.data.authorName.size() <= 80
+            && request.resource.data.body is string
+            && request.resource.data.body.size() > 0
+            && request.resource.data.body.size() <= 1000
+            && request.resource.data.createdAt is timestamp
+            && request.resource.data.deletedAt == null;
+          allow update: if (isSelf(resource.data.authorId) || isAdmin(organizationId))
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['deletedAt'])
+            && resource.data.deletedAt == null
+            && request.resource.data.deletedAt is timestamp;
+          allow delete: if isSelf(resource.data.authorId) || isAdmin(organizationId);
         }
       }
 

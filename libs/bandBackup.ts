@@ -7,6 +7,7 @@ import type {
   SetlistBlock,
   SetlistInput,
   ShowLogEntry,
+  ShowNote,
   Song,
   SongInput,
   Venue,
@@ -19,6 +20,7 @@ import { mapSongInput } from "@/libs/songMapper"
 import { normalizeSongLinks } from "@/libs/songLinks"
 import { normalizeRole } from "@/libs/membership"
 import { sanitizeShowLog } from "@/libs/showLog"
+import { sanitizeShowNotes } from "@/libs/showNotes"
 import { cleanBlocks } from "@/libs/setlistBlocks"
 
 /**
@@ -83,6 +85,8 @@ export interface BandBackupPerformance {
   status: Performance["status"]
   type: Performance["type"]
   showLog: ShowLogEntry[]
+  /** Roadmap #90's night notes — the same operational record as the log. */
+  showNotes: ShowNote[]
 }
 
 export interface BandBackupMember {
@@ -169,6 +173,7 @@ export const buildBandBackup = (input: BuildBandBackupInput): BandBackup => ({
     status: show.status,
     type: show.type,
     showLog: show.showLog,
+    showNotes: show.showNotes,
   })),
 })
 
@@ -279,6 +284,7 @@ const sanitizeBackupPerformance = (raw: unknown, index: number): BandBackupPerfo
     status: raw.status === "completed" || raw.status === "cancelled" ? raw.status : "scheduled",
     type: raw.type === "rehearsal" ? "rehearsal" : "gig",
     showLog: sanitizeShowLog(Array.isArray(raw.showLog) ? raw.showLog : []),
+    showNotes: sanitizeShowNotes(Array.isArray(raw.showNotes) ? raw.showNotes : []),
   }
 }
 

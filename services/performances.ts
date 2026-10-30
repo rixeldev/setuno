@@ -25,14 +25,17 @@ import type {
   PerformanceInput,
   PerformanceStatus,
   ShowLogEntry,
+  ShowNote,
 } from "@/interfaces"
 import { logActivity } from "@/services/activity"
 import { ValidationError } from "@/services/errors"
 import { ISO_DATE_PATTERN, TIME_PATTERN, toIsoDate } from "@/libs/validation"
 import { orderPerformancesAsc, performanceLastDay } from "@/libs/performances"
 import { sanitizeShowLog } from "@/libs/showLog"
+import { sanitizeShowNotes } from "@/libs/showNotes"
 import { mapAttendance } from "@/libs/eventLogistics"
 import { deleteEventTasks } from "@/services/eventLogistics"
+import { deleteEventComments } from "@/services/eventComments"
 
 const MAX_SETLISTS = 20
 
@@ -93,6 +96,8 @@ const mapPerformance = (data: Record<string, unknown>, id: string): Performance 
     // Roadmap #45: absent on every older document (reads back as no log), and
     // sanitized on the way in — the rules only pin the list shape.
     showLog: sanitizeShowLog(data.showLog),
+    // Roadmap #90: absent on every older document (reads back as no notes).
+    showNotes: sanitizeShowNotes(data.showNotes),
     // Roadmap #47: absent on every older document (no answers yet), and only
     // the caller's own key is ever written — the rules enforce exactly that.
     attendance: mapAttendance(data.attendance),
@@ -280,6 +285,25 @@ export const saveShowLog = async (
 }
 
 /**
+ * Writes an event's night notes (roadmap #90) as its own field-level update —
+ * like `saveShowLog`, `showNotes` is deliberately **not** part of
+ * `PerformanceInput`, so the event form can never clobber what the band wrote
+ * around the show. Callers pass the whole feed: the live strip appends one note
+ * and the post-gig report adds or removes one, and the last write wins. No
+ * activity event: notes happen mid-gig and the feed would be spam.
+ */
+export const saveShowNotes = async (
+  organizationId: string,
+  performanceId: string,
+  showNotes: readonly ShowNote[],
+): Promise<void> => {
+  await updateDoc(doc(firestore, paths.performance(organizationId, performanceId)), {
+    showNotes: sanitizeShowNotes(showNotes),
+    updatedAt: serverTimestamp(),
+  })
+}
+
+/**
  * Points an event at the share link its fans follow live (roadmap #57), or
  * clears it with `null` — its own field-level update, exactly like
  * `saveShowLog`: `LiveShare` is deliberately **not** part of
@@ -306,10 +330,11 @@ export const deletePerformance = async (
 ): Promise<void> => {
   const uid = requireUserId()
   const performance = await fetchPerformance(organizationId, performanceId)
-  // Firestore does not cascade subcollections: drop the event's tasks first
-  // (best-effort inside — leftover docs are unreachable once the event is
-  // gone, exactly like the version history's cleanup).
+  // Firestore does not cascade subcollections: drop the event's tasks and its
+  // comment thread first (best-effort inside — leftover docs are unreachable
+  // once the event is gone, exactly like the version history's cleanup).
   await deleteEventTasks(organizationId, performanceId)
+  await deleteEventComments(organizationId, performanceId)
   await deleteDoc(doc(firestore, paths.performance(organizationId, performanceId)))
 
   void logActivity({
