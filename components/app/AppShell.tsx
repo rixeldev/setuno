@@ -1,6 +1,6 @@
 import React, { useEffect } from "react"
 import { Platform, StyleSheet, View } from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { usePathname } from "expo-router"
 
 import { useThemedStyles } from "@/hooks/useThemedStyles"
@@ -27,6 +27,7 @@ import { isFocusRoute } from "@/libs/navigation"
 export function AppShell({ children }: { children: React.ReactNode }) {
   const styles = useThemedStyles(createStyles)
   const { usesSidebar } = useResponsive()
+  const insets = useSafeAreaInsets()
   const pathname = usePathname()
   const focused = isFocusRoute(pathname)
   // On desktop the banner stays a dashboard detail (web renders nothing); the
@@ -67,7 +68,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return (
       <View style={styles.desktop}>
         {focused ? null : <SidebarNav />}
-        <View style={styles.desktopContent}>
+        {/* The system bars float over the app (edge-to-edge), so the content
+            pane is inset instead of painted underneath: on a landscape tablet
+            the status bar covered the header's actions and the navigation bar
+            covered the last row of every list, leaving them untappable. The
+            sidebar bleeds its own chrome into the status bar on purpose. */}
+        <View
+          style={[
+            styles.desktopContent,
+            {
+              paddingTop: insets.top,
+              paddingBottom: insets.bottom,
+              paddingRight: insets.right,
+            },
+          ]}
+        >
           <SyncBanner />
           {/* The body takes the remaining height so the ad (below) is pinned to
               the bottom of the viewport instead of floating after the content. */}
@@ -82,7 +97,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <View style={styles.mobile}>
-      <SafeAreaView style={styles.mobileContent} edges={["top", "left", "right"]}>
+      {/* The bottom edge is left to the tab bar (it carries its own inset), but
+          a focus route hides the bar — the reader's dock would otherwise sit
+          under the system navigation bar. */}
+      <SafeAreaView
+        style={[styles.mobileContent, focused ? { paddingBottom: insets.bottom } : null]}
+        edges={["top", "left", "right"]}
+      >
         <SyncBanner />
         {children}
       </SafeAreaView>
@@ -117,6 +138,7 @@ const createStyles = () =>
       ...Platform.select({ web: { minHeight: "100vh" as never }, default: {} }),
     },
     desktopContent: { flex: 1, minWidth: 0, flexDirection: "column" },
-    desktopBody: { flex: 1, minHeight: 0 },    mobile: { flex: 1 },
+    desktopBody: { flex: 1, minHeight: 0 },
+    mobile: { flex: 1 },
     mobileContent: { flex: 1 },
   })
