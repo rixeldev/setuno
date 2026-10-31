@@ -668,17 +668,23 @@ How it works:
 All four values go into the secret, and the agent publishes it:
 `firebase functions:secrets:set STRIPE_CONFIG` (one JSON blob) and `pnpm deploy:functions`.
 
-**The state right now**: the two Stripe prices exist and are active — **$3.99/monthly and
-$34.99/yearly** ✓ — the key, the webhook secret and the price ids are in **Secret Manager**
-(`STRIPE_CONFIG`) ✓, the four endpoints are deployed and `ACTIVE` ✓, and a Checkout session was
-opened against the real API to prove the whole path ✓ (it returns `checkout.stripe.com` with the
-right amount ✓). The Play prices, meanwhile, still read **$30.99/$340.99** through the Play
-Developer API even though the console shows $3.99 — a pending price change on Play's side, most
-likely. A purchase with a **license tester** account settles which number Play really charges ✓.
+**The state right now — the store path is verified end to end** ✓ (owner, 2026-10-31): a real
+purchase from a device through Play (a license-tester / internal-testing account) went through,
+`syncProPurchase` confirmed it against the Play Developer API and the **band's** entitlement landed,
+which is the one step that had never run against the real store. The price question is settled by
+the same purchase: what the store charges is whatever the Play Console holds — the Developer API's
+stale `$30.99/$340.99` read was a pending price change, not a second price.
 
-**The web cannot take the payment yet** (the store's company details are still being set up), so
-the plan screen there **disables the buy buttons** and points at the Android app instead — the plan
-follows the **account**, so buying it on Android turns the web into Pro too ✓.
+On the web the two Stripe prices exist and are active — **$3.99/monthly and $34.99/yearly** ✓ — the
+key, the webhook secret and the price ids are in **Secret Manager** (`STRIPE_CONFIG`) ✓, the four
+endpoints are deployed and `ACTIVE` ✓, and a Checkout session was opened against the real API to
+prove the whole path ✓ (it returns `checkout.stripe.com` with the right amount ✓).
+
+**The web's buy buttons are still off** (the storefront's company details are still being set up),
+so the plan screen there points at the Android app instead — the plan follows the **band**, so
+buying it on Android turns the web Pro too ✓. The Stripe half is ready for the day those details
+land: `hooks/usePlanPurchase.web.ts` already opens Checkout through the callables, it is the
+screen's `disabled` that keeps the buttons shut.
 
 ### The tip
 
@@ -688,8 +694,11 @@ in as many words. There is no external payment link anywhere: the tip goes throu
 app already uses, and the server confirms it, consumes it (so it can be tipped again) and records
 that it happened. A tip never touches the plan, so a member who already has Pro keeps it.
 
-**Owner step**: create the one-time product `setuno_tip` in the Play Console with a fixed price (a
-store never takes a custom amount) and pick the amount.
+**The store product is live** ✓: `setuno_tip` exists in the Play Console with the exact id the app
+and the callable expect, its purchase option is `ACTIVE`, its four listings carry our texts and the
+price is already Play's charmed point. It rides the same confirmation the subscription proved on
+2026-10-31, and the server **consumes** it right after confirming, so it can be tipped again and
+Play never auto-refunds it.
 
 ### Sign in with Apple
 
