@@ -41,7 +41,6 @@ import { getDeviceLanguage } from "@/libs/deviceLanguage"
 import { PRIVACY_URL, TERMS_URL } from "@/libs/appLinks"
 import { LANGUAGE_NAMES, matchLanguage } from "@/libs/language"
 import { toFriendlyError } from "@/services/errors"
-import { pluralize } from "@/libs/format"
 
 interface RowProps {
   icon: React.ComponentType<{ size?: number; color?: string }>
@@ -215,7 +214,7 @@ export default function SettingsScreen() {
         <Row
           icon={GroupIcon}
           title={t("organizations.bands")}
-          subtitle={pluralize(organizations.length, "band")}
+          subtitle={t("organizations.bandsCount", { count: organizations.length })}
           onPress={() => router.push("/organizations")}
         />
       </Card>

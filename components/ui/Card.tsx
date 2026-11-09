@@ -10,6 +10,7 @@ import {
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
+import { webInteractionState } from "@/libs/interaction"
 
 interface CardProps {
   children: React.ReactNode
@@ -31,29 +32,30 @@ export function Card({
   padded = true,
 }: CardProps) {
   const styles = useThemedStyles(createStyles)
-  const content = (
-    <View
-      style={[
-        styles.card,
-        padded && styles.padded,
-        elevated && styles.elevated,
-        style,
-      ]}
-    >
-      {children}
-    </View>
-  )
+  const surface = [styles.card, padded && styles.padded, elevated && styles.elevated, style]
 
-  if (!onPress) return content
+  // A card that cannot be pressed is a plain surface. Only the pressable one
+  // gains a resting hover state and a keyboard ring (web; both read `false` on
+  // native), and it owns the card's own box now — one element instead of a
+  // wrapper whose child already looked like the card.
+  if (!onPress) return <View style={surface}>{children}</View>
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}
-      style={({ pressed }) => [pressed && styles.pressed]}
+      style={(state) => {
+        const { pressed, hovered, focused } = webInteractionState(state)
+        return [
+          surface,
+          pressed && styles.pressed,
+          hovered && styles.hovered,
+          focused && styles.focused,
+        ]
+      }}
     >
-      {content}
+      {children}
     </Pressable>
   )
 }
@@ -94,13 +96,18 @@ export function Chip({
       accessibilityState={{ selected, disabled }}
       disabled={disabled || !onPress}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        size === "sm" && styles.chipSmall,
-        toneStyle,
-        pressed && onPress ? styles.pressed : null,
-        style,
-      ]}
+      style={(state) => {
+        const { pressed, hovered, focused } = webInteractionState(state)
+        return [
+          styles.chip,
+          size === "sm" && styles.chipSmall,
+          toneStyle,
+          pressed && onPress ? styles.pressed : null,
+          hovered && onPress && !disabled ? styles.chipHovered : null,
+          focused ? styles.focused : null,
+          style,
+        ]
+      }}
     >
       {icon}
       <AppText
@@ -202,6 +209,14 @@ const createStyles = () =>
     padded: { padding: Theme.spacing.l },
     elevated: { ...Theme.shadows.sm },
     pressed: { opacity: 0.75 },
+    /** Resting pointer state for a pressable card (web). */
+    hovered: {
+      borderColor: Theme.colors.border,
+      backgroundColor: Theme.colors.surfaceHigh,
+    },
+    /** Keyboard focus ring: the theme accent on the edge the card already has. */
+    focused: { borderColor: Theme.colors.primary },
+    chipHovered: { opacity: 0.9 },
     chip: {
       flexDirection: "row",
       alignItems: "center",

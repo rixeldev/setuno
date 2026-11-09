@@ -26,8 +26,8 @@ import type { SharedSetlistPayload, SharedSongPayload } from "@/functions/src/sh
 type Phase = "loading" | "ready" | "gone" | "failed"
 
 /** `yyyy-mm-dd` renders as a readable date; anything else rides through as-is. */
-const dateText = (date: string): string =>
-  /^\d{4}-\d{2}-\d{2}$/.test(date) ? formatDate(new Date(date)) : date
+const dateText = (date: string, locale: string): string =>
+  /^\d{4}-\d{2}-\d{2}$/.test(date) ? formatDate(new Date(date), locale) : date
 
 /**
  * The share link itself (roadmap #56): a read-only public page, deliberately
@@ -47,7 +47,7 @@ export default function ShareScreen() {
   const tokenValue = Array.isArray(params.token) ? params.token[0] : params.token
   const token = typeof tokenValue === "string" ? tokenValue : ""
 
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const prefs = usePreferences()
   const { isMobile, contentMaxWidth } = useResponsive()
   const styles = useThemedStyles(createStyles)
@@ -216,7 +216,7 @@ export default function ShareScreen() {
             ) : null}
             {setlist.date ? (
               <AppText variant="caption" tone="muted">
-                {dateText(setlist.date)}
+                {dateText(setlist.date, i18n.language)}
               </AppText>
             ) : null}
             {sharedSetlistRows(setlist).map((row, index) =>

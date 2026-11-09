@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next"
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { useBottomChromeHeight } from "@/hooks/useBottomChrome"
+import { useReducedMotion } from "@/hooks/useReducedMotion"
 import { CheckIcon, CloseIcon, InfoIcon } from "@/components/ui/Icons"
 import { hapticError, hapticSuccess, hapticTap } from "@/libs/haptics"
 
@@ -22,6 +23,17 @@ interface ToastContextValue {
   showToast: (message: string, kind?: ToastKind) => void
   showSuccess: (message: string) => void
   showError: (message: string) => void
+  /**
+   * Snackbar with one action beside the message ("Undo", "Retry"). It stays up
+   * twice as long as a plain toast, because it is the only way back from an
+   * action that already happened.
+   */
+  showAction: (
+    message: string,
+    actionLabel: string,
+    onPress: () => void,
+    kind?: ToastKind,
+  ) => void
 }
 
 interface ToastStateValue {
@@ -73,6 +85,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       showToast,
       showSuccess: (message: string) => showToast(message, "success"),
       showError: (message: string) => showToast(message, "error"),
+      showAction: (message, actionLabel, onPress, kind = "info") =>
+        showToast(message, kind, { label: actionLabel, onPress }),
     }),
     [showToast],
   )
@@ -112,16 +126,22 @@ function ToastSnackbar({ toast, onDismiss }: { toast: ToastItem; onDismiss: () =
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const chrome = useBottomChromeHeight()
+  const reducedMotion = useReducedMotion()
   const progress = useState(() => new Animated.Value(0))[0]
 
   useEffect(() => {
+    if (reducedMotion) {
+      // No travel: the snackbar is simply there, fully opaque.
+      progress.setValue(1)
+      return
+    }
     Animated.spring(progress, {
       toValue: 1,
       useNativeDriver: Platform.OS !== "web",
       damping: 18,
       stiffness: 180,
     }).start()
-  }, [progress, toast.id])
+  }, [progress, toast.id, reducedMotion])
 
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [24, 0] })
   // Resolved per render so a theme switch repaints the snackbar too.

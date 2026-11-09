@@ -22,7 +22,7 @@ import { acceptSuggestion, rejectSuggestion, setSuggestionAssignee } from "@/ser
 import { canCollaborate } from "@/libs/membership"
 import { toFriendlyError } from "@/services/errors"
 import { logFunnelEvent } from "@/services/telemetry"
-import { formatRelativeTime } from "@/libs/format"
+import { formatRelativeTimeLocalized } from "@/libs/format"
 import { diffChordLine, diffWords } from "@/libs/songDiff"
 import { FUNNEL_EVENTS } from "@/libs/telemetry"
 import { DiffText } from "@/components/ui/DiffText"
@@ -43,7 +43,7 @@ const TYPE_LABEL_KEYS: Record<string, string> = {
  * songbook) or reject with a note; authors can withdraw their own request.
  */
 export default function SuggestionDetail() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
   const toast = useToast()
@@ -199,7 +199,7 @@ export default function SuggestionDetail() {
 
         <AppText variant="caption" tone="faint">
           {t("suggestions.author", { name: suggestion.authorName })} ·{" "}
-          {formatRelativeTime(toDate(suggestion.createdAt))}
+          {formatRelativeTimeLocalized(toDate(suggestion.createdAt), t, i18n.language)}
         </AppText>
 
         {suggestion.reviewedAt ? (
@@ -207,7 +207,7 @@ export default function SuggestionDetail() {
             {t("suggestions.reviewedStatus", {
               status: t(`suggestions.${suggestion.status}`),
               name: suggestion.reviewedByName || t("common.unknownAdmin"),
-              time: formatRelativeTime(toDate(suggestion.reviewedAt)),
+              time: formatRelativeTimeLocalized(toDate(suggestion.reviewedAt), t, i18n.language),
             })}
           </AppText>
         ) : null}

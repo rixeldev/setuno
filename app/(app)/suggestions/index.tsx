@@ -14,7 +14,7 @@ import { ModalScreen } from "@/components/app/ModalScreen"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useOrgData } from "@/hooks/useOrgData"
-import { formatRelativeTime } from "@/libs/format"
+import { formatRelativeTimeLocalized } from "@/libs/format"
 import { toDate } from "@/interfaces/timestamp"
 import type { SuggestionStatus } from "@/interfaces"
 
@@ -36,7 +36,7 @@ const STATUS_TONES: Record<SuggestionStatus, "accent" | "success" | "danger"> = 
 
 /** Suggestion inbox: members track their requests, admins review them (docs §13, §15). */
 export default function SuggestionsScreen() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
   const { profile } = useAuth()
@@ -120,7 +120,8 @@ export default function SuggestionsScreen() {
                       {suggestion.songTitle || t("suggestions.newSong")}
                     </AppText>
                     <AppText variant="caption" tone="muted" numberOfLines={1}>
-                      {suggestion.authorName} · {formatRelativeTime(toDate(suggestion.createdAt))}
+                      {suggestion.authorName} ·{" "}
+                      {formatRelativeTimeLocalized(toDate(suggestion.createdAt), t, i18n.language)}
                       {assignee ? ` · ${t("suggestions.assignedToShort", { name: assignee })}` : ""}
                     </AppText>
                   </View>

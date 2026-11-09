@@ -10,7 +10,7 @@ import { Card, Chip } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
 import { EmptyState, Skeleton } from "@/components/ui/States"
 import { ModalScreen } from "@/components/app/ModalScreen"
-import { PlusIcon } from "@/components/ui/Icons"
+import { PollIcon, PlusIcon } from "@/components/ui/Icons"
 import { useOrganization } from "@/hooks/useOrganization"
 import { usePolls } from "@/hooks/useDatePolls"
 
@@ -32,6 +32,7 @@ export default function PollsList() {
 
       {!loading && polls.length === 0 ? (
         <EmptyState
+          icon={<PollIcon size={24} color={Theme.colors.primary} />}
           title={t("polls.empty")}
           message={t("polls.emptyHint")}
           actionLabel={t("polls.newPoll")}

@@ -10,8 +10,10 @@ import {
   formatDurationLong,
   formatRelativeDay,
   formatRelativeTime,
+  formatRelativeTimeLocalized,
   formatShortDate,
   formatTime,
+  dayStamp,
   initials,
   isSameDay,
   parseDurationInput,
@@ -214,5 +216,64 @@ describe("sorting", () => {
     const original = [...events]
     sortByDateDesc(events, (event) => event.at)
     expect(events).toEqual(original)
+  })
+})
+describe("localized relative time", () => {
+  // The real `t` resolves the bundle; this spy only proves which key and count
+  // the helper asked for, which is what a wrong bucket would break.
+  const t = (key: string, options?: { count?: number }): string =>
+    options?.count === undefined ? key : `${key}:${options.count}`
+  const ago = (minutes: number): Date => new Date(Date.now() - minutes * 60_000)
+  const ahead = (minutes: number): Date => new Date(Date.now() + minutes * 60_000)
+
+  it("picks the past bucket that matches the distance", () => {
+    expect(formatRelativeTimeLocalized(new Date(), t)).toBe("common.justNow")
+    expect(formatRelativeTimeLocalized(ago(30), t)).toBe("common.minutesAgo:30")
+    expect(formatRelativeTimeLocalized(ago(60 * 5), t)).toBe("common.hoursAgo:5")
+    expect(formatRelativeTimeLocalized(ago(60 * 24 * 3), t)).toBe("common.daysAgo:3")
+  })
+
+  it("knows what is still ahead", () => {
+    expect(formatRelativeTimeLocalized(ahead(20), t)).toBe("common.inMinutes:20")
+    expect(formatRelativeTimeLocalized(ahead(60 * 2), t)).toBe("common.inHours:2")
+    expect(formatRelativeTimeLocalized(ahead(60 * 24 * 4), t)).toBe("common.inDays:4")
+  })
+
+  it("hands anything past a month to the date, in the app's language", () => {
+    const old = ago(60 * 24 * 45)
+    const label = formatRelativeTimeLocalized(old, t, "es")
+    expect(label.startsWith("common.")).toBe(false)
+    expect(label).toContain(`${old.getFullYear()}`)
+  })
+
+  it("says nothing for a missing date", () => {
+    expect(formatRelativeTimeLocalized(null, t)).toBe("")
+    expect(formatRelativeTimeLocalized(undefined, t)).toBe("")
+  })
+})
+
+describe("localized calendar labels", () => {
+  const date = new Date(2026, 9, 4)
+
+  it("spells the month in the requested language", () => {
+    expect(formatDate(date, "en").toLowerCase()).toContain("october")
+    expect(formatDate(date, "es").toLowerCase()).toContain("octubre")
+    expect(formatShortDate(date, "es").toLowerCase()).toContain("oct")
+  })
+
+  it("keeps the bundled English table when no locale is known", () => {
+    expect(formatDate(date)).toBe("October 4, 2026")
+    expect(formatShortDate(date)).toBe("Oct 4")
+  })
+
+  it("localizes every piece of a date stamp", () => {
+    const stamp = dayStamp(date, "es")
+    expect(stamp.day).toBe("4")
+    expect(stamp.weekday.toLowerCase()).not.toBe("sun")
+    expect(stamp.month.toLowerCase()).toBe("oct")
+  })
+
+  it("keeps the placeholder for a missing date", () => {
+    expect(dayStamp(null)).toEqual({ weekday: "--", day: "--", month: "" })
   })
 })

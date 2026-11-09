@@ -13,6 +13,7 @@ import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { hapticTap } from "@/libs/haptics"
+import { webInteractionState } from "@/libs/interaction"
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "subtle"
 export type ButtonSize = "sm" | "md" | "lg"
@@ -68,15 +69,22 @@ export function Button({
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       disabled={isDisabled}
       onPress={handlePress}
-      style={({ pressed }) => [
-        styles.base,
-        { minHeight: HEIGHTS[size] },
-        styles[variant],
-        full && styles.full,
-        pressed && !isDisabled && styles.pressed,
-        isDisabled && styles.disabled,
-        style,
-      ]}
+      style={(state) => {
+        const { pressed, hovered, focused } = webInteractionState(state)
+        return [
+          styles.base,
+          { minHeight: HEIGHTS[size] },
+          styles[variant],
+          full && styles.full,
+          pressed && !isDisabled && styles.pressed,
+          // Web only: the pointer gets a resting state and the keyboard gets a
+          // ring. Both read `false` on native, so nothing changes there.
+          hovered && !isDisabled && styles[`hover_${variant}`],
+          focused && styles.focused,
+          isDisabled && styles.disabled,
+          style,
+        ]
+      }}
     >
       {loading ? (
         <ActivityIndicator
@@ -141,14 +149,19 @@ export function IconButton({
       onPress={onPress}
       hitSlop={Theme.hitSlop}
       testID={testID}
-      style={({ pressed }) => [
-        styles.iconButton,
-        { width: size, height: size },
-        styles[`iconButton_${variant}`],
-        pressed && !disabled && styles.pressed,
-        disabled && styles.disabled,
-        style,
-      ]}
+      style={(state) => {
+        const { pressed, hovered, focused } = webInteractionState(state)
+        return [
+          styles.iconButton,
+          { width: size, height: size },
+          styles[`iconButton_${variant}`],
+          pressed && !disabled && styles.pressed,
+          hovered && !disabled && styles[`iconHover_${variant}`],
+          focused && styles.iconFocused,
+          disabled && styles.disabled,
+          style,
+        ]
+      }}
     >
       {icon}
     </Pressable>
@@ -192,6 +205,15 @@ const createStyles = () =>
     },
     pressed: { opacity: Platform.OS === "web" ? 0.85 : 0.7 },
     disabled: { opacity: 0.45 },
+    // Keyboard focus ring (web). The text colour rather than the accent: the
+    // primary and danger variants already have an accent border, so an accent
+    // ring would be invisible exactly where it matters most.
+    focused: { borderColor: Theme.colors.text },
+    hover_primary: { opacity: 0.92 },
+    hover_danger: { opacity: 0.92 },
+    hover_secondary: { borderColor: Theme.colors.primary },
+    hover_ghost: { backgroundColor: Theme.colors.primarySoft },
+    hover_subtle: { backgroundColor: Theme.colors.primarySoft },
     icon: { marginHorizontal: 2 },
     iconButton: {
       alignItems: "center",
@@ -209,4 +231,8 @@ const createStyles = () =>
       backgroundColor: Theme.colors.dangerSoft,
       borderColor: "transparent",
     },
+    iconFocused: { borderColor: Theme.colors.primary },
+    iconHover_ghost: { backgroundColor: Theme.colors.surfaceHigh },
+    iconHover_secondary: { borderColor: Theme.colors.primary },
+    iconHover_danger: { opacity: 0.9 },
   })

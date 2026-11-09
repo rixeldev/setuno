@@ -653,6 +653,8 @@
     "chordsCount_other": "{{count}} accords",
     "linesCount_one": "{{count}} ligne",
     "linesCount_other": "{{count}} lignes",
+    "updatedAgo": "mise à jour {{when}}",
+    "showingOf": "{{shown}} sur {{total}}",
     "summary": "{{sections}} sections · {{lines}} lignes · {{chords}} accords",
     "removeFilter": "Retirer le filtre « {{filter}} »",
     "noFacetOptions": "Rien à filtrer pour l'instant.",

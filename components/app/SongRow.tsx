@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useMemo } from "react"
 import { StyleSheet, View } from "react-native"
 import { useTranslation } from "react-i18next"
 
@@ -7,7 +7,7 @@ import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { AppText } from "@/components/ui/AppText"
 import { Badge, Card } from "@/components/ui/Card"
 import { ChevronRightIcon, MusicIcon } from "@/components/ui/Icons"
-import { formatDuration, formatRelativeTime, pluralize } from "@/libs/format"
+import { formatDuration, formatRelativeTimeLocalized } from "@/libs/format"
 import { toDate } from "@/interfaces/timestamp"
 import { countSongChords, countSongLines, estimateDurationSec } from "@/libs/songUtils"
 import { SONG_STATUS_LABEL_KEYS } from "@/libs/songStatus"
@@ -27,20 +27,38 @@ interface SongRowProps {
 /** One song in a list: title, artist, key and quick stats (docs §19). */
 export function SongRow({ song, onPress, right, dense = false }: SongRowProps) {
   const styles = useThemedStyles(createStyles)
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   // Keys are stored in letters; the reader settings decide how they are spelled.
   const notation = usePreferences().chordNotation ?? "letters"
-  const duration = song.durationSec ?? (song.sections.length > 0 ? estimateDurationSec(song.sections) : null)
+  // Walking the sections for the caption is not free, and the songbook redraws
+  // every row on each keystroke: keep the counts on the song, not the render.
+  const stats = useMemo(() => {
+    const lines = countSongLines(song.sections)
+    const chords = countSongChords(song.sections)
+    const duration =
+      song.durationSec ?? (song.sections.length > 0 ? estimateDurationSec(song.sections) : null)
+    return { lines, chords, duration }
+  }, [song.sections, song.durationSec])
   const keyLabel = song.key ? displayKey(song.key, notation) : ""
   // `active` is the default and the overwhelming majority — only the two
   // exceptions earn a badge (roadmap #30).
   const statusLabel = song.status === "active" ? null : t(SONG_STATUS_LABEL_KEYS[song.status])
+  // One spoken sentence, built from the same labels the row shows: a Spanish
+  // screen reader used to read "by", "key" and "unknown" in English.
+  const accessibilityLabel = [
+    song.title,
+    song.artist ? `${t("songs.artist")}: ${song.artist}` : t("common.unknownArtist"),
+    keyLabel ? `${t("songs.key")}: ${keyLabel}` : null,
+    statusLabel,
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join(", ")
 
   return (
     <Card
       padded={false}
       onPress={onPress}
-      accessibilityLabel={`${song.title}${song.artist ? ` by ${song.artist}` : ""}, key ${keyLabel || "unknown"}${statusLabel ? `, ${statusLabel}` : ""}`}
+      accessibilityLabel={accessibilityLabel}
       style={dense ? styles.dense : undefined}
     >
       <View style={styles.row}>
@@ -60,16 +78,18 @@ export function SongRow({ song, onPress, right, dense = false }: SongRowProps) {
           </View>
 
           <AppText variant="caption" tone="muted" numberOfLines={1}>
-            {song.artist || "Unknown artist"}
+            {song.artist || t("common.unknownArtist")}
             {song.genre ? ` · ${song.genre}` : ""}
             {song.bpm ? ` · ${song.bpm} BPM` : ""}
           </AppText>
 
           {!dense ? (
             <AppText variant="caption" tone="faint" numberOfLines={1}>
-              {pluralize(countSongLines(song.sections), "line")} ·{" "}
-              {pluralize(countSongChords(song.sections), "chord")} · {formatDuration(duration)} · updated{" "}
-              {formatRelativeTime(toDate(song.updatedAt))}
+              {t("songs.linesCount", { count: stats.lines })} ·{" "}
+              {t("songs.chordsCount", { count: stats.chords })} · {formatDuration(stats.duration)} ·{" "}
+              {t("songs.updatedAgo", {
+                when: formatRelativeTimeLocalized(toDate(song.updatedAt), t, i18n.language),
+              })}
             </AppText>
           ) : null}
         </View>

@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next"
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
 import { useResponsive } from "@/hooks/useResponsive"
+import { useReducedMotion } from "@/hooks/useReducedMotion"
 import { AppText } from "@/components/ui/AppText"
 import { IconButton } from "@/components/ui/Button"
 import {
@@ -87,6 +88,7 @@ export function ReaderDock({
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
   const { gutter, contentMaxWidth } = useResponsive()
+  const reducedMotion = useReducedMotion()
 
   // Created once through the lazy initializer: a module-level value would be
   // shared by every reader on screen.
@@ -96,13 +98,15 @@ export function ReaderDock({
   useEffect(() => {
     Animated.timing(openProgress, {
       toValue: open ? 1 : 0,
-      duration: PANEL_MS,
+      // Reduced motion keeps the same end states (the panel still opens and the
+      // chevron still turns) and just skips the travel between them.
+      duration: reducedMotion ? 0 : PANEL_MS,
       easing: Easing.out(Easing.cubic),
       // Height cannot be driven from the native thread, so everything the same
       // value touches (the chevron included) stays on the JS driver.
       useNativeDriver: false,
     }).start()
-  }, [open, openProgress])
+  }, [open, openProgress, reducedMotion])
 
   // The hairline alone says the transport is alive and how far it has gone;
   // open, the full bar shows both, so repeating them would be the same

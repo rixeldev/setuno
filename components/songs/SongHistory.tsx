@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { useOrganization } from "@/hooks/useOrganization"
 import type { Song, SongInput, SongVersion } from "@/interfaces"
 import { toDate } from "@/interfaces/timestamp"
-import { formatRelativeTime } from "@/libs/format"
+import { formatRelativeTimeLocalized } from "@/libs/format"
 import { songVersionData, versionDiff } from "@/libs/songHistory"
 import { fetchSong, updateSong } from "@/services/songs"
 import { fetchVersions } from "@/services/songVersions"
@@ -44,7 +44,7 @@ interface HistoryState {
  */
 export function SongHistory({ songId, songTitle }: SongHistoryProps) {
   const styles = useThemedStyles(createStyles)
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const toast = useToast()
   const { organizationId, isAdmin } = useOrganization()
   const { profile } = useAuth()
@@ -93,7 +93,9 @@ export function SongHistory({ songId, songTitle }: SongHistoryProps) {
   }
 
   const selected = state.versions.find((version) => version.id === selectedId) ?? null
-  const selectedWhen = selected ? formatRelativeTime(toDate(selected.savedAt)) : ""
+  const selectedWhen = selected
+    ? formatRelativeTimeLocalized(toDate(selected.savedAt), t, i18n.language)
+    : ""
   // The song's current content, projected once: the diff of every expanded
   // row compares against this same value.
   const currentData: SongInput | null = state.current ? songVersionData(state.current) : null
@@ -140,7 +142,7 @@ export function SongHistory({ songId, songTitle }: SongHistoryProps) {
 
       {!state.loading && !state.error
         ? state.versions.map((version) => {
-            const when = formatRelativeTime(toDate(version.savedAt))
+            const when = formatRelativeTimeLocalized(toDate(version.savedAt), t, i18n.language)
             const isSelected = version.id === selectedId
             const diff = isSelected && currentData ? versionDiff(version.data, currentData) : null
             return (

@@ -505,6 +505,8 @@
     "chordsCount_other": "{{count}} acordes",
     "linesCount_one": "{{count}} línea",
     "linesCount_other": "{{count}} líneas",
+    "updatedAgo": "actualizada {{when}}",
+    "showingOf": "Mostrando {{shown}} de {{total}}",
     "summary": "{{sections}} secciones · {{lines}} líneas · {{chords}} acordes",
     "removeFilter": "Quitar el filtro «{{filter}}»",
     "noFacetOptions": "Todavía no hay nada por lo que filtrar.",

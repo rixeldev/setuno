@@ -44,10 +44,10 @@ export function PerformanceCard({ performance, onPress }: CardProps) {
       <View style={styles.row}>
         <View style={styles.dateBlock}>
           <AppText variant="caption" tone="muted">
-            {dayStamp(parseIsoDate(performance.date)).weekday}
+            {dayStamp(parseIsoDate(performance.date), i18n.language).weekday}
           </AppText>
           <AppText variant="subheading" tone="primary">
-            {dayStamp(parseIsoDate(performance.date)).day}
+            {dayStamp(parseIsoDate(performance.date), i18n.language).day}
           </AppText>
         </View>
 

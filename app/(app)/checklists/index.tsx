@@ -10,7 +10,7 @@ import { Card, Chip } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/States"
 import { ModalScreen } from "@/components/app/ModalScreen"
-import { PlusIcon } from "@/components/ui/Icons"
+import { CheckCircleIcon, PlusIcon } from "@/components/ui/Icons"
 import { useOrganization } from "@/hooks/useOrganization"
 import { useChecklists } from "@/hooks/useChecklists"
 import { CHECKLIST_KIND_KEYS } from "@/interfaces/checklist"
@@ -37,6 +37,7 @@ export default function ChecklistsList() {
 
       {!loading && !error && lists.length === 0 ? (
         <EmptyState
+          icon={<CheckCircleIcon size={24} color={Theme.colors.primary} />}
           title={t("checklists.empty")}
           message={t("checklists.emptyHint")}
           actionLabel={t("checklists.newChecklist")}

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react"
+import React, { useDeferredValue, useMemo, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { useRouter } from "expo-router"
 import { useTranslation } from "react-i18next"
@@ -12,7 +12,7 @@ import { Input, SearchInput } from "@/components/ui/Input"
 import { Dialog } from "@/components/ui/Dialog"
 import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
 import { EmptyState, ErrorState, SkeletonList } from "@/components/ui/States"
-import { FilterIcon, ImportIcon, PlusIcon, SaveIcon, SearchIcon, SortIcon, TrashIcon } from "@/components/ui/Icons"
+import { FilterIcon, ImportIcon, MusicIcon, PlusIcon, SaveIcon, SearchIcon, SortIcon, TrashIcon } from "@/components/ui/Icons"
 import { ScreenContainer } from "@/components/app/ScreenContainer"
 import { SongRow } from "@/components/app/SongRow"
 import { useToast } from "@/components/ui/Toast"
@@ -114,9 +114,18 @@ export default function SongsScreen() {
     () => (filters.usage ? usagePassIds(songs, filters.usage, songUsage) : undefined),
     [songs, filters.usage, songUsage],
   )
+  // Typing stays instant: the field owns the immediate value, while the list
+  // renders the settled query at a lower priority. `filterSongs` is a whole-
+  // songbook pass, so deferring it is what keeps the keyboard from stuttering
+  // on a large library.
+  const settledSearch = useDeferredValue(filters.search)
+  const settledFilters = useMemo(
+    () => (settledSearch === filters.search ? filters : { ...filters, search: settledSearch }),
+    [filters, settledSearch],
+  )
   const results = useMemo(
-    () => sortSongs(filterSongs(songs, filters, favoriteSet, usagePass), sort),
-    [songs, filters, favoriteSet, usagePass, sort],
+    () => sortSongs(filterSongs(songs, settledFilters, favoriteSet, usagePass), sort),
+    [songs, settledFilters, favoriteSet, usagePass, sort],
   )
   const activeCount = countActiveFilters(filters)
   const progression = filters.progression.trim()
@@ -282,6 +291,7 @@ export default function SongsScreen() {
         <SkeletonList count={5} height={82} />
       ) : songs.length === 0 ? (
         <EmptyState
+          icon={<MusicIcon size={26} color={Theme.colors.primary} />}
           title={t("songs.noSongs")}
           message={isAdmin ? t("songs.noSongsDescription") : t("songs.noLyricsMember")}
           actionLabel={isAdmin ? t("songs.addFirstSong") : undefined}
@@ -289,6 +299,7 @@ export default function SongsScreen() {
         />
       ) : results.length === 0 ? (
         <EmptyState
+          icon={<SearchIcon size={26} color={Theme.colors.primary} />}
           title={t("songs.noResults")}
           message={t("songs.noResultsDescription")}
           actionLabel={isFiltered(filters) ? t("songs.clearFilters") : undefined}
@@ -297,10 +308,9 @@ export default function SongsScreen() {
       ) : (
         <View style={styles.list}>
           <AppText variant="caption" tone="faint">
-            {t("organizations.songsCount", { count: results.length })}
-            {results.length !== songs.length
-              ? ` · ${t("organizations.songsCount", { count: songs.length })}`
-              : ""}
+            {results.length === songs.length
+              ? t("organizations.songsCount", { count: results.length })
+              : t("songs.showingOf", { shown: results.length, total: songs.length })}
           </AppText>
           {results.map((song) => (
             <SongRow key={song.id} song={song} onPress={() => router.push(`/songs/${song.id}`)} />

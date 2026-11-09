@@ -17,7 +17,7 @@ import { sanitizeCommentBody } from "@/libs/suggestionComments"
 import { canCollaborate } from "@/libs/membership"
 import { appendMention } from "@/functions/src/mentions"
 import { toFriendlyError } from "@/services/errors"
-import { formatRelativeTime } from "@/libs/format"
+import { formatRelativeTimeLocalized } from "@/libs/format"
 import { toDate } from "@/interfaces/timestamp"
 import type { CommentEntry, OrganizationMember } from "@/interfaces"
 
@@ -71,7 +71,7 @@ export function CommentThread({
   onSend,
   onDelete,
 }: CommentThreadProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const styles = useThemedStyles(createStyles)
   const toast = useToast()
 
@@ -155,7 +155,7 @@ export function CommentThread({
                 {comment.authorName}
               </AppText>
               <AppText variant="caption" tone="faint">
-                {formatRelativeTime(toDate(comment.createdAt))}
+                {formatRelativeTimeLocalized(toDate(comment.createdAt), t, i18n.language)}
               </AppText>
               {canRemove ? (
                 <IconButton

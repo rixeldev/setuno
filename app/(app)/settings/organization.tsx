@@ -27,7 +27,7 @@ import { toDate } from "@/interfaces/timestamp"
 
 /** Band settings (docs §31): rename, describe, logo, danger zone (admins only). */
 export default function OrganizationSettings() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const styles = useThemedStyles(createStyles)
   const router = useRouter()
   const toast = useToast()
@@ -237,7 +237,7 @@ export default function OrganizationSettings() {
         </AppText>
         <AppText variant="caption" tone="faint">
           {t("settings.createdRole", {
-            date: formatDate(toDate(organization?.createdAt ?? null)),
+            date: formatDate(toDate(organization?.createdAt ?? null), i18n.language),
             role: t(`organizations.${role ?? "member"}`).toLowerCase(),
           })}
         </AppText>

@@ -12,7 +12,7 @@ import { Dialog } from "@/components/ui/Dialog"
 import { Input } from "@/components/ui/Input"
 import { BottomSheet, SheetOptionRow } from "@/components/ui/BottomSheet"
 import { EmptyState, ErrorState, SkeletonList } from "@/components/ui/States"
-import { DotsIcon, PencilIcon, PlusIcon, TrashIcon } from "@/components/ui/Icons"
+import { DotsIcon, LibraryIcon, PencilIcon, PlusIcon, TrashIcon } from "@/components/ui/Icons"
 import { ModalScreen } from "@/components/app/ModalScreen"
 import { useToast } from "@/components/ui/Toast"
 import { useCollections } from "@/hooks/useCollections"
@@ -104,6 +104,7 @@ export default function CollectionsScreen() {
       ) : collections.length === 0 ? (
         error ? null : (
           <EmptyState
+            icon={<LibraryIcon size={24} color={Theme.colors.primary} />}
             title={t("collections.empty")}
             message={t("collections.emptyMessage")}
             actionLabel={t("collections.newCollection")}

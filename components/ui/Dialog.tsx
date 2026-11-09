@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
+import { useReducedMotion } from "@/hooks/useReducedMotion"
 import { AppText } from "@/components/ui/AppText"
 import { Button } from "@/components/ui/Button"
 import { CloseIcon } from "@/components/ui/Icons"
@@ -64,17 +65,24 @@ export function Dialog({
 }: DialogProps) {
   const styles = useThemedStyles(createStyles)
   const { t } = useTranslation()
+  const reducedMotion = useReducedMotion()
   const progress = useState(() => new Animated.Value(0))[0]
   const requestClose = dismissible ? onClose : undefined
 
   useEffect(() => {
+    if (reducedMotion) {
+      // The dialog still arrives (and leaves) in the right state; it just does
+      // not scale on the way.
+      progress.setValue(visible ? 1 : 0)
+      return
+    }
     Animated.spring(progress, {
       toValue: visible ? 1 : 0,
       useNativeDriver: Platform.OS !== "web",
       damping: 20,
       stiffness: 220,
     }).start()
-  }, [progress, visible])
+  }, [progress, visible, reducedMotion])
 
   const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] })
 
@@ -82,7 +90,7 @@ export function Dialog({
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType={reducedMotion ? "none" : "fade"}
       statusBarTranslucent
       onRequestClose={requestClose}
     >

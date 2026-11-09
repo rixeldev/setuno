@@ -48,7 +48,7 @@ export function ShareSheet({
   sourceId,
   title,
 }: ShareSheetProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const toast = useToast()
   const styles = useThemedStyles(createSheetStyles)
 
@@ -161,7 +161,7 @@ export function ShareSheet({
             </AppText>
             <AppText variant="caption" tone="faint">
               {link.expiresAt
-                ? t("shares.expiresOn", { date: formatDate(new Date(link.expiresAt)) })
+                ? t("shares.expiresOn", { date: formatDate(new Date(link.expiresAt), i18n.language) })
                 : t("shares.expiresNever")}
             </AppText>
             <View style={styles.actions}>

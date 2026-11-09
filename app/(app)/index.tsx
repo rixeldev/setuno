@@ -345,7 +345,7 @@ export default function Dashboard() {
         },
       ]
 
-  const stamp = nextShow ? dayStamp(parseIsoDate(nextShow.date)) : null
+  const stamp = nextShow ? dayStamp(parseIsoDate(nextShow.date), i18n.language) : null
   const nextSetlistLabel = nextShow ? setlistSummary(nextShow.setlists) : ""
   const bandName = organization?.name || t("dashboard.dashboard")
   // Long band names step down a size and wrap instead of showing an ellipsis.
@@ -594,7 +594,7 @@ export default function Dashboard() {
                   >
                     <View style={styles.stampSmall}>
                       <AppText variant="label" tone="primary">
-                        {dayStamp(parseIsoDate(performance.date)).day}
+                        {dayStamp(parseIsoDate(performance.date), i18n.language).day}
                       </AppText>
                     </View>
                     <View style={styles.flex}>

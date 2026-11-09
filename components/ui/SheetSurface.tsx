@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
 import {
   Animated,
   Modal,
@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
+import { useReducedMotion } from "@/hooks/useReducedMotion"
 import { ToastOverlay } from "@/components/ui/Toast"
 
 interface SheetSurfaceProps {
@@ -51,6 +52,7 @@ export function SheetSurface({
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
   const { height: windowHeight } = useWindowDimensions()
+  const reducedMotion = useReducedMotion()
   const centered = placement === "center" || (placement === "auto" && Platform.OS === "web")
   // Dialogs nudge a few pixels; sheets travel all the way in from off-screen.
   const closedOffset = centered ? 56 : Math.max(windowHeight, 320)
@@ -63,22 +65,35 @@ export function SheetSurface({
   // right here (the guarded render-phase sync React documents for props).
   if (visible && !mounted) setMounted(true)
 
+  /**
+   * Bring the panel to rest at the top of its travel. With motion reduced the
+   * spring is replaced by a zero-duration animation, so the sheet still lands
+   * where it belongs — it just does not travel.
+   */
+  const settleOpen = useCallback((): void => {
+    if (reducedMotion) {
+      Animated.timing(offset, { toValue: 0, duration: 0, useNativeDriver: nativeDriver }).start()
+      return
+    }
+    Animated.spring(offset, { toValue: 0, useNativeDriver: nativeDriver, ...SPRING }).start()
+  }, [offset, nativeDriver, reducedMotion])
+
   useEffect(() => {
     if (visible) {
       // Park the panel off-screen first (so the first frame never flashes open)
       // and let the spring carry it in.
       offset.setValue(closedOffset)
-      Animated.spring(offset, { toValue: 0, useNativeDriver: nativeDriver, ...SPRING }).start()
+      settleOpen()
       return
     }
     Animated.timing(offset, {
       toValue: closedOffset,
-      duration: 200,
+      duration: reducedMotion ? 0 : 200,
       useNativeDriver: nativeDriver,
     }).start(({ finished }) => {
       if (finished) setMounted(false)
     })
-  }, [visible, closedOffset, offset, nativeDriver])
+  }, [visible, closedOffset, offset, nativeDriver, reducedMotion, settleOpen])
 
   // The grabber follows the finger: dismiss past the threshold or with a quick
   // flick, otherwise spring back to open. The drag bookkeeping lives in the
@@ -99,20 +114,20 @@ export function SheetSurface({
         if (gesture.dy > DISMISS_DISTANCE || gesture.vy > DISMISS_VELOCITY) {
           Animated.timing(offset, {
             toValue: closedOffset,
-            duration: 220,
+            duration: reducedMotion ? 0 : 220,
             useNativeDriver: nativeDriver,
           }).start(({ finished }) => {
             if (finished) onClose()
           })
           return
         }
-        Animated.spring(offset, { toValue: 0, useNativeDriver: nativeDriver, ...SPRING }).start()
+        settleOpen()
       },
       onPanResponderTerminate: () => {
-        Animated.spring(offset, { toValue: 0, useNativeDriver: nativeDriver, ...SPRING }).start()
+        settleOpen()
       },
     })
-  }, [offset, closedOffset, nativeDriver, onClose])
+  }, [offset, closedOffset, nativeDriver, onClose, reducedMotion, settleOpen])
 
   const backdropOpacity = offset.interpolate({
     inputRange: [0, closedOffset],
@@ -130,7 +145,7 @@ export function SheetSurface({
       visible={mounted}
       transparent
       statusBarTranslucent
-      animationType="fade"
+      animationType={reducedMotion ? "none" : "fade"}
       onRequestClose={onClose}
     >
       <View style={[styles.host, centered && styles.hostCentered]}>

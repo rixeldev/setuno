@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 
 import { Theme } from "@/constants/Theme"
 import { useThemedStyles } from "@/hooks/useThemedStyles"
+import { useReducedMotion } from "@/hooks/useReducedMotion"
 import { AppText } from "@/components/ui/AppText"
 import { Button } from "@/components/ui/Button"
 
@@ -96,10 +97,13 @@ export function Skeleton({
   radius?: number
   style?: object
 }) {
+  const reducedMotion = useReducedMotion()
   const pulse = useState(() => new Animated.Value(0.6))[0]
 
   useEffect(() => {
-    if (getAnimationsDisabled()) return
+    // A placeholder that breathes is motion; either switch (the member's own
+    // preference or the OS setting) keeps it perfectly still.
+    if (reducedMotion) return
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
@@ -118,7 +122,7 @@ export function Skeleton({
     )
     loop.start()
     return () => loop.stop()
-  }, [pulse])
+  }, [pulse, reducedMotion])
 
   return (
     <Animated.View
@@ -162,10 +166,6 @@ export function SkeletonList({ count = 4, height = 92 }: { count?: number; heigh
     </View>
   )
 }
-
-const getAnimationsDisabled = (): boolean =>
-  typeof globalThis.matchMedia === "function" &&
-  globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches
 
 const createStyles = () =>
   StyleSheet.create({

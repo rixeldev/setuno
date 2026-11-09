@@ -61,7 +61,7 @@ export function InviteLinkSheet({
   organizationId,
   organizationName,
 }: InviteLinkSheetProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const toast = useToast()
   const styles = useThemedStyles(createSheetStyles)
 
@@ -188,7 +188,7 @@ export function InviteLinkSheet({
   const expiryCaption = (expiresAt: number | null): string =>
     expiresAt === null
       ? t("inviteLink.expiresNever")
-      : t("inviteLink.expiresOn", { date: formatDate(new Date(expiresAt)) })
+      : t("inviteLink.expiresOn", { date: formatDate(new Date(expiresAt), i18n.language) })
 
   return (
     <>

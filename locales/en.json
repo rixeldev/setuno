@@ -653,6 +653,8 @@
     "chordsCount_other": "{{count}} chords",
     "linesCount_one": "{{count}} line",
     "linesCount_other": "{{count}} lines",
+    "updatedAgo": "updated {{when}}",
+    "showingOf": "Showing {{shown}} of {{total}}",
     "summary": "{{sections}} sections · {{lines}} lines · {{chords}} chords",
     "removeFilter": "Remove “{{filter}}” filter",
     "noFacetOptions": "Nothing to filter by yet.",

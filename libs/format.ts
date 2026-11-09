@@ -56,19 +56,42 @@ export const startOfDay = (date: Date): Date =>
 export const isSameDay = (a: Date, b: Date): boolean =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 
-export const formatDate = (date: Date | null | undefined): string => {
+/**
+ * Long date in the app's language ("2 de octubre de 2026"). The English table
+ * is the fallback for engines without Intl; callers that know the active
+ * language pass it, so a Spanish UI never prints "October".
+ */
+export const formatDate = (date: Date | null | undefined, locale?: string): string => {
   if (!date) return "—"
+  if (locale) {
+    try {
+      return new Intl.DateTimeFormat(locale, {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }).format(date)
+    } catch {
+      // Fall through to the bundled English table.
+    }
+  }
   return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
 }
 
-export const formatShortDate = (date: Date | null | undefined): string => {
+export const formatShortDate = (date: Date | null | undefined, locale?: string): string => {
   if (!date) return "—"
+  if (locale) {
+    try {
+      return new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(date)
+    } catch {
+      // Fall through to the bundled English table.
+    }
+  }
   return `${SHORT_MONTHS[date.getMonth()]} ${date.getDate()}`
 }
 
-export const formatWeekday = (date: Date | null | undefined): string => {
+export const formatWeekday = (date: Date | null | undefined, locale?: string): string => {
   if (!date) return ""
-  return date.toLocaleDateString(undefined, { weekday: "short" })
+  return date.toLocaleDateString(locale || undefined, { weekday: "short" })
 }
 
 const isoFromDate = (date: Date): string =>
@@ -117,12 +140,18 @@ export const formatDateRange = (
 /** Pieces of a date stamp ("Sat" / "24" / "Oct") used by cards and lists. */
 export const dayStamp = (
   date: Date | null | undefined,
+  locale?: string,
 ): { weekday: string; day: string; month: string } => {
   if (!date) return { weekday: "--", day: "--", month: "" }
+  // The stamp is drawn letter by letter, so the month goes through the same
+  // locale as the weekday: a Spanish dashboard must not print "OCT".
+  const month = locale
+    ? new Intl.DateTimeFormat(locale, { month: "short" }).format(date).replace(/\.$/, "")
+    : SHORT_MONTHS[date.getMonth()] ?? ""
   return {
-    weekday: formatWeekday(date),
+    weekday: formatWeekday(date, locale),
     day: `${date.getDate()}`,
-    month: SHORT_MONTHS[date.getMonth()],
+    month,
   }
 }
 
@@ -204,6 +233,45 @@ export const formatRelativeTime = (date: Date | null | undefined): string => {
 
 export const pluralize = (count: number, singular: string, plural?: string): string =>
   `${count} ${count === 1 ? singular : (plural ?? `${singular}s`)}`
+
+/**
+ * The slice of i18next's translate function these helpers need. Keeping it
+ * narrow keeps the module pure and unit-testable without a provider.
+ */
+export type RelativeTimeTranslate = (key: string, options?: { count?: number }) => string
+
+/**
+ * Localized "3 days ago" / "in 2 days" for lists, history and comment threads.
+ *
+ * `formatRelativeTime` stays English-only for the pure formatter tests; this
+ * twin resolves the same buckets through the bundles, so a Spanish member
+ * reads "hace 3 días" instead of "3 days ago". Past a month the date itself is
+ * the honest label, and it is formatted in the active language too.
+ */
+export const formatRelativeTimeLocalized = (
+  date: Date | null | undefined,
+  t: RelativeTimeTranslate,
+  locale?: string,
+): string => {
+  if (!date) return ""
+  const diffMs = date.getTime() - Date.now()
+  const minutes = Math.round(diffMs / 60_000)
+  if (Math.abs(minutes) < 1) return t("common.justNow")
+  if (Math.abs(minutes) < 60) {
+    return t(minutes > 0 ? "common.inMinutes" : "common.minutesAgo", {
+      count: Math.abs(minutes),
+    })
+  }
+  const hours = Math.round(minutes / 60)
+  if (Math.abs(hours) < 24) {
+    return t(hours > 0 ? "common.inHours" : "common.hoursAgo", { count: Math.abs(hours) })
+  }
+  const days = Math.round(hours / 24)
+  if (Math.abs(days) < 30) {
+    return t(days > 0 ? "common.inDays" : "common.daysAgo", { count: Math.abs(days) })
+  }
+  return formatDate(date, locale)
+}
 
 /** First letters of a name, capped at `max` (used by avatars). */
 export const initials = (name: string, max = 2): string =>

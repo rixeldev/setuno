@@ -88,11 +88,12 @@ import { useReadingPosition } from "@/hooks/useReadingPosition"
 import { useFontSizePinch } from "@/hooks/useFontSizePinch"
 import { useFontSizeShortcuts } from "@/hooks/useFontSizeShortcuts"
 import { useReaderKeys } from "@/hooks/useReaderKeys"
+import { useReducedMotion } from "@/hooks/useReducedMotion"
 import { useAnnotations } from "@/hooks/useAnnotations"
 import { useFavorites } from "@/hooks/useFavorites"
 import { usePaletteCommands } from "@/hooks/usePaletteCommands"
 import { useCopyDeepLink } from "@/hooks/useCopyDeepLink"
-import { duplicateSong, subscribeSong, trashSong } from "@/services/songs"
+import { duplicateSong, restoreSong, subscribeSong, trashSong } from "@/services/songs"
 import { mergeSongs } from "@/services/songMerge"
 import { setShareLive } from "@/services/shares"
 import { saveReaderState, type ReaderState } from "@/services/readerState"
@@ -104,7 +105,7 @@ import { displayKey as spellKey, semitonesBetweenKeys, transposeKey } from "@/li
 import type { PaletteCommand } from "@/libs/commandPalette"
 import { voicingPrefKey } from "@/libs/chordShapes"
 import { liveSetEntries, liveTotalSec } from "@/libs/liveShow"
-import { formatRelativeTime, formatDuration } from "@/libs/format"
+import { formatRelativeTimeLocalized, formatDuration } from "@/libs/format"
 import {
   AUTOSCROLL_DEFAULT_DELAY,
   AUTOSCROLL_DEFAULT_SPEED,
@@ -150,7 +151,7 @@ const EMPTY_SHOW_NOTES: ShowNote[] = []
  */
 export default function SongScreen() {
   const styles = useThemedStyles(createStyles)
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const router = useRouter()
   const toast = useToast()
   const copyDeepLink = useCopyDeepLink()
@@ -420,6 +421,11 @@ export default function SongScreen() {
       ? clampAutoscrollDelay(savedAutoscroll.autoscrollDelay)
       : AUTOSCROLL_DEFAULT_DELAY)
 
+  // The member's own setting or the OS accessibility switch (whichever is on)
+  // suppresses every travel in the reader: the autoscroll glides line by line,
+  // and the stage bar appears where it belongs instead of sliding in.
+  const reducedMotion = useReducedMotion()
+
   const {
     reset: resetAutoscroll,
     pause: pauseAutoscroll,
@@ -430,7 +436,9 @@ export default function SongScreen() {
     speed: autoscrollSpeed,
     delay: autoscrollDelay,
     fontSize,
-    reducedMotion: preferences.reduceMotion,
+    // The OS switch counts too: a phone set to "remove animations" should not
+    // get a gliding lyric scroll either.
+    reducedMotion,
     contentHeight,
     viewportHeight,
   })
@@ -519,12 +527,16 @@ export default function SongScreen() {
   // Stage mode announces itself with a short slide: swapping modes is the most
   // abrupt step in the reader, so the bar drops in instead of appearing. The
   // value is recreated on every entry, which restarts the spring without ever
-  // mutating it by hand.
-  const stageBarY = useMemo(() => new Animated.Value(immersive ? -24 : 0), [immersive])
+  // mutating it by hand — and with motion reduced it is created where it ends,
+  // so the bar is simply already there.
+  const stageBarY = useMemo(
+    () => new Animated.Value(immersive && !reducedMotion ? -24 : 0),
+    [immersive, reducedMotion],
+  )
   useEffect(() => {
-    if (!immersive) return
+    if (!immersive || reducedMotion) return
     Animated.spring(stageBarY, { toValue: 0, useNativeDriver: true, friction: 9, tension: 90 }).start()
-  }, [immersive, stageBarY])
+  }, [immersive, stageBarY, reducedMotion])
 
   // Stage mode keeps the screen awake unless the reader turned it off (#2).
   useWakeLock(immersive && preferences.keepAwake)
@@ -727,17 +739,33 @@ export default function SongScreen() {
   }
 
   // Roadmap #31: "delete" moves the song to the trash — it can be restored
-  // from there, and only the trash's "delete forever" really removes it.
+  // from there, and only the trash's "delete forever" really removes it. The
+  // snackbar carries that same undo, because a mis-tap here used to mean a
+  // trip to the trash screen to find the song again.
   const remove = async (): Promise<void> => {
     if (!song) return
+    const orgId = organizationId ?? ""
+    const actor = {
+      id: profile?.uid ?? "",
+      name: profile?.displayName || t("common.unknownAdmin"),
+    }
     setDeleting(true)
     try {
-      await trashSong(organizationId ?? "", song.id, {
-        id: profile?.uid ?? "",
-        name: profile?.displayName || "An admin",
-      })
+      const { id: songId, title } = song
+      await trashSong(orgId, songId, actor)
       setConfirmDelete(false)
-      toast.showSuccess(t("songs.trashedToast", { title: song.title }))
+      toast.showAction(
+        t("songs.trashedToast", { title }),
+        t("songs.undo"),
+        () => {
+          void restoreSong(orgId, songId, actor)
+            .then(() => toast.showSuccess(t("songs.restoredToast", { title })))
+            .catch((error: unknown) =>
+              toast.showError(toFriendlyError(error, t("songs.couldNotRestore"))),
+            )
+        },
+        "success",
+      )
       router.replace("/songs")
     } catch (error) {
       toast.showError(toFriendlyError(error, t("songs.couldNotDelete")))
@@ -1224,6 +1252,13 @@ export default function SongScreen() {
             />
           ) : null}
 
+        </Pressable>
+
+        {/* The footer is a control surface, not part of the song body: it sits
+            outside the stage-mode `Pressable`, so tapping the space between two
+            tiles (or the "played N times" caption) can no longer drop the
+            reader into fullscreen by accident. */}
+        <View style={[styles.footerWrap, step ? styles.withNavPadding : null]}>
           <View style={styles.footer}>
             <View style={styles.footerInfo}>
               {song.tags.length > 0 ? (
@@ -1250,7 +1285,7 @@ export default function SongScreen() {
               <AppText variant="caption" tone="faint">
                 {t("songs.addedUpdated", {
                   name: song.createdByName || t("songs.anAdmin"),
-                  when: formatRelativeTime(toDate(song.updatedAt)),
+                  when: formatRelativeTimeLocalized(toDate(song.updatedAt), t, i18n.language),
                 })}
               </AppText>
             </View>
@@ -1419,7 +1454,7 @@ export default function SongScreen() {
               ) : null}
             </View>
           </View>
-        </Pressable>
+        </View>
       </ScreenContainer>
 
       {/* Order matters: the arrows are painted *before* the tray, so the tray
@@ -1593,8 +1628,13 @@ const createStyles = () =>
     loading: { flex: 1, padding: Theme.spacing.l },
     scrollBody: { paddingTop: Theme.spacing.l },
     // The tray floats over the bottom of the lyrics, so the scroll needs room
-    // for it (and, in a running order, for the corner arrows above it).
-    content: { gap: Theme.spacing.l, paddingBottom: Theme.spacing.huge + READER_DOCK_HEIGHT },
+    // for it (and, in a running order, for the corner arrows above it). The
+    // reserved space lives on the footer, the last thing in the scroll.
+    content: { gap: Theme.spacing.l },
+    footerWrap: {
+      marginTop: Theme.spacing.l,
+      paddingBottom: Theme.spacing.huge + READER_DOCK_HEIGHT,
+    },
     notes: {
       flexDirection: "row",
       alignItems: "center",

@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/Toast"
 import {
   ChevronDownIcon,
   FlameIcon,
+  GroupIcon,
   MusicIcon,
   ShareIcon,
   StopwatchIcon,
@@ -176,6 +177,7 @@ export default function BandStatsScreen() {
             {topSongs.length === 0 ? (
               <EmptyState
                 compact
+                icon={<TrophyIcon size={22} color={Theme.colors.textFaint} />}
                 title={t("stats.noPlays")}
                 message={t("stats.noPlaysHint")}
               />
@@ -260,6 +262,7 @@ export default function BandStatsScreen() {
             {stats.memberActivity.length === 0 ? (
               <EmptyState
                 compact
+                icon={<GroupIcon size={22} color={Theme.colors.textFaint} />}
                 title={t("organizations.noMembers")}
                 message={t("members.noMembersViewer")}
               />

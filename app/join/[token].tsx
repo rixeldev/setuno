@@ -39,7 +39,7 @@ export default function JoinScreen() {
   const tokenValue = Array.isArray(params.token) ? params.token[0] : params.token
   const token = typeof tokenValue === "string" ? tokenValue : ""
 
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const router = useRouter()
   const toast = useToast()
   const styles = useThemedStyles(createStyles)
@@ -152,7 +152,7 @@ export default function JoinScreen() {
   const expiresCaption =
     preview.expiresAt === null
       ? t("inviteLink.expiresNever")
-      : t("inviteLink.expiresOn", { date: formatDate(new Date(preview.expiresAt)) })
+      : t("inviteLink.expiresOn", { date: formatDate(new Date(preview.expiresAt), i18n.language) })
 
   return (
     <AuthLayout
