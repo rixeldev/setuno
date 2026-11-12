@@ -1160,7 +1160,7 @@ export default function SongScreen() {
           // negotiation, and an ungrouped tree keeps them individually
           // focusable — this is a convenience gesture, not a control.
           accessible={false}
-          style={[styles.content, step ? styles.withNavPadding : null]}
+          style={styles.content}
         >
           {tourActive ? (
             <TourHint
