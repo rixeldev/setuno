@@ -6,10 +6,11 @@ import type { MaybeTimestamp, TimestampLike } from "./timestamp"
 export type AppearanceMode = "dark" | "light" | "system"
 export type AccentId = "ember" | "ocean" | "emerald" | "sunset" | "magenta" | "indigo"
 /**
- * How chords are spelled: american letters (C D E), solfège (Do Re Mi) or
- * Nashville numbers (1 4 5). Notes are always *stored* in letters.
+ * How chords are spelled: american letters (C D E), solfège (Do Re Mi),
+ * Nashville numbers (1 4 5) or roman numerals (I IV V). Notes are always
+ * *stored* in letters.
  */
-export type ChordNotation = "letters" | "solfege" | "nashville"
+export type ChordNotation = "letters" | "solfege" | "nashville" | "roman"
 /** Instrument the reader shows shapes for when a chord is tapped. */
 /**
  * The reader's "how to play" sheet. Guitar and ukulele come from the bundled
@@ -28,7 +29,7 @@ export interface UserPreferences {
   songFontSize: number
   /** Reader layout opened by default: both, lyrics only or chords only. */
   chordView: ChordView
-  /** Spell chords with letters (C, F#m), solfège (Do, Fa#m) or numbers (1, 4, 5). */
+  /** Spell chords with letters (C, F#m), solfège (Do, Fa#m), numbers (1, 4, 5) or roman numerals (I, IV, V). */
   chordNotation: ChordNotation
   /** Preferred instrument for the “how to play” chord sheet. */
   chordInstrument: ChordInstrument

@@ -18,6 +18,9 @@ import {
   parseChord,
   parseKey,
   previousWordStart,
+  romanChord,
+  romanDegree,
+  romanQuality,
   semitonesBetweenKeys,
   snapToWordStart,
   transposeChord,
@@ -282,6 +285,92 @@ describe("nashville notation", () => {
     expect(displayNote("B", "nashville", "G")).toBe("3")
     expect(displayNote("F", "nashville", "G")).toBe("b7")
     expect(displayNote("B", "nashville")).toBe("B")
+  })
+})
+
+describe("roman numeral notation", () => {
+  it("numbers the scale with roman numerals", () => {
+    expect(romanDegree(0)).toBe("I")
+    expect(romanDegree(2)).toBe("II")
+    expect(romanDegree(4)).toBe("III")
+    expect(romanDegree(5)).toBe("IV")
+    expect(romanDegree(7)).toBe("V")
+    expect(romanDegree(9)).toBe("VI")
+    expect(romanDegree(11)).toBe("VII")
+  })
+
+  it("gives chromatic degrees a flat or sharp", () => {
+    expect(romanDegree(1)).toBe("bII")
+    expect(romanDegree(3)).toBe("bIII")
+    expect(romanDegree(6)).toBe("#IV")
+    expect(romanDegree(8)).toBe("bVI")
+    expect(romanDegree(10)).toBe("bVII")
+    expect(romanDegree(12)).toBe("I")
+    expect(romanDegree(-1)).toBe("VII")
+  })
+
+  it("reads the quality as case and suffix", () => {
+    expect(romanQuality("")).toEqual({ lowercase: false, suffix: "" })
+    expect(romanQuality("7")).toEqual({ lowercase: false, suffix: "7" })
+    expect(romanQuality("maj7")).toEqual({ lowercase: false, suffix: "maj7" })
+    expect(romanQuality("sus4")).toEqual({ lowercase: false, suffix: "sus4" })
+    expect(romanQuality("add9")).toEqual({ lowercase: false, suffix: "add9" })
+    expect(romanQuality("aug")).toEqual({ lowercase: false, suffix: "aug" })
+    expect(romanQuality("m")).toEqual({ lowercase: true, suffix: "" })
+    expect(romanQuality("min7")).toEqual({ lowercase: true, suffix: "7" })
+    expect(romanQuality("m7")).toEqual({ lowercase: true, suffix: "7" })
+    expect(romanQuality("m6")).toEqual({ lowercase: true, suffix: "6" })
+    expect(romanQuality("madd9")).toEqual({ lowercase: true, suffix: "add9" })
+    expect(romanQuality("dim")).toEqual({ lowercase: true, suffix: "°" })
+    expect(romanQuality("dim7")).toEqual({ lowercase: true, suffix: "°7" })
+    expect(romanQuality("m7b5")).toEqual({ lowercase: true, suffix: "ø7" })
+    expect(romanQuality("min7b5")).toEqual({ lowercase: true, suffix: "ø7" })
+    expect(romanQuality("ø7")).toEqual({ lowercase: true, suffix: "ø7" })
+    expect(romanQuality("°")).toEqual({ lowercase: true, suffix: "°" })
+  })
+
+  it("reads a chord as a numeral relative to the key", () => {
+    expect(romanChord("C", "C")).toBe("I")
+    expect(romanChord("Dm", "C")).toBe("ii")
+    expect(romanChord("Em", "C")).toBe("iii")
+    expect(romanChord("F", "C")).toBe("IV")
+    expect(romanChord("G7", "C")).toBe("V7")
+    expect(romanChord("Am", "C")).toBe("vi")
+    expect(romanChord("Bdim", "C")).toBe("vii°")
+    expect(romanChord("Cmaj7", "C")).toBe("Imaj7")
+    expect(romanChord("F#m7b5", "G")).toBe("viiø7")
+    expect(romanChord("Eb", "C")).toBe("bIII")
+    expect(romanChord("Ebm", "C")).toBe("biii")
+    expect(romanChord("Gsus4", "C")).toBe("Vsus4")
+    expect(romanChord("C/E", "C")).toBe("I/III")
+    expect(romanChord("G/B", "G")).toBe("I/III")
+  })
+
+  it("numbers a minor key from its own tonic", () => {
+    expect(romanChord("Am", "Am")).toBe("i")
+    expect(romanChord("C", "Am")).toBe("bIII")
+    expect(romanChord("Dm", "Am")).toBe("iv")
+    expect(romanChord("E7", "Am")).toBe("V7")
+    expect(romanChord("G", "Am")).toBe("bVII")
+  })
+
+  it("falls back to letters without a key", () => {
+    expect(romanChord("C", "")).toBeNull()
+    expect(romanChord("C", "nonsense")).toBeNull()
+    expect(displayChord("C", "roman")).toBe("C")
+    expect(displayChord("C", "roman", "C")).toBe("I")
+    expect(displayChord("N.C.", "roman", "C")).toBe("N.C.")
+  })
+
+  it("never renames a key", () => {
+    expect(displayKey("C", "roman")).toBe("C")
+    expect(displayKey("Em", "roman")).toBe("Em")
+  })
+
+  it("spells single notes as numerals when the key is known", () => {
+    expect(displayNote("G", "roman", "C")).toBe("V")
+    expect(displayNote("Bb", "roman", "C")).toBe("bVII")
+    expect(displayNote("G", "roman")).toBe("G")
   })
 })
 

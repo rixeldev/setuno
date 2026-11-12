@@ -217,6 +217,56 @@ export const nashvilleDegree = (interval: number): string => {
 }
 
 /**
+ * Roman numerals for each semitone above the key's tonic, on the same interval
+ * table as Nashville (0 reads `I`, 3 reads `bIII`): the two notations can never
+ * disagree about which degree a chord is. Case carries the chord's quality, the
+ * way analysis writes it — uppercase for a major/dominant chord, lowercase for
+ * a minor one — and `romanQuality` decides it.
+ */
+export const ROMAN_DEGREES = [
+  "I", "bII", "II", "bIII", "III", "IV", "#IV", "V", "bVI", "VI", "bVII", "VII",
+] as const
+
+/** Degree of a semitone interval above the tonic, spelled as a roman numeral. */
+export const romanDegree = (interval: number): string => {
+  const normalised = ((Math.round(interval) % 12) + 12) % 12
+  return ROMAN_DEGREES[normalised] as string
+}
+
+export interface RomanQuality {
+  /** True for a minor-flavoured chord, which the numeral spells lowercase. */
+  lowercase: boolean
+  /** What follows the numeral (`7`, `maj7`, `sus4`, `°7`, `ø7`, …). */
+  suffix: string
+}
+
+/**
+ * Splits a stored chord quality into the case its numeral takes and the suffix
+ * that follows it. Minor chords lose the `m` (the lowercase numeral already
+ * says it), a diminished chord collapses to `°` and a half-diminished `m7b5`
+ * to `ø7` — the two spellings analysis has always used — while every other
+ * extension keeps exactly what the song stores (`7`, `maj7`, `sus4`, `add9`,
+ * `6`, `9`, `5`, `aug`).
+ */
+export const romanQuality = (quality: string): RomanQuality => {
+  // Already spelled with the analysis symbols: keep them, just lowercase it.
+  if (quality.startsWith("ø") || quality.startsWith("°")) {
+    return { lowercase: true, suffix: quality }
+  }
+  if (/^(?:m|min)7b5$/.test(quality)) return { lowercase: true, suffix: "ø7" }
+  const dim = /^dim(\d*)$/.exec(quality)
+  if (dim) return { lowercase: true, suffix: `°${dim[1] ?? ""}` }
+  // `min` is tried before `m`, and `maj` must never read as a minor `m`.
+  const minor = /^(?:min|m(?!aj))(.*)$/.exec(quality)
+  if (minor) return { lowercase: true, suffix: minor[1] ?? "" }
+  return { lowercase: false, suffix: quality }
+}
+
+/** Lowercases the numeral of a degree while keeping its accidental on front. */
+const lowercaseDegree = (degree: string): string =>
+  degree.replace(/[IV]+/, (numeral) => numeral.toLowerCase())
+
+/**
  * Tonic semitone of a key label. Minor keys keep their own tonic (Am -> A), so
  * numbering a minor song reads 1 2 b3 4 5 b6 b7 instead of the relative major
  * scale.
@@ -242,15 +292,39 @@ export const nashvilleChord = (chord: string, key: string): string | null => {
   return `${degree}${parsed.quality}${bass}`
 }
 
+/**
+ * Spells a chord as a roman numeral relative to `key` ("C" in C -> "I",
+ * "Am7" in C -> "vi7", "Bdim" in C -> "vii°", "C/E" in C -> "I/III"). The
+ * quality picks the case and the suffix; the slash bass is always uppercase,
+ * since a bare note has no quality of its own. Returns null when the key is
+ * missing, so callers keep the letters rather than inventing degrees.
+ *
+ * A minor key numbers from its own tonic (`Am` in Am is `i`, `C` is `bIII`),
+ * the modern reading bands use — the same tonic Nashville takes.
+ */
+export const romanChord = (chord: string, key: string): string | null => {
+  const tonic = keyTonic(key)
+  if (tonic === null) return null
+  const parsed = parseChord(chord)
+  if (!parsed.valid) return null
+  const { lowercase, suffix } = romanQuality(parsed.quality)
+  const degree = lowercase
+    ? lowercaseDegree(romanDegree(parsed.rootIndex - tonic))
+    : romanDegree(parsed.rootIndex - tonic)
+  const bass = parsed.bassIndex !== null ? `/${romanDegree(parsed.bassIndex - tonic)}` : ""
+  return `${degree}${suffix}${bass}`
+}
+
 /** Spells a single note ("C#", "Bb") in the chosen notation. */
 export const displayNote = (note: string, notation: ChordNotation, key = ""): string => {
   if (notation === "letters") return note
-  if (notation === "nashville") {
+  if (notation === "nashville" || notation === "roman") {
     const tonic = keyTonic(key)
     if (tonic === null) return note
     const parsed = parseChord(note.trim())
     if (!parsed.valid || parsed.quality.length > 0) return note
-    return nashvilleDegree(parsed.rootIndex - tonic)
+    const interval = parsed.rootIndex - tonic
+    return notation === "nashville" ? nashvilleDegree(interval) : romanDegree(interval)
   }
   const name = SOLFEGE_NAMES[note.charAt(0).toUpperCase()]
   return name ? `${name}${note.slice(1)}` : note
@@ -258,8 +332,9 @@ export const displayNote = (note: string, notation: ChordNotation, key = ""): st
 
 /**
  * Spells a chord in the chosen notation. Stored chords always use letters, so
- * this is a display-only conversion ("F#m7/C#" -> "Fa#m7/Do#"). Nashville
- * numbers need the song's key, passed as the third argument.
+ * this is a display-only conversion ("F#m7/C#" -> "Fa#m7/Do#", or "vii" as a
+ * roman numeral). Nashville numbers and roman numerals need the song's key,
+ * passed as the third argument; without one they keep the letters.
  */
 export const displayChord = (
   chord: string,
@@ -268,6 +343,7 @@ export const displayChord = (
 ): string => {
   if (notation === "letters") return chord
   if (notation === "nashville") return nashvilleChord(chord, key) ?? chord
+  if (notation === "roman") return romanChord(chord, key) ?? chord
   const parsed = parseChord(chord)
   if (!parsed.valid) return chord
   const bass = parsed.bass ? `/${displayNote(parsed.bass, notation)}` : ""
@@ -276,10 +352,11 @@ export const displayChord = (
 
 /**
  * Spells a key label in the chosen notation ("Em" -> "Mim", "Bb" -> "Sib").
- * Nashville numbering never renames a key — the player needs the real one.
+ * Nashville numbering and roman numerals never rename a key — the player needs
+ * the real one to read the degrees.
  */
 export const displayKey = (key: string, notation: ChordNotation = "letters"): string => {
-  if (notation === "letters" || notation === "nashville") return key
+  if (notation === "letters" || notation === "nashville" || notation === "roman") return key
   const match = /^([A-G][#♯b♭]{0,2})(m|min)?$/.exec(key.trim())
   if (!match) return key
   return `${displayNote(match[1] ?? "", notation)}${match[2] ? "m" : ""}`

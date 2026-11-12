@@ -26,7 +26,7 @@ interface SongControlsProps {
   /** Reader layout: chords above the lyrics ("both"), lyrics only or a chart. */
   view: ChordView
   onViewChange: (view: ChordView) => void
-  /** Chord spelling: letters (C), solfège (Do) or Nashville (1 4 5). */
+  /** Chord spelling: letters (C), solfège (Do), Nashville (1 4 5) or roman (I IV V). */
   notation: ChordNotation
   onNotationChange: (notation: ChordNotation) => void
   /** True while there is something to undo: a transposition, capo or resume point. */
@@ -40,8 +40,15 @@ const MAX_FONT = READER_FONT_MAX
 /** Touch-friendly size that still lets four groups share one phone row. */
 const STEP_SIZE = 28
 
-/** The three notations a tap on the chip cycles through, in order. */
-const NOTATION_ORDER: ChordNotation[] = ["letters", "solfege", "nashville"]
+/** The notations a tap on the chip cycles through, in order. */
+const NOTATION_ORDER: ChordNotation[] = ["letters", "solfege", "nashville", "roman"]
+/** One label per notation: `Record` over the union, so a new one cannot ship unlabelled. */
+const NOTATION_LABEL_KEYS: Record<ChordNotation, string> = {
+  letters: "songs.notationLetters",
+  solfege: "songs.notationSolfege",
+  nashville: "songs.notationNashville",
+  roman: "songs.notationRoman",
+}
 /** The three reader layouts a tap on the view chip cycles through, in order. */
 const VIEW_ORDER: ChordView[] = ["both", "lyrics", "chords"]
 
@@ -101,13 +108,7 @@ export function SongControls({
           </View>
 
           <Chip
-            label={
-              notation === "letters"
-                ? t("songs.notationLetters")
-                : notation === "solfege"
-                  ? t("songs.notationSolfege")
-                  : t("songs.notationNashville")
-            }
+            label={t(NOTATION_LABEL_KEYS[notation])}
             tone="primary"
             selected
             onPress={() => onNotationChange(nextOf(NOTATION_ORDER, notation))}
