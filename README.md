@@ -948,7 +948,10 @@ testIDs (never by label: the dashboard prints "Songs" too), forms through the `I
 labels and buttons through their labels; the emulator must run **English**.
 
 **CI** (`.github/workflows/e2e.yml`): nightly 03:17 UTC plus `workflow_dispatch` (Actions → Run
-workflow — the quickest first validation). Enables KVM, writes the staging config from secrets
+workflow — the quickest first validation). A preflight job checks the staging secrets first: while
+they are missing (the one-time setup above), the nightly ends **green with the journey skipped** and
+an annotation, instead of failing inside the config generator, and it starts running by itself once
+they exist. Then it enables KVM, writes the staging config from secrets
 (`FIREBASE_STAGING_*` ×6, `GOOGLE_SERVICES_JSON_STAGING`, `E2E_EMAIL`, `E2E_PASSWORD` — all in the
 Actions environment), seeds the account, builds a standalone **release** APK with a throwaway CI
 keystore (`expo prebuild` + injected signing, no Metro), installs it on an API 34 emulator and

@@ -14,8 +14,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The journey can only run once staging exists. Until the secrets below are
+  # defined, the nightly ends **green with the journey skipped** and a notice,
+  # instead of failing inside the config generator every night — the same red
+  # run every morning says nothing new. The gate opens by itself the moment the
+  # secrets are there (README §E2E, handoff §7 item 16).
+  preflight:
+    name: Staging configuration
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        env:
+          PROJECT_ID: ${{ secrets.FIREBASE_STAGING_PROJECT_ID }}
+          API_KEY: ${{ secrets.FIREBASE_STAGING_API_KEY }}
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: |
+          if [ -n "$PROJECT_ID" ] && [ -n "$API_KEY" ] && [ -n "$E2E_EMAIL" ] && [ -n "$E2E_PASSWORD" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Staging is configured — the journey will run."
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=E2E skipped::Staging secrets are not configured (README §E2E, handoff §7 item 16). The journey starts by itself once they exist."
+          fi
+
   maestro:
     name: Maestro journey (staging)
+    needs: preflight
+    if: needs.preflight.outputs.configured == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
