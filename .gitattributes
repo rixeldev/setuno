@@ -1,0 +1,25 @@
+# Keep one line ending in the repo and in every checkout (Windows included).
+# Without this, a checkout configured with core.autocrlf turns the whole tree
+# into a 27k-line "diff" that carries no real change.
+* text=auto eol=lf
+
+# Binary assets: never normalize, never diff as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.pdf binary
+*.zip binary
+*.aab binary
+*.apk binary
+*.jar binary
+*.keystore binary
