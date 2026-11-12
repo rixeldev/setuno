@@ -177,10 +177,17 @@ export interface RelativeDayLabels {
   yesterday: string
 }
 
-/** "Today · 9:00 PM" style relative labels used in agendas. */
+/**
+ * "Today · 9:00 PM" style relative labels used in agendas.
+ *
+ * `locale` is the app's language, not the device's: a member reading the app in
+ * Spanish on an English phone must get "miércoles", not "Wednesday" — and the
+ * far branch is the localized long date instead of the English month table.
+ */
 export const formatRelativeDay = (
   date: Date | null | undefined,
   labels?: RelativeDayLabels,
+  locale?: string,
 ): string => {
   if (!date) return "—"
   const today = startOfDay(new Date())
@@ -189,8 +196,17 @@ export const formatRelativeDay = (
   if (diffDays === 0) return labels?.today ?? "Today"
   if (diffDays === 1) return labels?.tomorrow ?? "Tomorrow"
   if (diffDays === -1) return labels?.yesterday ?? "Yesterday"
-  if (diffDays > 1 && diffDays < 7) return target.toLocaleDateString(undefined, { weekday: "long" })
-  return formatDate(date)
+  if (diffDays > 1 && diffDays < 7) {
+    if (locale) {
+      try {
+        return new Intl.DateTimeFormat(locale, { weekday: "long" }).format(target)
+      } catch {
+        // Fall through to the device locale / formatDate fallback.
+      }
+    }
+    return target.toLocaleDateString(undefined, { weekday: "long" })
+  }
+  return formatDate(date, locale)
 }
 
 /** `21:00` -> `9:00 PM` (invalid input is returned unchanged). */

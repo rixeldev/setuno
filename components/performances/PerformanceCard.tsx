@@ -33,7 +33,7 @@ export function PerformanceCard({ performance, onPress }: CardProps) {
   }
   const dateLine = performance.endDate
     ? formatDateRange(performance.date, performance.endDate, i18n.language)
-    : formatRelativeDay(parseIsoDate(performance.date), relativeLabels)
+    : formatRelativeDay(parseIsoDate(performance.date), relativeLabels, i18n.language)
 
   return (
     <Card
@@ -109,7 +109,7 @@ export function PerformanceListRow({ performance, onPress }: CardProps) {
       onPress={onPress}
       padded={false}
       style={styles.compact}
-      accessibilityLabel={`${performance.type === "rehearsal" ? `${t("performances.typeRehearsal")}, ` : ""}${performance.name}, ${formatRelativeDay(parseIsoDate(performance.date), relativeLabels)}`}
+      accessibilityLabel={`${performance.type === "rehearsal" ? `${t("performances.typeRehearsal")}, ` : ""}${performance.name}, ${formatRelativeDay(parseIsoDate(performance.date), relativeLabels, i18n.language)}`}
     >
       <View style={styles.compactRow}>
         <View style={styles.flex}>

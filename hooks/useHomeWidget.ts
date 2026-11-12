@@ -21,7 +21,7 @@ import { publishWidget } from "@/services/homeWidget"
  * would cost more than it is worth.
  */
 export const useHomeWidget = (): void => {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { organization } = useOrganization()
   const { performances } = useOrgData()
 
@@ -50,13 +50,17 @@ export const useHomeWidget = (): void => {
       when:
         event === null
           ? ""
-          : formatRelativeDay(parseIsoDate(event.date), {
-              today: t("common.today"),
-              tomorrow: t("common.tomorrow"),
-              yesterday: t("common.yesterday"),
-            }),
+          : formatRelativeDay(
+              parseIsoDate(event.date),
+              {
+                today: t("common.today"),
+                tomorrow: t("common.tomorrow"),
+                yesterday: t("common.yesterday"),
+              },
+              i18n.language,
+            ),
       nothingScheduled: t("widget.nothingScheduled"),
     })
     publishWidget(content)
-  }, [bandName, events, t])
+  }, [bandName, events, t, i18n.language])
 }

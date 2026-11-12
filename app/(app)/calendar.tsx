@@ -173,7 +173,7 @@ export default function CalendarScreen() {
     groups.map((group) => (
       <View key={group.iso} style={styles.dayGroup}>
         <AppText variant="label" tone="faint">
-          {formatRelativeDay(parseIsoDate(group.iso), dayLabels)}
+          {formatRelativeDay(parseIsoDate(group.iso), dayLabels, i18n.language)}
         </AppText>
         {group.performances.map((performance) => (
           <PerformanceListRow
@@ -294,7 +294,7 @@ export default function CalendarScreen() {
 
       {view === "month" ? (
         <Section
-          title={selected ? formatRelativeDay(parseIsoDate(selected), dayLabels) : t("calendar.pickDay")}
+          title={selected ? formatRelativeDay(parseIsoDate(selected), dayLabels, i18n.language) : t("calendar.pickDay")}
           subtitle={t("calendar.agendaSubtitle")}
         >
           {dayShows.length === 0 ? (

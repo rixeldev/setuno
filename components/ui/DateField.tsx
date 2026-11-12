@@ -127,7 +127,7 @@ export function DateField({
     setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + delta, 1, 12))
   }
 
-  const displayLabel = value ? formatRelativeDay(selected, dayLabels) : placeholderText
+  const displayLabel = value ? formatRelativeDay(selected, dayLabels, i18n.language) : placeholderText
 
   return (
     <View style={{ gap: 6 }}>

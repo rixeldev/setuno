@@ -95,6 +95,25 @@ describe("dates", () => {
     expect(formatRelativeDay(null, labels)).toBe("—")
   })
 
+  it("spells the near weekday in the app language, not the device one", () => {
+    const today = new Date()
+    const inThreeDays = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 3)
+    const spanish = formatRelativeDay(inThreeDays, undefined, "es")
+    const english = formatRelativeDay(inThreeDays, undefined, "en")
+    expect(spanish).toBe(new Intl.DateTimeFormat("es", { weekday: "long" }).format(inThreeDays))
+    expect(english).toBe(new Intl.DateTimeFormat("en", { weekday: "long" }).format(inThreeDays))
+    expect(spanish).not.toBe(english)
+  })
+
+  it("localizes a far day too, instead of the bundled English table", () => {
+    const today = new Date()
+    const far = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 40)
+    const spanish = formatRelativeDay(far, undefined, "es")
+    const month = new Intl.DateTimeFormat("es", { month: "long" }).format(far)
+    expect(spanish).toContain(month)
+    expect(spanish).not.toBe(formatDate(far))
+  })
+
   it("formats a long date in the requested locale", () => {
     const date = new Date(2026, 9, 4)
     expect(formatDateLong(date, "en").toLowerCase()).toContain("october")

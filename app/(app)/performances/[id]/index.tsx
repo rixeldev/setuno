@@ -231,7 +231,7 @@ export default function PerformanceDetail() {
   const stampDay = `${safeDate.getDate()}`
   const stampMonth = new Intl.DateTimeFormat(i18n.language, { month: "short" }).format(safeDate)
   const dateLabel = formatDateRange(performance.date, performance.endDate, i18n.language)
-  const relativeDay = date ? formatRelativeDay(date, dayLabels) : ""
+  const relativeDay = date ? formatRelativeDay(date, dayLabels, i18n.language) : ""
   const timeRange = [performance.startTime, performance.endTime]
     .filter((value) => value.length > 0)
     .map((value) => formatTime(value))

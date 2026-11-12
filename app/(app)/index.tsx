@@ -380,6 +380,7 @@ export default function Dashboard() {
           accessibilityLabel={`${t("dashboard.nextShow")}: ${nextShow.name}, ${formatRelativeDay(
             parseIsoDate(nextShow.date),
             dayLabels,
+            i18n.language,
           )}`}
           style={({ pressed }) => [pressed && styles.pressed]}
         >
@@ -430,7 +431,7 @@ export default function Dashboard() {
                   {[
                     nextShow.endDate
                       ? formatDateRange(nextShow.date, nextShow.endDate, i18n.language)
-                      : formatRelativeDay(parseIsoDate(nextShow.date), dayLabels),
+                      : formatRelativeDay(parseIsoDate(nextShow.date), dayLabels, i18n.language),
                     nextShow.startTime ? formatTime(nextShow.startTime) : null,
                   ]
                     .filter(Boolean)
@@ -589,6 +590,7 @@ export default function Dashboard() {
                     accessibilityLabel={`${performance.name}, ${formatRelativeDay(
                       parseIsoDate(performance.date),
                       dayLabels,
+                      i18n.language,
                     )}`}
                     style={styles.showCard}
                   >
@@ -611,6 +613,7 @@ export default function Dashboard() {
                           : formatRelativeDay(
                               parseIsoDate(performance.date),
                               dayLabels,
+                              i18n.language,
                             )}
                         {performance.startTime
                           ? ` · ${formatTime(performance.startTime)}`

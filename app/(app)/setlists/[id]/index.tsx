@@ -497,7 +497,7 @@ export default function SetlistDetail() {
     duration: formatDurationLong(setlist.estimatedDurationSec),
   })
   const dateLabel = setlist.date
-    ? formatRelativeDay(parseIsoDate(setlist.date), dayLabels)
+    ? formatRelativeDay(parseIsoDate(setlist.date), dayLabels, i18n.language)
     : ""
   // A template has no date, so this reads "Template · 12 songs · 45 min".
   const subtitle = [setlist.template ? t("setlists.templateBadge") : "", dateLabel, runsLabel]
