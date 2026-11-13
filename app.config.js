@@ -146,6 +146,9 @@ export default {
       themeColor: "#0B0B14",
     },
     plugins: [
+      // Firma de release con `keystore.properties` (raiz, gitignored): el
+      // template firma con la clave de debug y Play rechaza ese AAB.
+      "./modules/android-signing/app.plugin.js",
       // Keeps the Gradle daemon on JDK 17 (AGP's native tasks abort on 24+).
       // Local plugin: see `plugins/withGradleJdk17.js`.
       "./plugins/withGradleJdk17",
