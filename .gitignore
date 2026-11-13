@@ -83,3 +83,8 @@ docs
 
 scripts/fix-adv.mjs
 scripts/fix-i18n.mjs
+
+# Claves de firma: nunca al repo (ver AGENTS.md)
+*.jks
+*.keystore
+keystore.properties
