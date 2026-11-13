@@ -50,6 +50,11 @@ const appLinkData = appLinks.hosts.flatMap((host) =>
 const androidProguardRules = [
   "-keepattributes SourceFile,LineNumberTable",
   "-renamesourcefileattribute SourceFile",
+  // expo-gl: el codigo nativo busca este metodo **por nombre**
+  // (`GetMethodID(GLContextClass, "flush", "()V")`). Con R8 se renombraba y el
+  // `CallVoidMethod` con un jmethodID nulo mataba el proceso al abrir cualquier
+  // pantalla con GLView (dados de Yatzy, mesa del domino 3D).
+  "-keepclassmembers class expo.modules.gl.GLContext { void flush(); }",
 ].join("\n")
 
 export default {
