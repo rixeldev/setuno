@@ -41,6 +41,17 @@ const appLinkData = appLinks.hosts.flatMap((host) =>
   appLinks.paths.map((path) => ({ scheme: "https", host, pathPrefix: path })),
 )
 
+// R8 rules appended to `android/app/proguard-rules.pro` on every prebuild
+// (the file is generated, so a hand edit would not survive `--clean`).
+// `SourceFile`/`LineNumberTable` are the attributes R8 strips by default and
+// the only ones a release stack trace needs to point at a line of source;
+// `renamesourcefileattribute` keeps the original file name out of the APK
+// (`SourceFile` instead of `FirestoreModule.kt`).
+const androidProguardRules = [
+  "-keepattributes SourceFile,LineNumberTable",
+  "-renamesourcefileattribute SourceFile",
+].join("\n")
+
 export default {
   expo: {
     owner: "rikirilis",
@@ -138,6 +149,10 @@ export default {
       // Keeps the Gradle daemon on JDK 17 (AGP's native tasks abort on 24+).
       // Local plugin: see `plugins/withGradleJdk17.js`.
       "./plugins/withGradleJdk17",
+      // Gives R8 the heap a minified release build needs (2 GB is the
+      // template default and the build dies there). See
+      // `plugins/withAndroidMemory.js`.
+      "./plugins/withAndroidMemory",
       "@react-native-firebase/app",
       "@react-native-firebase/crashlytics",
       "@react-native-firebase/app-check",
@@ -202,6 +217,23 @@ export default {
             targetSdkVersion: 36,
             compileSdkVersion: 36,
             ndkVersion: "29.0.14206865",
+            // R8 in release builds. The template ships with `minifyEnabled`
+            // off, which is why Play Console reported **Obfuscation 1 %** on
+            // 1.1.0 ("DEX code optimization is below our threshold"): no
+            // shrinking, no renaming, and the DEX keeps every class name.
+            // Obfuscation is what that warning measures, so it is what gets
+            // turned on; `shrinkResources` is deliberately left off (it needs
+            // its own `tools:keep` pass for assets resolved by name).
+            enableMinifyInReleaseBuilds: true,
+            extraProguardRules: androidProguardRules,
+            // ABIs a compilar (escribe `reactNativeArchitectures` en
+            // gradle.properties durante el prebuild, así que sobrevive a
+            // `expo prebuild --clean`; la máquina de desarrollo es un
+            // i7-7820HQ con disipación degradada y 4 ABIs la llevaban a 99 °C).
+            // arm64-v8a: móviles modernos. armeabi-v7a: compatibilidad 32-bit
+            // en Play. x86/x86_64 solo servían para emulador/Chromebook y no
+            // se usan: se pueden omitir.
+            buildArchs: ["arm64-v8a", "armeabi-v7a"],
           },
         },
       ],
