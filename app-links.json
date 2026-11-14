@@ -3,5 +3,7 @@
   "bundleId": "com.rixeldev.setuno",
   "hosts": ["setuno.vercel.app", "setuno.app", "setuno.org"],
   "paths": ["/song", "/setlist", "/share", "/join"],
-  "sha256Fingerprints": []
+  "sha256Fingerprints": [
+    "48:A7:42:21:E9:02:EE:5C:2A:70:73:3C:EB:27:D6:56:4A:9A:45:1F:24:86:F5:60:B2:80:69:B4:06:AC:35:79"
+  ]
 }

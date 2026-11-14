@@ -8,8 +8,9 @@
 // claimed by the app and a host served by the web deploy can never drift.
 //
 // The **SHA-256 fingerprints** are the signing keys' certificates:
-//   - `app-links.json` lists the *release* one (the EAS keystore), which the
-//     owner adds once it is known;
+//   - `app-links.json` lists the *release* one — the project keystore
+//     `modules/android-signing` signs with (readable from any signed build:
+//     `keytool -printcert -jarfile app-release.aab`), added once it is known;
 //   - the *local debug* keystore is picked up automatically when it exists, so
 //     a development build on this machine verifies without any setup.
 //
