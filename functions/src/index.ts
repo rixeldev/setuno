@@ -58,9 +58,11 @@ import { sendExpoPush, type ExpoPushMessage } from "./expoPush"
 import {
   PRO_PRODUCTS,
   isKnownProduct,
+  isPro,
   mapEntitlement,
   type Entitlement,
 } from "./entitlements"
+import { isOwnerCaller, isOwnerEmail, ownerEntitlement } from "./ownerPlan"
 import {
   consumePlayPurchase,
   serviceAccountFromEnv,
@@ -1104,8 +1106,51 @@ export const getMyEntitlement = onCall(async (request) => {
 
   const snapshot = await db.doc(`organizations/${organizationId}/entitlement/pro`).get()
   const now = new Date().toISOString().slice(0, 10)
-  return mapEntitlement(snapshot.exists ? snapshot.data() : null, now)
+  const current = mapEntitlement(snapshot.exists ? snapshot.data() : null, now)
+
+  // The owner's own bands carry the plan without a purchase
+  // (`functions/src/ownerPlan.ts`). It is granted here, on the read the plan
+  // screen already makes ("restore purchases"), so the document lands where
+  // every other settlement writes it — never on the client, which cannot write
+  // it at all.
+  //
+  // A band that is already Pro is left alone: buying the plan must keep the
+  // store as its source, and an admin check mirrors `syncProPurchase` so the
+  // owner cannot gift Pro to a band he merely joined.
+  if (isPro(current) || !isOwnerCaller(request.auth.token)) return current
+  if (member.data()?.role !== "admin") return current
+  const granted = ownerEntitlement(now)
+  await db
+    .doc(`organizations/${organizationId}/entitlement/pro`)
+    .set(granted, { merge: true })
+  logger.info("getMyEntitlement granted the owner's plan", { uid, organizationId })
+  return granted
 })
+
+/**
+ * Gives the owner's bands the plan the moment one of them shows up.
+ *
+ * `getMyEntitlement` covers a band the owner already runs, but only when it is
+ * called; a band created (or joined as an admin) **after** the deploy would
+ * wait for that call. The member document is written exactly then, so this
+ * trigger settles it immediately — and it only ever fires for an admin whose
+ * email is on the allowlist (`functions/src/ownerPlan.ts`).
+ */
+export const onOwnerBandMember = onDocumentCreated(
+  "organizations/{organizationId}/members/{uid}",
+  async (event) => {
+    const data = event.data?.data()
+    if (!data || data.role !== "admin" || !isOwnerEmail(data.email)) return
+    const organizationId = event.params.organizationId
+    const db = getFirestore()
+    const now = new Date().toISOString().slice(0, 10)
+    const ref = db.doc(`organizations/${organizationId}/entitlement/pro`)
+    const snapshot = await ref.get()
+    if (isPro(mapEntitlement(snapshot.exists ? snapshot.data() : null, now))) return
+    await ref.set(ownerEntitlement(now), { merge: true })
+    logger.info("onOwnerBandMember granted the owner's plan", { organizationId })
+  },
+)
 
 /**
  * Confirms a purchase with the store and settles the plan (roadmap #61, and

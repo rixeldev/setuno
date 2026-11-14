@@ -14,7 +14,7 @@
 export type PlanId = "free" | "pro"
 
 /** Where the purchase came from. */
-export type EntitlementSource = "play" | "appstore" | "tip" | "stripe"
+export type EntitlementSource = "play" | "appstore" | "tip" | "stripe" | "owner"
 
 /**
  * The product ids the stores use. They are the contract between the app, the
@@ -110,7 +110,9 @@ export const mapEntitlement = (data: unknown, now: string): Entitlement => {
   const raw = data as Record<string, unknown>
   const plan: PlanId = raw.plan === "pro" ? "pro" : "free"
   const source: EntitlementSource =
-    raw.source === "appstore" || raw.source === "tip" ? raw.source : "play"
+    raw.source === "appstore" || raw.source === "tip" || raw.source === "owner"
+      ? raw.source
+      : "play"
   const productId = typeof raw.productId === "string" ? raw.productId : ""
   const expiresAt =
     typeof raw.expiresAt === "string" && /^\d{4}-\d{2}-\d{2}/.test(raw.expiresAt)
