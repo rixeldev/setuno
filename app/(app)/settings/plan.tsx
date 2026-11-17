@@ -122,7 +122,9 @@ export default function PlanScreen() {
         </AppText>
       </Card>
 
-      {monthly || annual ? (
+      {/* A band that already has the plan is never sold it again: the store
+          catalogue is only a reason to offer buttons to a free band. */}
+      {!plan.isPro && (monthly || annual) ? (
         <Card>
           <AppText variant="label" tone="faint" style={styles.buyTitle}>
             {t("plan.buyTitle")}
@@ -162,7 +164,9 @@ export default function PlanScreen() {
             />
           ) : null}
         </Card>
-      ) : (
+      ) : null}
+
+      {!plan.isPro && !(monthly || annual) ? (
         <Card>
           <AppText variant="body" tone="muted">
             {!isWeb && !store.connected ? t("plan.storeUnavailable") : t("plan.notOffered")}
@@ -181,7 +185,7 @@ export default function PlanScreen() {
             />
           ) : null}
         </Card>
-      )}
+      ) : null}
 
       <Button
         label={t("plan.restore")}
@@ -190,7 +194,9 @@ export default function PlanScreen() {
         loading={busy}
         onPress={() => void onRestore()}
       />
-      {plan.isPro ? (
+      {/* The store's own subscription screen only exists for a plan the store
+          sold. The owner's allowance has no subscription to manage. */}
+      {plan.isPro && plan.source !== "owner" ? (
         <Button
           label={t("plan.manage")}
           variant="ghost"

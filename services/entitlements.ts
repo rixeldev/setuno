@@ -37,6 +37,8 @@ export interface PlanState {
   limits: typeof FREE_LIMITS | null
   /** The product the plan was bought with. */
   productId: string
+  /** Where the plan came from (`owner` = the app's own allowlist, not a store). */
+  source: Entitlement["source"]
   /** When the current period ends (ISO date). `null`: it never ends. */
   expiresAt: string | null
 }
@@ -48,6 +50,7 @@ const toPlanState = (entitlement: Entitlement): PlanState => {
     isPro: pro,
     limits: pro ? null : FREE_LIMITS,
     productId: entitlement.productId,
+    source: entitlement.source,
     expiresAt: entitlement.expiresAt,
   }
 }
@@ -58,6 +61,7 @@ export const freePlanState = (): PlanState => ({
   isPro: false,
   limits: FREE_LIMITS,
   productId: "",
+  source: "play",
   expiresAt: null,
 })
 
